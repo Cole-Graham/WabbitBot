@@ -1,0 +1,13 @@
+{
+    "token": "your-bot-token-here",
+    "logLevel": "Information",
+    "roles": {
+        "whitelisted": "role-id-here",
+        "admin": "role-id-here",
+        "moderator": "role-id-here"
+    },
+    "activity": {
+        "type": "Playing",
+        "name": "Wabbit Wars"
+    }
+}

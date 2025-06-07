@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="DSharpPlus" Version="5.0.0-nightly-02516" />
+    <PackageReference Include="DSharpPlus.Commands" Version="5.0.0-nightly-02516" />
+    <PackageReference Include="DSharpPlus.Interactivity" Version="5.0.0-nightly-02516" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\WabbitBot.Common\WabbitBot.Common.csproj" />
+    <ProjectReference Include="..\WabbitBot.Core\WabbitBot.Core.csproj" />
+  </ItemGroup>
+
+</Project>

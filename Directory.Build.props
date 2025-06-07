@@ -1,0 +1,5 @@
+<Project>
+  <PropertyGroup>
+    <OutputPath>$(MSBuildThisFileDirectory)src/output/bin/$(Configuration)</OutputPath>
+  </PropertyGroup>
+</Project>

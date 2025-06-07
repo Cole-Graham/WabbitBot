@@ -398,3 +398,25 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+
+# Misc
+!*.template.json
+*.json
+*.cursor/
+*docs/
+*src/WabbitBot.Old
+*src/deprecated
+*docs.old
+*notes/
+
+# Custom output directory
+src/output/bin/
+src/output/config.json
+!src/output/config.template.json
+
+# Custom map configurations
+src/WabbitBot.Core/Config/maps.json
+!src/WabbitBot.Core/Config/maps.default.json
+
+# Generated source code
+src/WabbitBot.DiscBot/DSharpPlus/Generated/
