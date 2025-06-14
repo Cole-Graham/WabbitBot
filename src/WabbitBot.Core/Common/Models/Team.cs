@@ -1,27 +1,50 @@
 using System;
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 using WabbitBot.Common.Models;
+using WabbitBot.Common.Data.Utilities;
 
 namespace WabbitBot.Core.Common.Models
 {
     public class Team : BaseEntity
     {
-        public string Id { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
         public string TeamCaptainId { get; set; } = string.Empty;
         public GameSize TeamSize { get; set; }
         public int MaxRosterSize { get; set; }
-        public List<TeamMember> Roster { get; set; } = new();
-        public DateTime CreatedAt { get; set; }
         public DateTime LastActive { get; set; }
-        public Dictionary<GameSize, TeamStats> Stats { get; set; } = new();
+        public bool IsArchived { get; set; }
+        public DateTime? ArchivedAt { get; set; }
         public string? Tag { get; set; }
         public string? Description { get; set; }
 
+        [JsonIgnore]
+        public List<TeamMember> Roster { get; set; } = new();
+
+        [JsonIgnore]
+        public Dictionary<GameSize, TeamStats> Stats { get; set; } = new();
+
+        // JSON serialization properties
+        [JsonPropertyName("Roster")]
+        public string RosterJson
+        {
+            get => JsonUtil.Serialize(Roster);
+            set => Roster = JsonUtil.Deserialize<List<TeamMember>>(value) ?? new();
+        }
+
+        [JsonPropertyName("Stats")]
+        public string StatsJson
+        {
+            get => JsonUtil.Serialize(Stats);
+            set => Stats = JsonUtil.Deserialize<Dictionary<GameSize, TeamStats>>(value) ?? new();
+        }
+
         public Team()
         {
+            Id = Guid.NewGuid();
             CreatedAt = DateTime.UtcNow;
             LastActive = DateTime.UtcNow;
+            IsArchived = false;
             InitializeStats();
             SetMaxRosterSize();
         }
@@ -48,6 +71,103 @@ namespace WabbitBot.Core.Common.Models
                 }
             }
         }
+
+        public void UpdateLastActive()
+        {
+            LastActive = DateTime.UtcNow;
+        }
+
+        public void Archive()
+        {
+            IsArchived = true;
+            ArchivedAt = DateTime.UtcNow;
+        }
+
+        public void Unarchive()
+        {
+            IsArchived = false;
+            ArchivedAt = null;
+        }
+
+        public void AddPlayer(string playerId, TeamRole role = TeamRole.Core)
+        {
+            if (Roster.Count >= MaxRosterSize)
+            {
+                throw new InvalidOperationException($"Team roster is full (max size: {MaxRosterSize})");
+            }
+
+            if (Roster.Exists(m => m.PlayerId == playerId))
+            {
+                throw new InvalidOperationException("Player is already on the team");
+            }
+
+            Roster.Add(new TeamMember
+            {
+                PlayerId = playerId,
+                Role = role,
+                JoinedAt = DateTime.UtcNow,
+                IsActive = true
+            });
+        }
+
+        public void RemovePlayer(string playerId)
+        {
+            var member = Roster.Find(m => m.PlayerId == playerId);
+            if (member != null)
+            {
+                Roster.Remove(member);
+            }
+        }
+
+        public void UpdatePlayerRole(string playerId, TeamRole newRole)
+        {
+            var member = Roster.Find(m => m.PlayerId == playerId);
+            if (member != null)
+            {
+                member.Role = newRole;
+            }
+        }
+
+        public void DeactivatePlayer(string playerId)
+        {
+            var member = Roster.Find(m => m.PlayerId == playerId);
+            if (member != null)
+            {
+                member.IsActive = false;
+            }
+        }
+
+        public void ReactivatePlayer(string playerId)
+        {
+            var member = Roster.Find(m => m.PlayerId == playerId);
+            if (member != null)
+            {
+                member.IsActive = true;
+            }
+        }
+
+        /// <summary>
+        /// Creates a 1v1 team for a player. This is used when a player participates in 1v1 matches.
+        /// The team name will be the same as the player's name (which should match their Discord nickname).
+        /// </summary>
+        public static Team CreateOneVOneTeam(Player player)
+        {
+            var team = new Team
+            {
+                Name = player.Name,
+                TeamSize = GameSize.OneVOne,
+                TeamCaptainId = player.Id.ToString(),
+                Tag = player.Name[..Math.Min(3, player.Name.Length)].ToUpper()
+            };
+
+            team.AddPlayer(player.Id.ToString(), TeamRole.Captain);
+            return team;
+        }
+
+        public bool HasPlayer(ulong playerId)
+        {
+            return Roster.Any(m => m.PlayerId == playerId.ToString());
+        }
     }
 
     public class TeamMember
@@ -70,16 +190,20 @@ namespace WabbitBot.Core.Common.Models
         Substitute
     }
 
-    public class TeamStats
+    public class TeamStats : BaseStats
     {
-        public int Wins { get; set; }
-        public int Losses { get; set; }
-        public int Rating { get; set; } = 1000; // Initial ELO rating
-        public int HighestRating { get; set; } = 1000;
-        public int CurrentStreak { get; set; }
-        public int LongestStreak { get; set; }
-        public DateTime LastMatchAt { get; set; }
+        public Dictionary<string, double> OpponentDistribution { get; set; } = new();
 
-        public double WinRate => Wins + Losses == 0 ? 0 : (double)Wins / (Wins + Losses);
+        public override void UpdateStats(bool isWin)
+        {
+            base.UpdateStats(isWin);
+            // Team-specific stat updates can be added here
+        }
+
+        public override void UpdateRating(int newRating)
+        {
+            base.UpdateRating(newRating);
+            // Team-specific rating updates can be added here
+        }
     }
 }

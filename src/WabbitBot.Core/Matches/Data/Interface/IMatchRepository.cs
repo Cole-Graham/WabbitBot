@@ -9,7 +9,6 @@ namespace WabbitBot.Core.Matches.Data
     /// </summary>
     public interface IMatchRepository : IBaseRepository<Match>
     {
-        Task<Match?> GetMatchAsync(string matchId);
         Task<IEnumerable<Match>> GetMatchesByStatusAsync(MatchStatus status);
         Task<IEnumerable<Match>> GetMatchesByTeamAsync(string teamId);
         Task<IEnumerable<Match>> GetMatchesByParentAsync(string parentId, string parentType);

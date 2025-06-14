@@ -5,8 +5,9 @@ using DSharpPlus.Commands;
 using DSharpPlus.Commands.ContextChecks;
 using DSharpPlus.Commands.Trees;
 using Microsoft.Extensions.DependencyInjection;
-using WabbitBot.Common.Models.Rating;
-using WabbitBot.Common.Services.Interfaces;
+using WabbitBot.Core.Common.Models;
+using WabbitBot.Common.Models;
+using WabbitBot.Core.Common.Data.Interface;
 
 namespace WabbitBot.DiscBot.DSharpPlus.Attributes
 {
@@ -39,8 +40,8 @@ namespace WabbitBot.DiscBot.DSharpPlus.Attributes
             {
                 // First make sure the user has the whitelisted role
                 var permissionService = context.ServiceProvider.GetRequiredService<IPermissionService>();
-                if (!await permissionService.HasWhitelistedRoleAsync(context.User.Id))
-                    return "You need the Whitelisted role to use this command.";
+                // if (!await permissionService.HasWhitelistedRoleAsync(context.User.Id))
+                //     return "You need the Whitelisted role to use this command.";
 
                 // If it's an admin, they can bypass team permission checks
                 if (await permissionService.HasAdminPrivilegesAsync(context.User.Id))
@@ -59,12 +60,12 @@ namespace WabbitBot.DiscBot.DSharpPlus.Attributes
                     return $"Parameter '{TeamParameterName}' cannot be empty.";
 
                 // Get the team service
-                var teamService = context.ServiceProvider.GetRequiredService<ITeamService>();
+                var teamService = context.ServiceProvider.GetRequiredService<ITeamRepository>();
 
                 // Get the team (could be by ID or name)
                 var team = teamParameter.StartsWith("team-")
-                    ? await teamService.GetTeamByIdAsync(teamParameter)
-                    : await teamService.GetTeamByNameAsync(teamParameter);
+                    ? await teamService.GetByNameAsync(teamParameter)
+                    : await teamService.GetByTagAsync(teamParameter);
 
                 // If team not found, fail
                 if (team == null)

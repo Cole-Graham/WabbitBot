@@ -1,9 +1,12 @@
 using System.Text.Json;
-using WabbitBot.Common.Models;
+using WabbitBot.Core.Common.Models;
+using WabbitBot.Common.Events.EventInterfaces;
+using WabbitBot.Core.Common.Events;
+using WabbitBot.Core.Common.BotCore;
 
-namespace WabbitBot.Core.Common.Services;
+namespace WabbitBot.Core.Common.Handlers;
 
-public class MapService
+public class MapHandler
 {
     private static readonly string ConfigDirectory = "config";
     private static readonly string DefaultMapsFile = Path.Combine(ConfigDirectory, "maps.default.json");
@@ -16,10 +19,13 @@ public class MapService
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
 
-    public static MapService Instance { get; } = new();
+    private readonly ICoreEventBus _eventBus;
 
-    private MapService()
+    public static MapHandler Instance { get; } = new();
+
+    private MapHandler()
     {
+        _eventBus = CoreEventBus.Instance;
         EnsureConfigDirectory();
         LoadMaps();
     }
@@ -56,12 +62,14 @@ public class MapService
     {
         var json = JsonSerializer.Serialize(_maps, _jsonOptions);
         await File.WriteAllTextAsync(CustomMapsFile, json);
+        await _eventBus.PublishAsync(new MapsSavedEvent { Maps = _maps });
     }
 
     public async Task ExportMapsAsync(string path)
     {
         var json = JsonSerializer.Serialize(_maps, _jsonOptions);
         await File.WriteAllTextAsync(path, json);
+        await _eventBus.PublishAsync(new MapsExportedEvent { Path = path });
     }
 
     public async Task ImportMapsAsync(string json)
@@ -71,6 +79,7 @@ public class MapService
 
         _maps = maps;
         await SaveMapsAsync();
+        await _eventBus.PublishAsync(new MapsImportedEvent { Maps = maps });
     }
 
     public Map? GetRandomMap()
@@ -121,8 +130,19 @@ public class MapService
         var existingMap = GetMapByName(map.Name);
         if (existingMap != null)
         {
+            // If updating an existing map, preserve its thumbnail if not changed
+            if (map.ThumbnailFilename == null && existingMap.ThumbnailFilename != null)
+            {
+                map.ThumbnailFilename = existingMap.ThumbnailFilename;
+            }
             _maps.Remove(existingMap);
+            await _eventBus.PublishAsync(new MapUpdatedEvent { Map = map, PreviousMap = existingMap });
         }
+        else
+        {
+            await _eventBus.PublishAsync(new MapAddedEvent { Map = map });
+        }
+
         _maps.Add(map);
         await SaveMapsAsync();
     }
@@ -134,6 +154,62 @@ public class MapService
         {
             _maps.Remove(map);
             await SaveMapsAsync();
+            await _eventBus.PublishAsync(new MapRemovedEvent { Map = map });
         }
+    }
+
+    /// <summary>
+    /// Updates the thumbnail filename for a map.
+    /// Note: The actual file must be manually uploaded to the thumbnails directory.
+    /// </summary>
+    /// <param name="mapName">The name of the map to update.</param>
+    /// <param name="filename">The filename of the thumbnail (must exist in thumbnails directory).</param>
+    public async Task UpdateMapThumbnailFilenameAsync(string mapName, string filename)
+    {
+        var map = GetMapByName(mapName);
+        if (map == null)
+        {
+            throw new ArgumentException($"Map '{mapName}' not found", nameof(mapName));
+        }
+
+        // Verify the file exists
+        var fullPath = Path.Combine("config/maps/thumbnails", filename);
+        if (!File.Exists(fullPath))
+        {
+            throw new ArgumentException($"Thumbnail file '{filename}' not found in thumbnails directory", nameof(filename));
+        }
+
+        var oldFilename = map.ThumbnailFilename;
+        map.ThumbnailFilename = filename;
+        await SaveMapsAsync();
+        await _eventBus.PublishAsync(new MapThumbnailUpdatedEvent
+        {
+            Map = map,
+            OldFilename = oldFilename,
+            NewFilename = filename
+        });
+    }
+
+    /// <summary>
+    /// Removes the thumbnail filename from a map.
+    /// Note: The actual file must be manually deleted from the thumbnails directory.
+    /// </summary>
+    /// <param name="mapName">The name of the map to update.</param>
+    public async Task RemoveMapThumbnailAsync(string mapName)
+    {
+        var map = GetMapByName(mapName);
+        if (map == null)
+        {
+            throw new ArgumentException($"Map '{mapName}' not found", nameof(mapName));
+        }
+
+        var oldFilename = map.ThumbnailFilename;
+        map.ThumbnailFilename = null;
+        await SaveMapsAsync();
+        await _eventBus.PublishAsync(new MapThumbnailRemovedEvent
+        {
+            Map = map,
+            OldFilename = oldFilename
+        });
     }
 }

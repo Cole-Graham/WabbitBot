@@ -1,13 +1,8 @@
 using WabbitBot.Common.Events;
 using WabbitBot.Common.Events.EventInterfaces;
+using WabbitBot.Common.ErrorHandling;
 
 namespace WabbitBot.Core.Common.BotCore;
-
-public interface ICoreErrorHandler
-{
-    Task HandleError(Exception ex);
-    Task Initialize();
-}
 
 public class CoreErrorHandler : ICoreErrorHandler
 {

@@ -29,15 +29,25 @@ namespace WabbitBot.Core.Common.Data
             return new Team();
         }
 
-        public async Task<Team> GetByNameAsync(string name)
+        public async Task<Team?> GetByNameAsync(string name)
         {
+            if (string.IsNullOrEmpty(name))
+            {
+                throw new ArgumentNullException(nameof(name));
+            }
+
             const string sql = "SELECT * FROM Teams WHERE Name = @Name";
             var results = await QueryAsync(sql, new { Name = name });
             return results.FirstOrDefault();
         }
 
-        public async Task<Team> GetByTagAsync(string tag)
+        public async Task<Team?> GetByTagAsync(string tag)
         {
+            if (string.IsNullOrEmpty(tag))
+            {
+                throw new ArgumentNullException(nameof(tag));
+            }
+
             const string sql = "SELECT * FROM Teams WHERE Tag = @Tag";
             var results = await QueryAsync(sql, new { Tag = tag });
             return results.FirstOrDefault();
@@ -45,6 +55,11 @@ namespace WabbitBot.Core.Common.Data
 
         public async Task<IEnumerable<Team>> GetTeamsByCaptainAsync(string captainId)
         {
+            if (string.IsNullOrEmpty(captainId))
+            {
+                throw new ArgumentNullException(nameof(captainId));
+            }
+
             const string sql = @"
                 SELECT * FROM Teams 
                 WHERE TeamCaptainId = @CaptainId 
@@ -76,6 +91,11 @@ namespace WabbitBot.Core.Common.Data
 
         public async Task UpdateLastActiveAsync(string teamId)
         {
+            if (string.IsNullOrEmpty(teamId))
+            {
+                throw new ArgumentNullException(nameof(teamId));
+            }
+
             const string sql = @"
                 UPDATE Teams 
                 SET LastActive = @LastActive 
@@ -90,6 +110,16 @@ namespace WabbitBot.Core.Common.Data
 
         public async Task UpdateTeamStatsAsync(string teamId, GameSize gameSize, TeamStats stats)
         {
+            if (string.IsNullOrEmpty(teamId))
+            {
+                throw new ArgumentNullException(nameof(teamId));
+            }
+
+            if (stats == null)
+            {
+                throw new ArgumentNullException(nameof(stats));
+            }
+
             const string sql = @"
                 UPDATE Teams 
                 SET Stats = json_set(Stats, @StatsPath, @StatsValue) 

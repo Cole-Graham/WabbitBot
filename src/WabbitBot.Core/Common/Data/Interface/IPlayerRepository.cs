@@ -8,7 +8,7 @@ namespace WabbitBot.Core.Common.Data.Interface
 {
     public interface IPlayerRepository : IBaseRepository<Player>
     {
-        Task<Player> GetByNameAsync(string name);
+        Task<Player?> GetByNameAsync(string name);
         Task<IEnumerable<Player>> GetInactivePlayersAsync(TimeSpan inactivityThreshold);
         Task UpdateLastActiveAsync(string playerId);
         Task<IEnumerable<Player>> GetPlayersByTeamIdAsync(string teamId);

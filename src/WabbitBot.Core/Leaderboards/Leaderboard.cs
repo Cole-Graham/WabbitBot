@@ -5,7 +5,6 @@ namespace WabbitBot.Core.Leaderboards
 {
     public class LeaderboardEntry
     {
-        public string Id { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
         public int Wins { get; set; }
         public int Losses { get; set; }
@@ -18,11 +17,13 @@ namespace WabbitBot.Core.Leaderboards
     public class Leaderboard : BaseEntity
     {
         public Dictionary<GameSize, Dictionary<string, LeaderboardEntry>> Rankings { get; set; } = new();
-        public const int InitialRating = 1000;
+        public const int InitialRating = 1500;
         public const int KFactor = 32; // ELO rating system constant
 
         public Leaderboard()
         {
+            Id = Guid.NewGuid();
+            CreatedAt = DateTime.UtcNow;
             foreach (GameSize size in Enum.GetValues(typeof(GameSize)))
             {
                 Rankings[size] = new Dictionary<string, LeaderboardEntry>();

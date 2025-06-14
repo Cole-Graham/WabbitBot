@@ -26,7 +26,7 @@ namespace WabbitBot.Core.Common.Data
         {
             return new Team
             {
-                Id = reader.GetString(reader.GetOrdinal("Id")),
+                Id = Guid.Parse(reader.GetString(reader.GetOrdinal("Id"))),
                 Name = reader.GetString(reader.GetOrdinal("Name")),
                 TeamCaptainId = reader.GetString(reader.GetOrdinal("TeamCaptainId")),
                 TeamSize = (GameSize)reader.GetInt32(reader.GetOrdinal("TeamSize")),
@@ -45,7 +45,7 @@ namespace WabbitBot.Core.Common.Data
         {
             return new
             {
-                entity.Id,
+                Id = entity.Id.ToString(),
                 entity.Name,
                 entity.TeamCaptainId,
                 TeamSize = (int)entity.TeamSize,

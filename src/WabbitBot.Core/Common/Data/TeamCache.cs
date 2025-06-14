@@ -17,11 +17,6 @@ namespace WabbitBot.Core.Common.Data.Cache
             _repository = repository;
         }
 
-        public async Task<Team> GetTeamAsync(string teamId)
-        {
-            return await GetAsync($"{KeyPrefix}{teamId}");
-        }
-
         public async Task SetTeamAsync(Team team, TimeSpan? expiry = null)
         {
             await SetAsync($"{KeyPrefix}{team.Id}", team, expiry);
@@ -44,7 +39,7 @@ namespace WabbitBot.Core.Common.Data.Cache
             {
                 teams.FilterByGameSize = gameSize;
             }
-            return teams;
+            return teams ?? new TeamListWrapper();
         }
 
         public async Task SetActiveTeamsAsync(TeamListWrapper teams, TimeSpan? expiry = null)

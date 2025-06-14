@@ -14,7 +14,7 @@ namespace WabbitBot.Core.Tournaments.Data
         {
         }
 
-        public async Task<Tournament> GetTournamentAsync(Guid id)
+        public async Task<Tournament?> GetTournamentAsync(Guid id)
         {
             return await GetAsync($"{KeyPrefix}{id}");
         }
@@ -36,7 +36,7 @@ namespace WabbitBot.Core.Tournaments.Data
 
         public async Task<TournamentListWrapper> GetActiveTournamentsAsync()
         {
-            return await GetCollectionAsync(ListKey);
+            return await GetCollectionAsync(ListKey) ?? new TournamentListWrapper();
         }
 
         public async Task SetActiveTournamentsAsync(TournamentListWrapper tournaments, TimeSpan? expiry = null)

@@ -1,7 +1,8 @@
 using System;
 using System.Threading.Tasks;
 using DSharpPlus.Commands;
-using WabbitBot.Common.Models.Rating;
+using WabbitBot.Core.Common.Models;
+using WabbitBot.Common.Models;
 
 namespace WabbitBot.DiscBot.DSharpPlus.Attributes
 {

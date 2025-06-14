@@ -1,4 +1,5 @@
 using System;
+using WabbitBot.Common.Models.Interface;
 
 namespace WabbitBot.Common.Models
 {
@@ -6,7 +7,7 @@ namespace WabbitBot.Common.Models
     /// Base class for all entities in the system.
     /// Provides common properties that all entities must have.
     /// </summary>
-    public abstract class BaseEntity
+    public abstract class BaseEntity : IBaseEntity
     {
         /// <summary>
         /// Unique identifier for the entity

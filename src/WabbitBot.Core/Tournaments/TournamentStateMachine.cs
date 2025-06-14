@@ -5,15 +5,22 @@ using WabbitBot.Common.Events.EventInterfaces;
 
 namespace WabbitBot.Core.Tournaments
 {
+    public interface ITournamentEventStore
+    {
+        Task<IEnumerable<TournamentEvent>> GetEventsAsync(Guid tournamentId);
+    }
+
     public class TournamentStateMachine
     {
         private readonly ICoreEventBus _eventBus;
+        private readonly ITournamentEventStore _eventStore;
         private readonly Dictionary<Guid, Tournament> _currentState;
         private readonly Dictionary<Guid, List<TournamentEvent>> _eventStreams;
 
-        public TournamentStateMachine(ICoreEventBus eventBus)
+        public TournamentStateMachine(ICoreEventBus eventBus, ITournamentEventStore eventStore)
         {
             _eventBus = eventBus;
+            _eventStore = eventStore;
             _currentState = new Dictionary<Guid, Tournament>();
             _eventStreams = new Dictionary<Guid, List<TournamentEvent>>();
 
@@ -44,13 +51,13 @@ namespace WabbitBot.Core.Tournaments
             return _eventStreams.TryGetValue(tournamentId, out var events) ? events : Array.Empty<TournamentEvent>();
         }
 
-        public async Task<Tournament> ReplayEventsAsync(Guid tournamentId, int targetVersion = -1)
+        public async Task<Tournament?> ReplayEventsAsync(Guid tournamentId, int targetVersion = -1)
         {
-            if (!_eventStreams.ContainsKey(tournamentId))
+            var events = await _eventStore.GetEventsAsync(tournamentId);
+            if (events == null)
                 return null;
 
             var state = new Tournament { Id = tournamentId };
-            var events = _eventStreams[tournamentId];
 
             foreach (var evt in events)
             {
@@ -58,6 +65,11 @@ namespace WabbitBot.Core.Tournaments
                     break;
 
                 state = ApplyEvent(state, evt);
+                if (state == null)
+                {
+                    // Tournament was deleted, stop processing further events
+                    return null;
+                }
             }
 
             return state;
@@ -75,7 +87,7 @@ namespace WabbitBot.Core.Tournaments
             _eventStreams[evt.TournamentId].Add(evt);
         }
 
-        private Tournament ApplyEvent(Tournament state, TournamentEvent evt)
+        private Tournament? ApplyEvent(Tournament state, TournamentEvent evt)
         {
             switch (evt)
             {

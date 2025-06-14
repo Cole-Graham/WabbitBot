@@ -1,12 +1,13 @@
 using System;
 using System.Threading.Tasks;
 using DSharpPlus.Commands;
-using WabbitBot.Common.Models.Rating;
+using WabbitBot.Core.Common.Models;
+using WabbitBot.Common.Models;
 
 namespace WabbitBot.DiscBot.DSharpPlus.Attributes
 {
     /// <summary>
-    /// Requires that a user is a team captain (team creator) to execute a command.
+    /// Requires that a user is a team captain to execute a command.
     /// Can only be used on commands that include a teamId or teamName parameter.
     /// </summary>
     [AttributeUsage(AttributeTargets.Method, AllowMultiple = false)]
@@ -26,10 +27,12 @@ namespace WabbitBot.DiscBot.DSharpPlus.Attributes
         /// </summary>
         protected override Task<string?> PerformTeamPermissionCheckAsync(CommandContext context, Team team)
         {
-            // Check if the user is the team creator
-            return team.CreatorId == context.User.Id
+            // Check if the user is the team captain
+            return team.TeamCaptainId == context.User.Id.ToString()
                 ? Task.FromResult<string?>(null) // Success 
                 : Task.FromResult<string?>("You must be the team captain to use this command.");
         }
+
+
     }
 }

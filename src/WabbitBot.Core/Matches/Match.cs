@@ -10,7 +10,6 @@ namespace WabbitBot.Core.Matches
         public List<string> Team1PlayerIds { get; set; } = new();
         public List<string> Team2PlayerIds { get; set; } = new();
         public GameSize GameSize { get; set; }
-        public DateTime CreatedAt { get; set; }
         public DateTime? StartedAt { get; set; }
         public DateTime? CompletedAt { get; set; }
         public string? WinnerId { get; set; }

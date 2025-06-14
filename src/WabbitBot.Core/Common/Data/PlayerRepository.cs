@@ -11,7 +11,7 @@ namespace WabbitBot.Core.Common.Data
 {
     public class PlayerWithUserDetails
     {
-        public Player Player { get; set; }
+        public required Player Player { get; set; }
         public string? DiscordId { get; set; }
         public string? Username { get; set; }
         public string? Nickname { get; set; }
@@ -94,7 +94,7 @@ namespace WabbitBot.Core.Common.Data
             };
         }
 
-        public async Task<Player> GetByNameAsync(string name)
+        public async Task<Player?> GetByNameAsync(string name)
         {
             const string sql = "SELECT * FROM Players WHERE Name = @Name AND IsArchived = 0";
             var results = await QueryAsync(sql, new { Name = name });

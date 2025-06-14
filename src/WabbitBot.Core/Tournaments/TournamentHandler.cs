@@ -123,7 +123,7 @@ namespace WabbitBot.Core.Tournaments
             await _eventBus.PublishAsync(evt);
         }
 
-        public async Task<Tournament> GetTournamentAtVersionAsync(
+        public async Task<Tournament?> GetTournamentAtVersionAsync(
             Guid tournamentId,
             int version)
         {

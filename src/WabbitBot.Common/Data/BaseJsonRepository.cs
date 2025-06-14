@@ -20,12 +20,26 @@ namespace WabbitBot.Common.Data
 
         protected T DeserializeJson<T>(string json)
         {
-            return JsonUtil.Deserialize<T>(json);
+            try
+            {
+                return JsonUtil.Deserialize<T>(json);
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Failed to deserialize JSON: {ex.Message}", ex);
+            }
         }
 
         protected string SerializeJson<T>(T obj)
         {
-            return JsonUtil.Serialize(obj);
+            try
+            {
+                return JsonUtil.Serialize(obj);
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Failed to serialize JSON: {ex.Message}", ex);
+            }
         }
 
         protected override TEntity MapEntity(IDataReader reader)
@@ -44,14 +58,40 @@ namespace WabbitBot.Common.Data
                 }
 
                 var value = reader.GetValue(ordinal);
-
-                // Handle JSON fields
-                if (prop.PropertyType.IsClass && prop.PropertyType != typeof(string))
+                if (value == null)
                 {
-                    value = JsonUtil.Deserialize(value.ToString(), prop.PropertyType);
+                    throw new InvalidOperationException($"Null value for property {prop.Name}");
                 }
 
-                prop.SetValue(entity, value);
+                try
+                {
+                    // Handle JSON fields
+                    if (prop.PropertyType.IsClass && prop.PropertyType != typeof(string))
+                    {
+                        var jsonString = value.ToString();
+                        if (string.IsNullOrEmpty(jsonString))
+                        {
+                            throw new InvalidOperationException($"Empty JSON string for property {prop.Name}");
+                        }
+                        value = JsonUtil.Deserialize(jsonString, prop.PropertyType);
+                    }
+                    // Handle Guid conversion
+                    else if (prop.PropertyType == typeof(Guid))
+                    {
+                        var guidString = value.ToString();
+                        if (string.IsNullOrEmpty(guidString))
+                        {
+                            throw new InvalidOperationException($"Empty GUID string for property {prop.Name}");
+                        }
+                        value = Guid.Parse(guidString);
+                    }
+
+                    prop.SetValue(entity, value);
+                }
+                catch (Exception ex)
+                {
+                    throw new InvalidOperationException($"Error mapping property {prop.Name}: {ex.Message}", ex);
+                }
             }
 
             return entity;
@@ -64,15 +104,31 @@ namespace WabbitBot.Common.Data
 
             foreach (var prop in properties)
             {
-                var value = prop.GetValue(entity);
-
-                // Handle JSON fields
-                if (prop.PropertyType.IsClass && prop.PropertyType != typeof(string))
+                try
                 {
-                    value = SerializeJson(value);
-                }
+                    var value = prop.GetValue(entity);
+                    if (value == null)
+                    {
+                        continue;
+                    }
 
-                parameters[prop.Name] = value;
+                    // Handle JSON fields
+                    if (prop.PropertyType.IsClass && prop.PropertyType != typeof(string))
+                    {
+                        value = JsonUtil.Serialize(value);
+                    }
+                    // Handle Guid conversion
+                    else if (prop.PropertyType == typeof(Guid))
+                    {
+                        value = value.ToString();
+                    }
+
+                    parameters[prop.Name] = value!;
+                }
+                catch (Exception ex)
+                {
+                    throw new InvalidOperationException($"Error building parameters for property {prop.Name}: {ex.Message}", ex);
+                }
             }
 
             return parameters;

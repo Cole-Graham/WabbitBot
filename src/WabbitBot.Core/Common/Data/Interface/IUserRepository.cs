@@ -8,7 +8,7 @@ namespace WabbitBot.Core.Common.Data.Interface
 {
     public interface IUserRepository : IBaseRepository<User>
     {
-        Task<User> GetByDiscordIdAsync(ulong discordId);
+        Task<User?> GetByDiscordIdAsync(ulong discordId);
         Task<IEnumerable<User>> GetInactiveUsersAsync(TimeSpan inactivityThreshold);
         Task UpdateLastActiveAsync(string userId);
     }

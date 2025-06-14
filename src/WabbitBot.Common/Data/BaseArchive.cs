@@ -23,15 +23,20 @@ namespace WabbitBot.Common.Data
             string idColumn = "Id",
             string dateColumn = "CreatedAt")
         {
-            _connection = connection;
-            _tableName = tableName;
-            _columns = columns;
-            _idColumn = idColumn;
-            _dateColumn = dateColumn;
+            _connection = connection ?? throw new ArgumentNullException(nameof(connection));
+            _tableName = tableName ?? throw new ArgumentNullException(nameof(tableName));
+            _columns = columns ?? throw new ArgumentNullException(nameof(columns));
+            _idColumn = idColumn ?? throw new ArgumentNullException(nameof(idColumn));
+            _dateColumn = dateColumn ?? throw new ArgumentNullException(nameof(dateColumn));
         }
 
-        public virtual async Task<TEntity> GetByIdAsync(object id)
+        public virtual async Task<TEntity?> GetByIdAsync(object id)
         {
+            if (id == null)
+            {
+                throw new ArgumentNullException(nameof(id));
+            }
+
             var sql = QueryUtil.BuildSelectQuery(_tableName, whereClause: $"{_idColumn} = @Id");
             var results = await QueryUtil.QueryAsync(
                 await _connection.GetConnectionAsync(),
@@ -61,7 +66,11 @@ namespace WabbitBot.Common.Data
 
         public virtual async Task<int> ArchiveAsync(TEntity entity)
         {
-            // Ensure archive timestamp is set
+            if (entity == null)
+            {
+                throw new ArgumentNullException(nameof(entity));
+            }
+
             entity.UpdatedAt = DateTime.UtcNow;
 
             var sql = QueryUtil.BuildInsertQuery(_tableName, _columns);
@@ -74,6 +83,11 @@ namespace WabbitBot.Common.Data
 
         public virtual async Task<bool> DeleteAsync(object id)
         {
+            if (id == null)
+            {
+                throw new ArgumentNullException(nameof(id));
+            }
+
             var sql = $"DELETE FROM {_tableName} WHERE {_idColumn} = @Id";
             var result = await QueryUtil.ExecuteNonQueryAsync(
                 await _connection.GetConnectionAsync(),
@@ -83,8 +97,13 @@ namespace WabbitBot.Common.Data
             return result > 0;
         }
 
-        public virtual async Task<IEnumerable<TEntity>> QueryAsync(string whereClause, object parameters = null)
+        public virtual async Task<IEnumerable<TEntity>> QueryAsync(string whereClause, object? parameters = null)
         {
+            if (string.IsNullOrEmpty(whereClause))
+            {
+                throw new ArgumentNullException(nameof(whereClause));
+            }
+
             var sql = QueryUtil.BuildSelectQuery(_tableName, whereClause: whereClause);
             return await QueryUtil.QueryAsync(
                 await _connection.GetConnectionAsync(),

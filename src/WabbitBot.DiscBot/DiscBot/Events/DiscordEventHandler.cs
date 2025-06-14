@@ -41,6 +41,6 @@ public class DiscordEventHandler
         await _discordBot.StartAsync();
 
         // Signal that the application is fully ready
-        await _globalEventBus.PublishAsync(new ApplicationReadyEvent());
+        await _globalEventBus.PublishAsync(new ApplicationReadyEvent(TimeSpan.Zero, _configReader));
     }
 }

@@ -16,6 +16,8 @@ namespace WabbitBot.Core.Leaderboards
 
         public Season()
         {
+            Id = Guid.NewGuid();
+            CreatedAt = DateTime.UtcNow;
             // Initialize stats for each game size
             foreach (GameSize size in Enum.GetValues(typeof(GameSize)))
             {
@@ -60,7 +62,7 @@ namespace WabbitBot.Core.Leaderboards
                 TeamStats[gameSize][teamId] = stats;
             }
 
-            stats.MatchesPlayed++;
+            stats.MatchesCount++;
             if (isWin)
                 stats.Wins++;
             else
@@ -108,9 +110,11 @@ namespace WabbitBot.Core.Leaderboards
         public int CurrentRating { get; set; }
         public int Wins { get; set; }
         public int Losses { get; set; }
-        public int MatchesPlayed { get; set; }
+        public int MatchesCount { get; set; }
         public DateTime LastUpdated { get; set; }
-        public double WinRate => MatchesPlayed == 0 ? 0 : (double)Wins / MatchesPlayed;
+        public Dictionary<string, double> OpponentDistribution { get; set; } = new();
+        public double WinRate => MatchesCount == 0 ? 0 : (double)Wins / MatchesCount;
+        public int RecentMatchesCount{ get; set; }  // Number of games played within the variety window
     }
 
     public class SeasonConfig

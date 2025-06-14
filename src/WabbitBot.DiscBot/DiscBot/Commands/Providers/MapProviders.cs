@@ -1,44 +1,34 @@
 using DSharpPlus.Commands.Processors.SlashCommands;
 using DSharpPlus.Commands.Processors.SlashCommands.ArgumentModifiers;
 using DSharpPlus.Entities;
-using WabbitBot.Core.Common.Services;
+using WabbitBot.Core.Common.Handlers;
 
 namespace WabbitBot.DiscBot.Commands.Providers;
 
-public class MapSizeChoiceProvider : IChoiceProvider, ISlashCommandOptionProvider
+public class MapSizeChoiceProvider : IAutoCompleteProvider
 {
-    private static readonly MapService MapService = MapService.Instance;
+    private static readonly MapHandler MapHandler = MapHandler.Instance;
 
-    public IEnumerable<CommandChoice> GetChoices()
+    public async ValueTask<IEnumerable<DiscordAutoCompleteChoice>> AutoCompleteAsync(AutoCompleteContext ctx)
     {
-        return MapService.GetAvailableSizes()
-            .Select(size => new CommandChoice(size, size))
-            .Append(new CommandChoice("All", "all"));
-    }
-
-    public IEnumerable<DiscordApplicationCommandOptionChoice> GetSlashChoices()
-    {
-        return GetChoices()
-            .Select(c => new DiscordApplicationCommandOptionChoice(c.Name, c.Value));
+        var userInput = ctx.UserInput ?? "";
+        var sizes = MapHandler.GetAvailableSizes().Append("All");
+        return await Task.FromResult(sizes
+            .Where(s => s.Contains(userInput, StringComparison.OrdinalIgnoreCase))
+            .Select(s => new DiscordAutoCompleteChoice(s, s)));
     }
 }
 
-public class MapNameAutoCompleteProvider : IAutoCompleteProvider, IAutoComplete
+public class MapNameAutoCompleteProvider : IAutoCompleteProvider
 {
-    private static readonly MapService MapService = MapService.Instance;
+    private static readonly MapHandler MapHandler = MapHandler.Instance;
 
-    public IEnumerable<CommandChoice> GetSuggestions(string userInput)
+    public async ValueTask<IEnumerable<DiscordAutoCompleteChoice>> AutoCompleteAsync(AutoCompleteContext ctx)
     {
-        return MapService.GetMaps()
+        var userInput = ctx.UserInput ?? "";
+        return await Task.FromResult(MapHandler.GetMaps()
             .Where(m => m.Name.Contains(userInput, StringComparison.OrdinalIgnoreCase))
             .Take(25)
-            .Select(m => new CommandChoice(m.Name, m.Name));
-    }
-
-    public IEnumerable<DiscordAutoCompleteChoice> GetAutoComplete(AutoCompleteContext ctx)
-    {
-        var userInput = ctx.FocusedOption.Value?.ToString() ?? "";
-        return GetSuggestions(userInput)
-            .Select(c => new DiscordAutoCompleteChoice(c.Name, c.Value));
+            .Select(m => new DiscordAutoCompleteChoice(m.Name, m.Name)));
     }
 }

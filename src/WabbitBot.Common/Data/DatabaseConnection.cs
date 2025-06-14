@@ -9,7 +9,7 @@ namespace WabbitBot.Common.Data
 {
     public class DatabaseConnection : IDatabaseConnection
     {
-        private SQLiteConnection _connection;
+        private SQLiteConnection? _connection;
         private readonly string _connectionString;
         private bool _disposed;
 
@@ -63,7 +63,7 @@ namespace WabbitBot.Common.Data
                 throw new InvalidOperationException("Database connection is not open");
             }
 
-            return Task.FromResult<IDbConnection>(_connection);
+            return Task.FromResult<IDbConnection>(_connection!);
         }
 
         public async Task<IDbTransaction> BeginTransactionAsync()
@@ -73,7 +73,7 @@ namespace WabbitBot.Common.Data
                 await ConnectAsync();
             }
 
-            return _connection.BeginTransaction();
+            return _connection!.BeginTransaction();
         }
 
         public Task CommitTransactionAsync(IDbTransaction transaction)

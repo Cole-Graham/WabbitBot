@@ -17,7 +17,7 @@ namespace WabbitBot.Core.Common.Data.Cache
             _repository = repository;
         }
 
-        public async Task<User> GetByDiscordIdAsync(ulong discordId)
+        public async Task<User?> GetByDiscordIdAsync(ulong discordId)
         {
             var key = discordId.ToString();
             var cachedUser = await GetAsync(key);

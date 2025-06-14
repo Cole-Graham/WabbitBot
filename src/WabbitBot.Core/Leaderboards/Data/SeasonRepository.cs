@@ -28,7 +28,7 @@ namespace WabbitBot.Core.Leaderboards.Data
             return new Season();
         }
 
-        public async Task<Season> GetActiveSeasonAsync()
+        public async Task<Season?> GetActiveSeasonAsync()
         {
             const string sql = "SELECT * FROM Seasons WHERE IsActive = 1";
             var results = await QueryAsync(sql);
@@ -41,6 +41,7 @@ namespace WabbitBot.Core.Leaderboards.Data
                 SELECT * FROM Seasons 
                 WHERE StartDate >= @StartDate 
                 AND EndDate <= @EndDate";
+
             return await QueryAsync(sql, new { StartDate = startDate, EndDate = endDate });
         }
 
@@ -60,19 +61,40 @@ namespace WabbitBot.Core.Leaderboards.Data
                 }
 
                 var value = reader.GetValue(ordinal);
-
-                // Handle JSON fields
-                if (prop.PropertyType.IsClass && prop.PropertyType != typeof(string))
+                if (value == null)
                 {
-                    value = JsonUtil.Deserialize(value.ToString(), prop.PropertyType);
-                }
-                // Handle Guid conversion
-                else if (prop.PropertyType == typeof(Guid))
-                {
-                    value = Guid.Parse(value.ToString());
+                    throw new InvalidOperationException($"Null value for property {prop.Name}");
                 }
 
-                prop.SetValue(entity, value);
+                try
+                {
+                    // Handle JSON fields
+                    if (prop.PropertyType.IsClass && prop.PropertyType != typeof(string))
+                    {
+                        var jsonString = value.ToString();
+                        if (string.IsNullOrEmpty(jsonString))
+                        {
+                            throw new InvalidOperationException($"Empty JSON string for property {prop.Name}");
+                        }
+                        value = JsonUtil.Deserialize(jsonString, prop.PropertyType);
+                    }
+                    // Handle Guid conversion
+                    else if (prop.PropertyType == typeof(Guid))
+                    {
+                        var guidString = value.ToString();
+                        if (string.IsNullOrEmpty(guidString))
+                        {
+                            throw new InvalidOperationException($"Empty GUID string for property {prop.Name}");
+                        }
+                        value = Guid.Parse(guidString);
+                    }
+
+                    prop.SetValue(entity, value);
+                }
+                catch (Exception ex)
+                {
+                    throw new InvalidOperationException($"Error mapping property {prop.Name}: {ex.Message}", ex);
+                }
             }
 
             return entity;
@@ -85,20 +107,34 @@ namespace WabbitBot.Core.Leaderboards.Data
 
             foreach (var prop in properties)
             {
-                var value = prop.GetValue(entity);
-
-                // Handle JSON fields
-                if (prop.PropertyType.IsClass && prop.PropertyType != typeof(string))
+                try
                 {
-                    value = JsonUtil.Serialize(value);
-                }
-                // Handle Guid conversion
-                else if (prop.PropertyType == typeof(Guid))
-                {
-                    value = value.ToString();
-                }
+                    var value = prop.GetValue(entity);
+                    if (value == null)
+                    {
+                        continue;
+                    }
 
-                parameters[prop.Name] = value;
+                    // Handle JSON fields
+                    if (prop.PropertyType.IsClass && prop.PropertyType != typeof(string))
+                    {
+                        value = JsonUtil.Serialize(value);
+                    }
+                    // Handle Guid conversion
+                    else if (prop.PropertyType == typeof(Guid))
+                    {
+                        value = value.ToString();
+                    }
+
+                    if (value != null)
+                    {
+                        parameters[prop.Name] = value;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    throw new InvalidOperationException($"Error building parameters for property {prop.Name}: {ex.Message}", ex);
+                }
             }
 
             return parameters;

@@ -29,10 +29,12 @@ namespace WabbitBot.Common.Events
     public class ApplicationReadyEvent
     {
         public TimeSpan StartupDuration { get; }
+        public IBotConfigurationReader ConfigurationReader { get; init; }
 
-        public ApplicationReadyEvent(TimeSpan startupDuration)
+        public ApplicationReadyEvent(TimeSpan startupDuration, IBotConfigurationReader configReader)
         {
             StartupDuration = startupDuration;
+            ConfigurationReader = configReader;
         }
     }
     #endregion

@@ -400,10 +400,15 @@ FodyWeavers.xsd
 *.sln.iml
 
 # Misc
+Scrimmage_backup.txt
+.editorconfig
+rating_simulator.py
+rating_simulator_backup.py
+plot_win_probabilities.py
+win_probability_curves.png
 !*.template.json
 *.json
 *.cursor/
-*docs/
 *src/WabbitBot.Old
 *src/deprecated
 *docs.old
@@ -420,3 +425,8 @@ src/WabbitBot.Core/Config/maps.json
 
 # Generated source code
 src/WabbitBot.DiscBot/DSharpPlus/Generated/
+
+# Ignore docs directory
+docs/*
+# But allow ScrimmageRatingCalculator.md
+docs/ScrimmageRatingCalculator.md

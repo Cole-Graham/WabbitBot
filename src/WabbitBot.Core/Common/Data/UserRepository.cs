@@ -50,7 +50,7 @@ namespace WabbitBot.Core.Common.Data
             return new User();
         }
 
-        public async Task<User> GetByDiscordIdAsync(ulong discordId)
+        public async Task<User?> GetByDiscordIdAsync(ulong discordId)
         {
             const string sql = "SELECT * FROM Users WHERE DiscordId = @DiscordId";
             var results = await QueryAsync(sql, new { DiscordId = discordId.ToString() });

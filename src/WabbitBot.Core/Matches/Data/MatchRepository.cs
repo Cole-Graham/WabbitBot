@@ -50,16 +50,6 @@ namespace WabbitBot.Core.Matches.Data
             @event.HasActiveMatches = count > 0;
         }
 
-        public async Task<Match?> GetMatchAsync(string matchId)
-        {
-            var match = await GetByIdAsync(matchId);
-            if (match != null)
-            {
-                match.Games = (await _gameRepository.GetGamesByMatchAsync(matchId)).ToList();
-            }
-            return match;
-        }
-
         public async Task<IEnumerable<Match>> GetMatchesByStatusAsync(MatchStatus status)
         {
             const string sql = @"

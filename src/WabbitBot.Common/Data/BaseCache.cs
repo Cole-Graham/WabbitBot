@@ -12,7 +12,7 @@ namespace WabbitBot.Common.Data
     {
         private class CacheEntry
         {
-            public object Value { get; set; }
+            public required object Value { get; set; }
             public DateTime? ExpiryTime { get; set; }
             public bool IsExpired => ExpiryTime.HasValue && DateTime.UtcNow > ExpiryTime.Value;
         }
@@ -24,20 +24,20 @@ namespace WabbitBot.Common.Data
             _cache = new ConcurrentDictionary<string, CacheEntry>();
         }
 
-        public Task<TEntity> GetAsync(string key)
+        public Task<TEntity?> GetAsync(string key)
         {
             if (_cache.TryGetValue(key, out var entry))
             {
                 if (!entry.IsExpired)
                 {
-                    return Task.FromResult((TEntity)entry.Value);
+                    return Task.FromResult((TEntity?)entry.Value);
                 }
 
                 // Remove expired entry
                 _cache.TryRemove(key, out _);
             }
 
-            return Task.FromResult<TEntity>(null);
+            return Task.FromResult<TEntity?>(null);
         }
 
         public Task SetAsync(string key, TEntity value, TimeSpan? expiry = null)
@@ -84,20 +84,20 @@ namespace WabbitBot.Common.Data
             return Task.FromResult(false);
         }
 
-        public Task<TCollection> GetCollectionAsync(string key)
+        public Task<TCollection?> GetCollectionAsync(string key)
         {
             if (_cache.TryGetValue(key, out var entry))
             {
                 if (!entry.IsExpired)
                 {
-                    return Task.FromResult((TCollection)entry.Value);
+                    return Task.FromResult((TCollection?)entry.Value);
                 }
 
                 // Remove expired entry
                 _cache.TryRemove(key, out _);
             }
 
-            return Task.FromResult<TCollection>(null);
+            return Task.FromResult<TCollection?>(null);
         }
 
         public Task SetCollectionAsync(string key, TCollection collection, TimeSpan? expiry = null)

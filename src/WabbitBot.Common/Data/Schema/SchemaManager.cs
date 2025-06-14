@@ -14,12 +14,14 @@ namespace WabbitBot.Common.Data.Schema
     public static class MigrationOrder
     {
         public const int CreatePlayers = 1;
-        public const int CreateGames = 2;
-        public const int CreateMatches = 3;
-        public const int CreateScrimmages = 4;
-        public const int CreateTournaments = 5;
-        public const int CreateLeaderboards = 6;
-        public const int CreateSeasons = 7;
+        public const int CreateTeams = 2;
+        public const int CreateMaps = 3;
+        public const int CreateGames = 4;
+        public const int CreateMatches = 5;
+        public const int CreateScrimmages = 6;
+        public const int CreateTournaments = 7;
+        public const int CreateLeaderboards = 8;
+        public const int CreateSeasons = 9;
     }
 
     public class SchemaManager

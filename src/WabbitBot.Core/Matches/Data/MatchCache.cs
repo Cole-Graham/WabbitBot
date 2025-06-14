@@ -15,11 +15,6 @@ namespace WabbitBot.Core.Matches.Data
         {
         }
 
-        public async Task<Match> GetMatchAsync(string matchId)
-        {
-            return await GetAsync($"{KeyPrefix}{matchId}");
-        }
-
         public async Task SetMatchAsync(Match match, TimeSpan? expiry = null)
         {
             await SetAsync($"{KeyPrefix}{match.Id}", match, expiry);
@@ -37,7 +32,7 @@ namespace WabbitBot.Core.Matches.Data
 
         public async Task<MatchListWrapper> GetActiveMatchesAsync()
         {
-            return await GetCollectionAsync(ListKey);
+            return await GetCollectionAsync(ListKey) ?? new MatchListWrapper();
         }
 
         public async Task SetActiveMatchesAsync(MatchListWrapper matches, TimeSpan? expiry = null)

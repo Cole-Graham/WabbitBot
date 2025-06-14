@@ -22,11 +22,6 @@ namespace WabbitBot.Core.Common.Data
         {
         }
 
-        public async Task<Game?> GetGameAsync(string gameId)
-        {
-            return await GetByIdAsync(gameId);
-        }
-
         public async Task<IEnumerable<Game>> GetGamesByMatchAsync(string matchId)
         {
             const string sql = @"

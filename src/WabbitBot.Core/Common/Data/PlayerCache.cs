@@ -17,7 +17,7 @@ namespace WabbitBot.Core.Common.Data.Cache
             _repository = repository;
         }
 
-        public async Task<Player> GetByNameAsync(string name)
+        public async Task<Player?> GetByNameAsync(string name)
         {
             var key = $"{NameKeyPrefix}{name}";
             var cachedPlayer = await GetAsync(key);

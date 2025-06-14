@@ -24,6 +24,12 @@ namespace WabbitBot.Core.Tournaments
         public int MaxParticipants { get; set; }
         public int BestOf { get; set; } = 1; // Number of games to win each match
 
+        public Tournament()
+        {
+            CreatedAt = DateTime.UtcNow;
+            Status = TournamentStatus.Created;
+        }
+
         public Tournament Clone()
         {
             return new Tournament

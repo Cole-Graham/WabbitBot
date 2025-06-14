@@ -73,10 +73,5 @@ namespace WabbitBot.Core.Common.Data
         {
             return await GetByDateRangeAsync(startDate, endDate);
         }
-
-        public async Task<Player> GetPlayerByIdAsync(Guid playerId)
-        {
-            return await GetByIdAsync(playerId.ToString());
-        }
     }
 }

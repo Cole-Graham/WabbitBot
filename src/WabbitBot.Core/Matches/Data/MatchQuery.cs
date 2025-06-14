@@ -1,56 +1,80 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using WabbitBot.Core.Matches;
 using WabbitBot.Core.Common.Models;
+using WabbitBot.Common.Data;
 
 namespace WabbitBot.Core.Matches.Data
 {
-    public class MatchQuery
+    public class MatchQuery : BaseQuery
     {
-        public string? TeamId { get; set; }
-        public MatchStatus? Status { get; set; }
-        public GameSize? GameSize { get; set; }
-        public DateTime? StartDate { get; set; }
-        public DateTime? EndDate { get; set; }
-        public int? Limit { get; set; }
-        public int? Skip { get; set; }
-        public bool IncludeArchived { get; set; }
-
-        public IQueryable<Match> Apply(IQueryable<Match> query)
+        public MatchQuery() : base("Matches")
         {
-            if (TeamId != null)
-            {
-                query = query.Where(m => m.Team1Id == TeamId || m.Team2Id == TeamId);
-            }
+            SetOrderBy("CreatedAt", true);
+        }
 
-            if (Status.HasValue)
-            {
-                query = query.Where(m => m.Status == Status.Value);
-            }
+        public MatchQuery ByTeam(string teamId)
+        {
+            AddWhereClause("(Team1Id = @TeamId OR Team2Id = @TeamId)",
+                new { TeamId = teamId });
+            return this;
+        }
 
-            if (GameSize.HasValue)
-            {
-                query = query.Where(m => m.GameSize == GameSize.Value);
-            }
+        public MatchQuery ByStatus(MatchStatus status)
+        {
+            AddWhereClause("Status = @Status", new { Status = (int)status });
+            return this;
+        }
 
-            if (StartDate.HasValue)
-            {
-                query = query.Where(m => m.CreatedAt >= StartDate.Value);
-            }
+        public MatchQuery ByGameSize(GameSize gameSize)
+        {
+            AddWhereClause("GameSize = @GameSize", new { GameSize = (int)gameSize });
+            return this;
+        }
 
-            if (EndDate.HasValue)
-            {
-                query = query.Where(m => m.CreatedAt <= EndDate.Value);
-            }
+        public MatchQuery ByDateRange(DateTime startDate, DateTime endDate)
+        {
+            AddWhereClause("CreatedAt BETWEEN @StartDate AND @EndDate",
+                new { StartDate = startDate, EndDate = endDate });
+            return this;
+        }
 
-            if (Skip.HasValue)
-            {
-                query = query.Skip(Skip.Value);
-            }
+        public MatchQuery ByWinner(string teamId)
+        {
+            AddWhereClause("WinnerId = @WinnerId", new { WinnerId = teamId });
+            return this;
+        }
 
-            if (Limit.HasValue)
-            {
-                query = query.Take(Limit.Value);
-            }
+        public MatchQuery ByParent(string parentId, string parentType)
+        {
+            AddWhereClause("ParentId = @ParentId AND ParentType = @ParentType",
+                new { ParentId = parentId, ParentType = parentType });
+            return this;
+        }
 
-            return query;
+        public MatchQuery ByStage(MatchStage stage)
+        {
+            AddWhereClause("Stage = @Stage", new { Stage = (int)stage });
+            return this;
+        }
+
+        public MatchQuery OrderBy(string column, bool descending = true)
+        {
+            SetOrderBy(column, descending);
+            return this;
+        }
+
+        public MatchQuery Limit(int limit)
+        {
+            SetLimit(limit);
+            return this;
+        }
+
+        public MatchQuery Offset(int offset)
+        {
+            SetOffset(offset);
+            return this;
         }
     }
 }

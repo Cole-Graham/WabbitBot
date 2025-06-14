@@ -16,7 +16,7 @@ namespace WabbitBot.Core.Leaderboards.Data
         {
         }
 
-        public async Task<Season> GetSeasonAsync(Guid id)
+        public async Task<Season?> GetSeasonAsync(Guid id)
         {
             return await GetAsync($"{KeyPrefix}{id}");
         }
@@ -36,7 +36,7 @@ namespace WabbitBot.Core.Leaderboards.Data
             return await ExistsAsync($"{KeyPrefix}{id}");
         }
 
-        public async Task<Season> GetActiveSeasonAsync()
+        public async Task<Season?> GetActiveSeasonAsync()
         {
             return await GetAsync(ActiveKey);
         }
@@ -58,7 +58,7 @@ namespace WabbitBot.Core.Leaderboards.Data
 
         public async Task<SeasonListWrapper> GetAllSeasonsAsync()
         {
-            return await GetCollectionAsync(ListKey);
+            return await GetCollectionAsync(ListKey) ?? new SeasonListWrapper();
         }
 
         public async Task SetAllSeasonsAsync(SeasonListWrapper seasons, TimeSpan? expiry = null)

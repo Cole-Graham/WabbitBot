@@ -25,6 +25,7 @@ namespace WabbitBot.Core.Common.Models
 
         public Game()
         {
+            CreatedAt = DateTime.UtcNow;
             StartedAt = DateTime.UtcNow;
             Status = GameStatus.Created;
         }

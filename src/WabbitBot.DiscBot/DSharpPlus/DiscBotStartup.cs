@@ -1,10 +1,14 @@
 using WabbitBot.Common.Events;
 using WabbitBot.DiscBot.DiscBot.Events;
+using WabbitBot.Core.Common.Configuration;
+using WabbitBot.Common.Configuration;
 
 namespace WabbitBot.DiscBot.DSharpPlus;
 
 public static class DiscBotStartup
 {
+    private static IBotConfigurationReader? _configReader;
+
     // This will be called when the assembly loads
     static DiscBotStartup()
     {
@@ -18,8 +22,15 @@ public static class DiscBotStartup
         // Get the global event bus from Common provider
         var globalEventBus = GlobalEventBusProvider.GetGlobalEventBus();
 
-        // Create and register handlers - their constructors will subscribe to events
-        _ = new DiscordEventHandler(globalEventBus, config);
+        // Subscribe to startup events
+        globalEventBus.Subscribe<StartupInitiatedEvent>(OnStartupInitiated);
+    }
+
+    private static Task OnStartupInitiated(StartupInitiatedEvent evt)
+    {
+        _configReader = evt.ConfigurationReader;
+        _ = new DiscordEventHandler(GlobalEventBusProvider.GetGlobalEventBus(), _configReader);
+        return Task.CompletedTask;
     }
 }
 

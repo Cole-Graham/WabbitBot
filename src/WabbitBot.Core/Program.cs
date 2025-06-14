@@ -4,6 +4,7 @@ using WabbitBot.Common.Configuration;
 using WabbitBot.Common.Events;
 using WabbitBot.Common.Events.EventInterfaces;
 using WabbitBot.Common.Models;
+using WabbitBot.Common.ErrorHandling;
 using WabbitBot.Core.Common.BotCore;
 using WabbitBot.Core.Common.Configuration;
 
@@ -59,6 +60,14 @@ public static class Program
 
             // This will trigger DiscBot initialization through event handlers
             await GlobalEventBus.PublishAsync(new SystemReadyEvent());
+
+            // Signal that the application is fully ready
+            var startTime = DateTime.UtcNow;
+            var startupDuration = DateTime.UtcNow - startTime;
+            await GlobalEventBus.PublishAsync(new ApplicationReadyEvent(startupDuration, ConfigurationReader)
+            {
+                ConfigurationReader = ConfigurationReader
+            });
 
             // Keep the application running
             await Task.Delay(-1);

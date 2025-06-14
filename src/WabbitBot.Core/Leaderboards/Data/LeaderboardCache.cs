@@ -14,7 +14,7 @@ namespace WabbitBot.Core.Leaderboards.Data
         {
         }
 
-        public async Task<Leaderboard> GetLeaderboardAsync(Guid id)
+        public async Task<Leaderboard?> GetLeaderboardAsync(Guid id)
         {
             return await GetAsync($"{KeyPrefix}{id}");
         }
@@ -36,7 +36,7 @@ namespace WabbitBot.Core.Leaderboards.Data
 
         public async Task<LeaderboardListWrapper> GetActiveLeaderboardsAsync()
         {
-            return await GetCollectionAsync(ListKey);
+            return await GetCollectionAsync(ListKey) ?? new LeaderboardListWrapper();
         }
 
         public async Task SetActiveLeaderboardsAsync(LeaderboardListWrapper leaderboards, TimeSpan? expiry = null)

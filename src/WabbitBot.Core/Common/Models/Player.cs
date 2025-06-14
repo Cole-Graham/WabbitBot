@@ -8,12 +8,14 @@ namespace WabbitBot.Core.Common.Models
 {
     /// <summary>
     /// Represents a player in the game system, independent of Discord users.
+    /// Players are always part of a team, even in 1v1 matches.
     /// </summary>
     public class Player : BaseEntity
     {
         public string Name { get; set; } = string.Empty;
-        public DateTime CreatedAt { get; set; }
         public DateTime LastActive { get; set; }
+        public bool IsArchived { get; set; }
+        public DateTime? ArchivedAt { get; set; }
 
         [JsonIgnore]
         public Dictionary<GameSize, PlayerStats> Stats { get; set; } = new();
@@ -23,9 +25,6 @@ namespace WabbitBot.Core.Common.Models
 
         [JsonIgnore]
         public List<string> PreviousUserIds { get; set; } = new(); // History of linked Discord users
-
-        public bool IsArchived { get; set; }
-        public DateTime? ArchivedAt { get; set; }
 
         // JSON serialization properties
         [JsonPropertyName("Stats")]
@@ -70,27 +69,6 @@ namespace WabbitBot.Core.Common.Models
             LastActive = DateTime.UtcNow;
         }
 
-        public void AddPreviousUserId(string userId)
-        {
-            if (!PreviousUserIds.Contains(userId))
-            {
-                PreviousUserIds.Add(userId);
-            }
-        }
-
-        public void RemoveTeam(string teamId)
-        {
-            TeamIds.Remove(teamId);
-        }
-
-        public void AddTeam(string teamId)
-        {
-            if (!TeamIds.Contains(teamId))
-            {
-                TeamIds.Add(teamId);
-            }
-        }
-
         public void Archive()
         {
             IsArchived = true;
@@ -102,41 +80,31 @@ namespace WabbitBot.Core.Common.Models
             IsArchived = false;
             ArchivedAt = null;
         }
+
+        public void AddPreviousUserId(string userId)
+        {
+            if (!PreviousUserIds.Contains(userId))
+            {
+                PreviousUserIds.Add(userId);
+            }
+        }
+
+        public void AddTeam(string teamId)
+        {
+            if (!TeamIds.Contains(teamId))
+            {
+                TeamIds.Add(teamId);
+            }
+        }
+
+        public void RemoveTeam(string teamId)
+        {
+            TeamIds.Remove(teamId);
+        }
     }
 
-    public class PlayerStats
+    public class PlayerStats : BaseStats
     {
-        public int Wins { get; set; }
-        public int Losses { get; set; }
-        public int Rating { get; set; } = 1000; // Initial ELO rating
-        public int HighestRating { get; set; } = 1000;
-        public int CurrentStreak { get; set; }
-        public int LongestStreak { get; set; }
-        public DateTime LastMatchAt { get; set; }
-
-        public double WinRate => Wins + Losses == 0 ? 0 : (double)Wins / (Wins + Losses);
-
-        public void UpdateStats(bool isWin)
-        {
-            if (isWin)
-            {
-                Wins++;
-                CurrentStreak = Math.Max(0, CurrentStreak) + 1;
-            }
-            else
-            {
-                Losses++;
-                CurrentStreak = Math.Min(0, CurrentStreak) - 1;
-            }
-
-            LongestStreak = Math.Max(Math.Abs(CurrentStreak), LongestStreak);
-            LastMatchAt = DateTime.UtcNow;
-        }
-
-        public void UpdateRating(int newRating)
-        {
-            Rating = newRating;
-            HighestRating = Math.Max(HighestRating, newRating);
-        }
+        // Player-specific stats can be added here if needed
     }
 }
