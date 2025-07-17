@@ -42,16 +42,6 @@ namespace WabbitBot.Core.Scrimmages
         public Dictionary<string, (int Count, int Rating)> OpponentMatches { get; set; } = new();
     }
 
-    public class AllTeamOpponentDistributionsRequest
-    {
-        public DateTime Since { get; set; }
-    }
-
-    public class AllTeamOpponentDistributionsResponse
-    {
-        public List<(string TeamId, Dictionary<string, double> NormalizedWeights)> Distributions { get; set; } = new();
-    }
-
     public class GetActiveSeasonRequest
     {
         // No additional properties needed
@@ -70,5 +60,62 @@ namespace WabbitBot.Core.Scrimmages
     public class TeamGamesPlayedResponse
     {
         public Dictionary<string, SeasonTeamStats> SeasonTeamStats { get; set; } = new();
+    }
+
+    public class GetTeamRatingRequest
+    {
+        public string TeamId { get; set; } = string.Empty;
+    }
+
+    public class GetTeamRatingResponse
+    {
+        public int Rating { get; set; }
+    }
+
+    public class CheckProvenPotentialRequest
+    {
+        public string TeamId { get; set; } = string.Empty;
+        public int CurrentRating { get; set; }
+    }
+
+    public class CheckProvenPotentialResponse
+    {
+        public bool HasAdjustments { get; set; }
+        public List<RatingAdjustment> Adjustments { get; set; } = new();
+    }
+
+    public class RatingAdjustment
+    {
+        public string Team1Id { get; set; } = string.Empty;
+        public string Team2Id { get; set; } = string.Empty;
+        public int Adjustment { get; set; }
+    }
+
+    public class CreateProvenPotentialRecordRequest
+    {
+        public Guid MatchId { get; set; }
+        public string Team1Id { get; set; } = string.Empty;
+        public string Team2Id { get; set; } = string.Empty;
+        public int Team1Rating { get; set; }
+        public int Team2Rating { get; set; }
+        public double Team1Confidence { get; set; }
+        public double Team2Confidence { get; set; }
+        public int RatingChange { get; set; }
+    }
+
+    public class CreateProvenPotentialRecordResponse
+    {
+        public bool Created { get; set; }
+        public string? Reason { get; set; }
+    }
+
+    public class ScrimmageCompletedEvent
+    {
+        public Guid MatchId { get; set; }
+        public string Team1Id { get; set; } = string.Empty;
+        public string Team2Id { get; set; } = string.Empty;
+        public int Team1Score { get; set; }
+        public int Team2Score { get; set; }
+        public GameSize GameSize { get; set; }
     }
 }

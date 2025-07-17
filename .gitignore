@@ -400,6 +400,7 @@ FodyWeavers.xsd
 *.sln.iml
 
 # Misc
+.dev/
 Scrimmage_backup.txt
 .editorconfig
 rating_simulator.py
@@ -413,6 +414,7 @@ win_probability_curves.png
 *src/deprecated
 *docs.old
 *notes/
+dev/rating_simulator/simulation_results/
 
 # Custom output directory
 src/output/bin/
