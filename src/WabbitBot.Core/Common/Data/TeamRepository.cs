@@ -15,7 +15,7 @@ namespace WabbitBot.Core.Common.Data
         private static readonly string[] Columns = new[]
         {
             "Id", "Name", "TeamCaptainId", "TeamSize", "MaxRosterSize",
-            "Roster", "CreatedAt", "LastActive", "Stats", "Tag", "Description",
+            "Roster", "LastActive", "Tag", "Description", "IsArchived", "ArchivedAt",
             "CreatedAt", "UpdatedAt"
         };
 
@@ -105,33 +105,6 @@ namespace WabbitBot.Core.Common.Data
                 await _connection.GetConnectionAsync(),
                 sql,
                 new { TeamId = teamId, LastActive = DateTime.UtcNow }
-            );
-        }
-
-        public async Task UpdateTeamStatsAsync(string teamId, GameSize gameSize, TeamStats stats)
-        {
-            if (string.IsNullOrEmpty(teamId))
-            {
-                throw new ArgumentNullException(nameof(teamId));
-            }
-
-            if (stats == null)
-            {
-                throw new ArgumentNullException(nameof(stats));
-            }
-
-            const string sql = @"
-                UPDATE Teams 
-                SET Stats = json_set(Stats, @StatsPath, @StatsValue) 
-                WHERE Id = @TeamId";
-
-            var statsPath = $"$.{gameSize}";
-            var statsValue = JsonUtil.Serialize(stats);
-
-            await QueryUtil.ExecuteNonQueryAsync(
-                await _connection.GetConnectionAsync(),
-                sql,
-                new { TeamId = teamId, StatsPath = statsPath, StatsValue = statsValue }
             );
         }
     }

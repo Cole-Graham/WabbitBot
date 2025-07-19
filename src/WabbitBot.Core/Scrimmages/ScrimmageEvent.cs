@@ -3,9 +3,16 @@ using System.Collections.Generic;
 using WabbitBot.Core.Scrimmages.Data;
 using WabbitBot.Core.Leaderboards;
 using WabbitBot.Core.Common.Models;
+using WabbitBot.Common.Events.EventInterfaces;
 
 namespace WabbitBot.Core.Scrimmages
 {
+    public abstract record ScrimmageEvent : ICoreEvent
+    {
+        public string ScrimmageId { get; init; } = string.Empty;
+        public DateTime Timestamp { get; init; } = DateTime.UtcNow;
+    }
+
     public class ScrimmageHistoryRequest
     {
         public string TeamId { get; set; } = string.Empty;
@@ -109,13 +116,15 @@ namespace WabbitBot.Core.Scrimmages
         public string? Reason { get; set; }
     }
 
-    public class ScrimmageCompletedEvent
+    public record ScrimmageCompletedEvent : ScrimmageEvent
     {
-        public Guid MatchId { get; set; }
-        public string Team1Id { get; set; } = string.Empty;
-        public string Team2Id { get; set; } = string.Empty;
-        public int Team1Score { get; set; }
-        public int Team2Score { get; set; }
-        public GameSize GameSize { get; set; }
+        public Guid MatchId { get; init; }
+        public string Team1Id { get; init; } = string.Empty;
+        public string Team2Id { get; init; } = string.Empty;
+        public int Team1Score { get; init; }
+        public int Team2Score { get; init; }
+        public GameSize GameSize { get; init; }
+        public double Team1Confidence { get; init; } = 0.0;
+        public double Team2Confidence { get; init; } = 0.0;
     }
 }

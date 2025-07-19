@@ -8,6 +8,13 @@ namespace WabbitBot.Core.Scrimmages
 {
     public class Scrimmage : BaseEntity
     {
+        private static readonly ICoreEventBus _eventBus;
+
+        static Scrimmage()
+        {
+            _eventBus = CoreEventBus.Instance;
+        }
+
         public string Team1Id { get; set; } = string.Empty;
         public string Team2Id { get; set; } = string.Empty;
         public List<string> Team1RosterIds { get; set; } = new();
@@ -21,6 +28,8 @@ namespace WabbitBot.Core.Scrimmages
         public int Team2Rating { get; set; }
         public int RatingChange { get; set; }
         public double RatingMultiplier { get; set; } = 1.0;
+        public double Team1Confidence { get; set; } = 0.0; // Confidence at time of match
+        public double Team2Confidence { get; set; } = 0.0; // Confidence at time of match
         public DateTime? ChallengeExpiresAt { get; set; }
         public bool IsAccepted { get; set; }
         public Match? Match { get; private set; }
@@ -34,6 +43,11 @@ namespace WabbitBot.Core.Scrimmages
         }
 
         public bool IsTeamMatch => GameSize != GameSize.OneVOne;
+
+        private async Task PublishEventAsync(ICoreEvent @event)
+        {
+            await _eventBus.PublishAsync(@event);
+        }
 
         public static Scrimmage Create(string team1Id, string team2Id, GameSize gameSize, int bestOf = 1)
         {
@@ -96,7 +110,7 @@ namespace WabbitBot.Core.Scrimmages
             // Event will be published by source generator
         }
 
-        public void Complete(string winnerId, int team1Rating, int team2Rating, int ratingChange)
+        public async Task CompleteAsync(string winnerId, int team1Rating, int team2Rating, int ratingChange, double team1Confidence = 0.0, double team2Confidence = 0.0)
         {
             if (Status != ScrimmageStatus.InProgress)
                 throw new InvalidOperationException("Scrimmage can only be completed when in Progress state");
@@ -113,10 +127,24 @@ namespace WabbitBot.Core.Scrimmages
             Team1Rating = team1Rating;
             Team2Rating = team2Rating;
             RatingChange = ratingChange;
+            Team1Confidence = team1Confidence;
+            Team2Confidence = team2Confidence;
 
             Match.Complete(winnerId);
 
-            // Event will be published by source generator
+            // Publish ScrimmageCompletedEvent with confidence values
+            await PublishEventAsync(new ScrimmageCompletedEvent
+            {
+                ScrimmageId = Id.ToString(),
+                MatchId = Match.Id,
+                Team1Id = Team1Id,
+                Team2Id = Team2Id,
+                Team1Score = winnerId == Team1Id ? 1 : 0,
+                Team2Score = winnerId == Team2Id ? 1 : 0,
+                GameSize = GameSize,
+                Team1Confidence = team1Confidence,
+                Team2Confidence = team2Confidence
+            });
         }
 
         public void Cancel(string reason, string cancelledBy)

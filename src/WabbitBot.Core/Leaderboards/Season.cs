@@ -46,7 +46,7 @@ namespace WabbitBot.Core.Leaderboards
             EndDate = DateTime.UtcNow;
         }
 
-        public void AddTeamStats(string teamId, GameSize gameSize, int ratingChange, bool isWin, bool isTournament)
+        public void AddTeamStats(string teamId, GameSize gameSize, int ratingChange, bool isWin)
         {
             if (!IsActive)
                 throw new InvalidOperationException("Cannot add stats to an inactive season");
@@ -68,12 +68,8 @@ namespace WabbitBot.Core.Leaderboards
             else
                 stats.Losses++;
 
-            // Apply tournament/scrimmage weighting
-            var weightedChange = isTournament
-                ? (int)(ratingChange * Config.TournamentWeight)
-                : (int)(ratingChange * Config.ScrimmageWeight);
-
-            stats.CurrentRating += weightedChange;
+            // Apply rating change directly (no weighting)
+            stats.CurrentRating += ratingChange;
             stats.LastUpdated = DateTime.UtcNow;
         }
 
@@ -114,7 +110,7 @@ namespace WabbitBot.Core.Leaderboards
         public DateTime LastUpdated { get; set; }
         public Dictionary<string, double> OpponentDistribution { get; set; } = new();
         public double WinRate => MatchesCount == 0 ? 0 : (double)Wins / MatchesCount;
-        public int RecentMatchesCount{ get; set; }  // Number of games played within the variety window
+        public int RecentMatchesCount { get; set; }  // Number of games played within the variety window
     }
 
     public class SeasonConfig
@@ -122,7 +118,5 @@ namespace WabbitBot.Core.Leaderboards
         public bool RatingDecayEnabled { get; set; }
         public int DecayRatePerWeek { get; set; }
         public int MinimumRating { get; set; }
-        public double TournamentWeight { get; set; }
-        public double ScrimmageWeight { get; set; }
     }
 }

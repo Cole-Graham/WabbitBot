@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Text.Json.Serialization;
 using WabbitBot.Common.Models;
 using WabbitBot.Common.Data.Utilities;
+using System.Linq;
 
 namespace WabbitBot.Core.Common.Models
 {
@@ -21,9 +22,6 @@ namespace WabbitBot.Core.Common.Models
         [JsonIgnore]
         public List<TeamMember> Roster { get; set; } = new();
 
-        [JsonIgnore]
-        public Dictionary<GameSize, TeamStats> Stats { get; set; } = new();
-
         // JSON serialization properties
         [JsonPropertyName("Roster")]
         public string RosterJson
@@ -32,20 +30,12 @@ namespace WabbitBot.Core.Common.Models
             set => Roster = JsonUtil.Deserialize<List<TeamMember>>(value) ?? new();
         }
 
-        [JsonPropertyName("Stats")]
-        public string StatsJson
-        {
-            get => JsonUtil.Serialize(Stats);
-            set => Stats = JsonUtil.Deserialize<Dictionary<GameSize, TeamStats>>(value) ?? new();
-        }
-
         public Team()
         {
             Id = Guid.NewGuid();
             CreatedAt = DateTime.UtcNow;
             LastActive = DateTime.UtcNow;
             IsArchived = false;
-            InitializeStats();
             SetMaxRosterSize();
         }
 
@@ -59,17 +49,6 @@ namespace WabbitBot.Core.Common.Models
                 GameSize.FourVFour => 5,
                 _ => 1
             };
-        }
-
-        private void InitializeStats()
-        {
-            foreach (GameSize size in Enum.GetValues(typeof(GameSize)))
-            {
-                if (size != GameSize.OneVOne) // Teams don't participate in 1v1
-                {
-                    Stats[size] = new TeamStats();
-                }
-            }
         }
 
         public void UpdateLastActive()
@@ -146,28 +125,49 @@ namespace WabbitBot.Core.Common.Models
             }
         }
 
-        /// <summary>
-        /// Creates a 1v1 team for a player. This is used when a player participates in 1v1 matches.
-        /// The team name will be the same as the player's name (which should match their Discord nickname).
-        /// </summary>
-        public static Team CreateOneVOneTeam(Player player)
+        public bool HasPlayer(string playerId)
         {
-            var team = new Team
+            return Roster.Exists(m => m.PlayerId == playerId);
+        }
+
+        public bool HasActivePlayer(string playerId)
+        {
+            return Roster.Exists(m => m.PlayerId == playerId && m.IsActive);
+        }
+
+        public int GetActivePlayerCount()
+        {
+            return Roster.Count(m => m.IsActive);
+        }
+
+        public List<string> GetActivePlayerIds()
+        {
+            return Roster.Where(m => m.IsActive).Select(m => m.PlayerId).ToList();
+        }
+
+        public List<string> GetCorePlayerIds()
+        {
+            return Roster.Where(m => m.IsActive && m.Role == TeamRole.Core).Select(m => m.PlayerId).ToList();
+        }
+
+        public bool IsValidForGameSize(GameSize gameSize)
+        {
+            var requiredPlayers = gameSize switch
             {
-                Name = player.Name,
-                TeamSize = GameSize.OneVOne,
-                TeamCaptainId = player.Id.ToString(),
-                Tag = player.Name[..Math.Min(3, player.Name.Length)].ToUpper()
+                GameSize.TwoVTwo => 2,
+                GameSize.ThreeVThree => 3,
+                GameSize.FourVFour => 4,
+                _ => 1
             };
 
-            team.AddPlayer(player.Id.ToString(), TeamRole.Captain);
-            return team;
+            return GetActivePlayerCount() >= requiredPlayers;
         }
+    }
 
-        public bool HasPlayer(ulong playerId)
-        {
-            return Roster.Any(m => m.PlayerId == playerId.ToString());
-        }
+    public enum TeamRole
+    {
+        Core,
+        Substitute
     }
 
     public class TeamMember
@@ -175,35 +175,6 @@ namespace WabbitBot.Core.Common.Models
         public string PlayerId { get; set; } = string.Empty;
         public TeamRole Role { get; set; }
         public DateTime JoinedAt { get; set; }
-        public bool IsActive { get; set; } = true;
-
-        public TeamMember()
-        {
-            JoinedAt = DateTime.UtcNow;
-        }
-    }
-
-    public enum TeamRole
-    {
-        Captain,
-        Core,
-        Substitute
-    }
-
-    public class TeamStats : BaseStats
-    {
-        public Dictionary<string, double> OpponentDistribution { get; set; } = new();
-
-        public override void UpdateStats(bool isWin)
-        {
-            base.UpdateStats(isWin);
-            // Team-specific stat updates can be added here
-        }
-
-        public override void UpdateRating(int newRating)
-        {
-            base.UpdateRating(newRating);
-            // Team-specific rating updates can be added here
-        }
+        public bool IsActive { get; set; }
     }
 }

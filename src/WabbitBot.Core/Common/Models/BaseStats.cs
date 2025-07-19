@@ -9,8 +9,8 @@ namespace WabbitBot.Core.Common.Models
     {
         public int Wins { get; set; }
         public int Losses { get; set; }
-        public int Rating { get; set; } = 1500;
-        public int HighestRating { get; set; } = 1500;
+        public int Rating { get; set; } = 1000; // Starting rating changed to 1000
+        public int HighestRating { get; set; } = 1000; // Starting rating changed to 1000
         public int CurrentStreak { get; set; }
         public int LongestStreak { get; set; }
         public DateTime LastMatchAt { get; set; }

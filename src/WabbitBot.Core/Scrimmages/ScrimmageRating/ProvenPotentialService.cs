@@ -1,10 +1,13 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using WabbitBot.Core.Scrimmages.Data;
-using WabbitBot.Core.Scrimmages.ScrimmageRating.Interface;
 using WabbitBot.Common.Events.EventInterfaces;
 using WabbitBot.Common.ErrorHandling;
+using WabbitBot.Core.Common.Models;
+using WabbitBot.Core.Scrimmages;
+using WabbitBot.Core.Scrimmages.Data;
+using WabbitBot.Core.Scrimmages.ScrimmageRating.Interface;
 
 namespace WabbitBot.Core.Scrimmages.ScrimmageRating
 {
@@ -16,7 +19,7 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
         private readonly RatingCalculatorService _ratingCalculator;
         private const double PROVEN_POTENTIAL_GAP_THRESHOLD = 0.1;
         private const int MAX_MATCHES_FOR_PROVEN_POTENTIAL = 10;
-        private const double MAX_CONFIDENCE_FOR_PROVEN_POTENTIAL = 0.9;
+        private const double MAX_CONFIDENCE_FOR_PROVEN_POTENTIAL = 1.0; // Match Python: only consider matches where player had low confidence (< 1.0)
 
         public ProvenPotentialService(
             ICoreEventBus eventBus,
@@ -40,21 +43,23 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
             {
                 try
                 {
-                    // Use event bus to get team ratings and confidence levels
+                    // Use event bus to get team ratings
                     var team1RatingResp = await _eventBus.RequestAsync<GetTeamRatingRequest, GetTeamRatingResponse>(new GetTeamRatingRequest { TeamId = evt.Team1Id });
                     var team2RatingResp = await _eventBus.RequestAsync<GetTeamRatingRequest, GetTeamRatingResponse>(new GetTeamRatingRequest { TeamId = evt.Team2Id });
                     var team1Rating = team1RatingResp?.Rating ?? 0;
                     var team2Rating = team2RatingResp?.Rating ?? 0;
 
-                    // Confidence can be calculated or requested similarly (placeholder: 1.0)
-                    var team1Confidence = 1.0;
-                    var team2Confidence = 1.0;
+                    // Use confidence values from the event (calculated at match time)
+                    var team1Confidence = evt.Team1Confidence;
+                    var team2Confidence = evt.Team2Confidence;
 
                     // Calculate rating change using RatingCalculatorService
-                    var multiplier = await _ratingCalculator.CalculateRatingMultiplierAsync(
+                    var (team1Change, team2Change) = await _ratingCalculator.CalculateRatingChangeAsync(
                         evt.Team1Id, evt.Team2Id, team1Rating, team2Rating, evt.GameSize);
-                    var ratingChange = _ratingCalculator.CalculateRatingChange(
-                        evt.Team1Id, evt.Team2Id, team1Rating, team2Rating, multiplier);
+
+                    // For proven potential, we need a single rating change value
+                    // Use the average of both changes as a reasonable approximation
+                    var ratingChange = (int)((team1Change + team2Change) / 2.0);
 
                     // Request creation of proven potential record
                     var createRequest = new CreateProvenPotentialRecordRequest
@@ -109,7 +114,8 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
                 var gapClosurePercent = (originalGap - currentGap) / originalGap;
 
                 // Calculate next threshold to check
-                var nextThreshold = (Math.Floor(record.AppliedThresholds.Max() / PROVEN_POTENTIAL_GAP_THRESHOLD) + 1) * PROVEN_POTENTIAL_GAP_THRESHOLD;
+                var maxApplied = record.AppliedThresholds.Any() ? record.AppliedThresholds.Max() : 0.0;
+                var nextThreshold = (Math.Floor(maxApplied / PROVEN_POTENTIAL_GAP_THRESHOLD) + 1) * PROVEN_POTENTIAL_GAP_THRESHOLD;
 
                 // Skip if threshold not reached or already applied
                 if (gapClosurePercent < nextThreshold || record.AppliedThresholds.Contains(nextThreshold))
@@ -118,7 +124,7 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
                 // Calculate new rating change
                 var expectedScore = 1.0 / (1.0 + Math.Pow(10, (request.CurrentRating - record.Team2Rating) / 400.0));
                 var baseChange = 16.0 * (1 - expectedScore);
-                var confidenceMultiplier = 1.0 + (1.0 - record.Team1Confidence);
+                var confidenceMultiplier = 2.0 - record.Team1Confidence; // Use new formula: 2.0 - confidence
                 var newRatingChange = (int)(baseChange * confidenceMultiplier);
 
                 // Calculate adjustment
@@ -131,6 +137,16 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
                     Team1Id = record.Team1Id,
                     Team2Id = record.Team2Id,
                     Adjustment = ratingAdjustment
+                });
+
+                // Publish event to apply the rating adjustment
+                await _eventBus.PublishAsync(new ApplyProvenPotentialAdjustmentEvent
+                {
+                    Team1Id = record.Team1Id,
+                    Team2Id = record.Team2Id,
+                    Adjustment = ratingAdjustment,
+                    GameSize = GameSize.TwoVTwo, // TODO: Get actual game size from record
+                    Reason = $"Proven potential adjustment: {nextThreshold:P0} gap closure threshold"
                 });
 
                 // Update record
@@ -151,9 +167,9 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
         /// </summary>
         public async Task<CreateProvenPotentialRecordResponse> HandleCreateProvenPotentialRecordRequest(CreateProvenPotentialRecordRequest request)
         {
-            // Only create record if at least one team has low confidence
-            if (request.Team1Confidence > MAX_CONFIDENCE_FOR_PROVEN_POTENTIAL &&
-                request.Team2Confidence > MAX_CONFIDENCE_FOR_PROVEN_POTENTIAL)
+            // Only create record if at least one team has low confidence (< 1.0)
+            if (request.Team1Confidence >= MAX_CONFIDENCE_FOR_PROVEN_POTENTIAL &&
+                request.Team2Confidence >= MAX_CONFIDENCE_FOR_PROVEN_POTENTIAL)
             {
                 return new CreateProvenPotentialRecordResponse
                 {

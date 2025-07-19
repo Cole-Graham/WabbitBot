@@ -30,10 +30,11 @@ def write_overall_stats(f, players: List, results: List[Dict]) -> None:
     player_wins = defaultdict(int)
     player_games = defaultdict(int)
     for match in results:
-        winner = match["winner"]
+        # Calculate winner from player_won field
+        winner = match["player_id"] if match["player_won"] else match["opponent_id"]
         player_wins[winner] += 1
-        player_games[match["player1"]["name"]] += 1
-        player_games[match["player2"]["name"]] += 1
+        player_games[match["player_id"]] += 1
+        player_games[match["opponent_id"]] += 1
 
     # Calculate match statistics
     total_matches = len(results)
@@ -81,6 +82,9 @@ def write_overall_stats(f, players: List, results: List[Dict]) -> None:
 
     # Write top 10 players
     write_top_players(f, players, player_wins, player_games, results)
+
+    # Write proven potential statistics
+    write_proven_potential_stats(f, results)
 
 
 def write_target_achievement(
@@ -260,15 +264,15 @@ def write_top_players(
             last_match = None
             for match in reversed(results):
                 if (
-                    match["player1"]["name"] == player.name
-                    or match["player2"]["name"] == player.name
+                    match["player_id"] == player.name
+                    or match["opponent_id"] == player.name
                 ):
                     last_match = match
                     break
 
             if last_match:
                 # Get the variety bonus from the last match
-                if match["player1"]["name"] == player.name:
+                if match["player_id"] == player.name:
                     variety_bonus = match.get("p1_variety_bonus", 0.0)
                 else:
                     variety_bonus = match.get("p2_variety_bonus", 0.0)
@@ -314,3 +318,101 @@ def write_top_players(
             f"| {i:<4} | {player['name']:<8} | {player['rating']:>11.1f} | {player['target']:>13} | {player['win_rate']:>8.1f}% | {player['games']:>12} | {player['variety_bonus']:>13.2f} |\n"
         )
     f.write("\n")
+
+
+def write_proven_potential_stats(f, results: List[Dict]) -> None:
+    """Write proven potential statistics.
+
+    Args:
+        f: File object to write to
+        results: List of match results
+    """
+    f.write("## Proven Potential Statistics\n\n")
+
+    # Count total proven potential adjustments
+    total_pp_adjustments = 0
+    total_pp_matches = 0
+    player_pp_adjustments = defaultdict(int)
+    player_pp_benefits = defaultdict(float)
+
+    for match in results:
+        # Count player proven potential adjustments
+        player_pp_details = match.get("proven_potential_details", [])
+        opponent_pp_details = match.get("opponent_proven_potential_details", [])
+
+        if player_pp_details:
+            total_pp_matches += 1
+            player_id = match["player_id"]
+            player_pp_adjustments[player_id] += len(player_pp_details)
+            total_pp_adjustments += len(player_pp_details)
+
+            # Calculate total benefit for this player
+            for detail in player_pp_details:
+                player_pp_benefits[player_id] += detail.get("rating_adjustment", 0)
+
+        if opponent_pp_details:
+            total_pp_matches += 1
+            opponent_id = match["opponent_id"]
+            player_pp_adjustments[opponent_id] += len(opponent_pp_details)
+            total_pp_adjustments += len(opponent_pp_details)
+
+            # Calculate total benefit for this opponent
+            for detail in opponent_pp_details:
+                player_pp_benefits[opponent_id] += detail.get("rating_adjustment", 0)
+
+    # Calculate statistics
+    total_matches = len(results)
+    pp_match_percentage = (
+        (total_pp_matches / total_matches * 100) if total_matches > 0 else 0
+    )
+    avg_adjustments_per_pp_match = (
+        (total_pp_adjustments / total_pp_matches) if total_pp_matches > 0 else 0
+    )
+
+    # Find players with most proven potential adjustments
+    top_pp_players = sorted(
+        [(player, count) for player, count in player_pp_adjustments.items()],
+        key=lambda x: x[1],
+        reverse=True,
+    )[:10]
+
+    # Find players with most proven potential benefits
+    top_pp_beneficiaries = sorted(
+        [(player, benefit) for player, benefit in player_pp_benefits.items()],
+        key=lambda x: x[1],
+        reverse=True,
+    )[:10]
+
+    # Write overall proven potential statistics
+    f.write("| Metric                           | Value |\n")
+    f.write("|----------------------------------|-------|\n")
+    f.write(f"| Total Proven Potential Adjustments | {total_pp_adjustments:>6} |\n")
+    f.write(f"| Matches with PP Adjustments        | {total_pp_matches:>6} |\n")
+    f.write(f"| PP Match Percentage                | {pp_match_percentage:>6.1f}% |\n")
+    f.write(
+        f"| Avg Adjustments per PP Match       | {avg_adjustments_per_pp_match:>6.1f} |\n"
+    )
+    f.write(
+        f"| Players with PP Adjustments        | {len(player_pp_adjustments):>6} |\n"
+    )
+    f.write("\n")
+
+    # Write top players by proven potential adjustments
+    if top_pp_players:
+        f.write("### Top Players by Proven Potential Adjustments\n\n")
+        f.write("| Rank | Player   | PP Adjustments | Total Benefit |\n")
+        f.write("|------|----------|----------------|---------------|\n")
+        for i, (player, count) in enumerate(top_pp_players, 1):
+            benefit = player_pp_benefits.get(player, 0.0)
+            f.write(f"| {i:<4} | {player:<8} | {count:>14} | {benefit:>13.1f} |\n")
+        f.write("\n")
+
+    # Write top players by proven potential benefits
+    if top_pp_beneficiaries:
+        f.write("### Top Players by Proven Potential Benefits\n\n")
+        f.write("| Rank | Player   | Total Benefit | PP Adjustments |\n")
+        f.write("|------|----------|---------------|----------------|\n")
+        for i, (player, benefit) in enumerate(top_pp_beneficiaries, 1):
+            count = player_pp_adjustments.get(player, 0)
+            f.write(f"| {i:<4} | {player:<8} | {benefit:>13.1f} | {count:>14} |\n")
+        f.write("\n")

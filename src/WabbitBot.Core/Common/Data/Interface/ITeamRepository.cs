@@ -14,6 +14,5 @@ namespace WabbitBot.Core.Common.Data.Interface
         Task<IEnumerable<Team>> GetTeamsByGameSizeAsync(GameSize gameSize);
         Task<IEnumerable<Team>> GetInactiveTeamsAsync(TimeSpan inactivityThreshold);
         Task UpdateLastActiveAsync(string teamId);
-        Task UpdateTeamStatsAsync(string teamId, GameSize gameSize, TeamStats stats);
     }
 }

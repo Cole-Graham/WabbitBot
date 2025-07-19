@@ -36,7 +36,7 @@ namespace WabbitBot.Common.Data.Schema.Migrations
                         ParentId TEXT NULL,
                         ParentType TEXT NULL,
                         BestOf INTEGER NOT NULL DEFAULT 1,
-                        CreatedAt DATETIME NOT NULL,
+                        PlayToCompletion BOOLEAN NOT NULL DEFAULT 0,
                         UpdatedAt DATETIME NOT NULL
                     )", new { }, transaction);
 

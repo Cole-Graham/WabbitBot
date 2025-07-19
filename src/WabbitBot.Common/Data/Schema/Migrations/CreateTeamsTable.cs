@@ -28,7 +28,6 @@ namespace WabbitBot.Common.Data.Schema
                         MaxRosterSize INTEGER NOT NULL,
                         Roster TEXT NOT NULL,
                         LastActive DATETIME NOT NULL,
-                        Stats TEXT NOT NULL,
                         Tag TEXT,
                         Description TEXT,
                         IsArchived BOOLEAN NOT NULL,

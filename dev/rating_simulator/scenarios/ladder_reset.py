@@ -39,6 +39,17 @@ class LadderResetScenario(BaseScenario):
             1500  # The average rating we want players to converge to
         )
 
+        # Scenario-specific rating parameters
+        self.variety_bonus_games_threshold = (
+            20  # Only apply variety bonuses after 20 games
+        )
+        self.catch_up_bonus_config = {
+            "enabled": True,
+            "target_rating": self.intended_average,
+            "threshold": self.convergence_threshold,
+            "max_bonus": 1.0,
+        }
+
     def get_scenario_name(self) -> str:
         """Get the name of the scenario.
 
@@ -61,13 +72,19 @@ class LadderResetScenario(BaseScenario):
             "to intended average of 1500."
         )
 
-    def generate_players(self) -> List:
+    def generate_players(self, num_players: int = None) -> List:
         """Generate initial players with a curved distribution of target ratings.
+
+        Args:
+            num_players: Number of players to generate (defaults to self.num_players)
 
         Returns:
             List of player objects
         """
         players = []
+
+        # Use provided num_players or default to self.num_players
+        player_count = num_players if num_players is not None else self.num_players
 
         # Generate target ratings using a normal distribution
         # Center around 1700 (middle of 1000-2400 range)
@@ -77,7 +94,7 @@ class LadderResetScenario(BaseScenario):
 
         # Generate target ratings for all players
         target_ratings = []
-        for _ in range(self.num_players):
+        for _ in range(player_count):
             # Generate rating from normal distribution
             rating = random.gauss(mean_rating, std_dev)
 
@@ -218,168 +235,35 @@ class LadderResetScenario(BaseScenario):
         variety = min(1.0, rating_diff / 400)  # Max variety at 400 rating difference
         return variety
 
-    def calculate_multiplier(
-        self,
-        p1,
-        p2,
-        p1_variety_bonus: float = None,
-        p2_variety_bonus: float = None,
-        p1_won: bool = None,
-    ) -> tuple[float, float]:
+    def calculate_multiplier(self, p1, p2) -> float:
         """Calculate rating change multiplier for the match.
+
+        This is a minimal implementation since the actual multiplier calculation
+        is now handled by the rating calculator in the scenario simulator.
 
         Args:
             p1: Player 1
             p2: Player 2
-            p1_variety_bonus: Variety bonus for player 1 (from rating calculator)
-            p2_variety_bonus: Variety bonus for player 2 (from rating calculator)
-            p1_won: Whether player 1 won (needed to determine winner/loser multipliers)
 
         Returns:
-            Tuple of (p1_multiplier, p2_multiplier) - individual multipliers for each player
+            Default multiplier of 1.0 (actual calculation done by rating calculator)
         """
-        # Calculate individual confidence for each player
-        p1_confidence = min(1.0, p1.games_played / 20)  # Max confidence at 20 games
-        p2_confidence = min(1.0, p2.games_played / 20)  # Max confidence at 20 games
+        return 1.0
 
-        # Use individual variety bonuses if provided, otherwise fallback to simple calculation
-        if p1_variety_bonus is not None and p2_variety_bonus is not None:
-            p1_variety = p1_variety_bonus
-            p2_variety = p2_variety_bonus
-        else:
-            # Fallback to simple variety calculation
-            fallback_variety = self.calculate_variety_bonus(p1, p2)
-            p1_variety = fallback_variety
-            p2_variety = fallback_variety
-
-        # Calculate confidence multipliers (1.0 to 2.0 based on confidence)
-        # Lower confidence = higher multiplier (more volatile ratings)
-        p1_confidence_multiplier = 2.0 - p1_confidence
-        p2_confidence_multiplier = 2.0 - p2_confidence
-
-        # Calculate multipliers differently for winners vs losers
-        # Winners: positive variety = more gain (higher multiplier)
-        # Losers: negative variety = more loss (higher multiplier)
-        # Only apply variety bonuses after 20 games
-        if p1_won is not None:
-            if p1_won:
-                # p1 is winner, p2 is loser
-                p1_variety_effect = p1_variety if p1.games_played >= 20 else 0.0
-                p2_variety_effect = p2_variety if p2.games_played >= 20 else 0.0
-                p1_multiplier = (
-                    1.0 + p1_variety_effect
-                ) * p1_confidence_multiplier  # Winner: positive variety = more gain
-                p2_multiplier = (
-                    1.0 + p2_variety_effect
-                ) * p2_confidence_multiplier  # Loser: negative variety = more loss (same formula)
-            else:
-                # p2 is winner, p1 is loser
-                p1_variety_effect = p1_variety if p1.games_played >= 20 else 0.0
-                p2_variety_effect = p2_variety if p2.games_played >= 20 else 0.0
-                p1_multiplier = (
-                    1.0 + p1_variety_effect
-                ) * p1_confidence_multiplier  # Loser: negative variety = more loss (same formula)
-                p2_multiplier = (
-                    1.0 + p2_variety_effect
-                ) * p2_confidence_multiplier  # Winner: positive variety = more gain
-        else:
-            # Fallback if winner not specified
-            p1_variety_effect = p1_variety if p1.games_played >= 20 else 0.0
-            p2_variety_effect = p2_variety if p2.games_played >= 20 else 0.0
-            p1_multiplier = (1.0 + p1_variety_effect) * p1_confidence_multiplier
-            p2_multiplier = (1.0 + p2_variety_effect) * p2_confidence_multiplier
-
-        # Clamp multipliers between min and max values (same as rating calculator)
-        p1_multiplier = max(0.5, min(2.0, p1_multiplier))
-        p2_multiplier = max(0.5, min(2.0, p2_multiplier))
-
-        return p1_multiplier, p2_multiplier
-
-    def update_player_stats(
-        self,
-        p1,
-        p2,
-        p1_won: bool,
-        p1_variety_bonus: float = None,
-        p2_variety_bonus: float = None,
-    ) -> None:
+    def update_player_stats(self, p1, p2, p1_won: bool) -> None:
         """Update player statistics after a match.
+
+        This is a minimal implementation since the actual rating updates
+        are now handled by the rating calculator in the scenario simulator.
 
         Args:
             p1: Player 1
             p2: Player 2
             p1_won: Whether player 1 won
-            p1_variety_bonus: Variety bonus for player 1 (from rating calculator)
-            p2_variety_bonus: Variety bonus for player 2 (from rating calculator)
         """
-        # Calculate base rating change using normal K-factor
-        if p1_won:
-            # p1 is winner, p2 is loser
-            expected_score = 1 / (1 + 10 ** ((p2.rating - p1.rating) / 400))
-            base_change = 16.0 * (
-                1 - expected_score
-            )  # Use normal K-factor for base calculation
-        else:
-            # p2 is winner, p1 is loser
-            expected_score = 1 / (1 + 10 ** ((p1.rating - p2.rating) / 400))
-            base_change = 16.0 * (
-                1 - expected_score
-            )  # Use normal K-factor for base calculation
-
-        # Apply catch-up bonus for players below 1500
-        # This creates upward pressure toward the intended average
-        # Only apply to winners - losers should lose normal rating
-        p1_catchup_bonus = 1.0
-        p2_catchup_bonus = 1.0
-
-        if p1_won:
-            # p1 is winner - apply catch-up bonus if below 1500
-            if p1.rating < self.intended_average:
-                distance = self.intended_average - p1.rating
-                if distance > self.convergence_threshold:
-                    # Use exponential decay for the bonus
-                    scale = self.convergence_threshold / 2
-                    progress = 1 - math.exp(-distance / scale)
-                    p1_catchup_bonus = 1.0 + progress  # Bonus ranges from 1.0 to 2.0
-        else:
-            # p2 is winner - apply catch-up bonus if below 1500
-            if p2.rating < self.intended_average:
-                distance = self.intended_average - p2.rating
-                if distance > self.convergence_threshold:
-                    # Use exponential decay for the bonus
-                    scale = self.convergence_threshold / 2
-                    progress = 1 - math.exp(-distance / scale)
-                    p2_catchup_bonus = 1.0 + progress  # Bonus ranges from 1.0 to 2.0
-
-        # Apply multiplier using individual variety bonuses
-        p1_multiplier, p2_multiplier = self.calculate_multiplier(
-            p1, p2, p1_variety_bonus, p2_variety_bonus, p1_won
-        )
-
-        # Apply individual multipliers and catch-up bonuses to each player's rating change
-        # Only winners get catch-up bonus, losers use normal multipliers
-        if p1_won:
-            p1_change = (
-                base_change * p1_multiplier * p1_catchup_bonus
-            )  # Winner gets positive change with catch-up bonus
-            p2_change = (
-                -base_change * p2_multiplier
-            )  # Loser gets negative change (no catch-up bonus)
-        else:
-            p1_change = (
-                -base_change * p1_multiplier
-            )  # Loser gets negative change (no catch-up bonus)
-            p2_change = (
-                base_change * p2_multiplier * p2_catchup_bonus
-            )  # Winner gets positive change with catch-up bonus
-
-        # Update ratings
-        p1.rating += p1_change
-        p2.rating += p2_change
-
-        # Update games played
-        p1.games_played += 1
-        p2.games_played += 1
+        # The actual rating updates are handled by the rating calculator
+        # This method is just here to satisfy the abstract base class
+        pass
 
 
 class Player:

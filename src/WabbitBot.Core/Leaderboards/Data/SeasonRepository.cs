@@ -7,10 +7,11 @@ using WabbitBot.Common.Data;
 using WabbitBot.Common.Data.Interfaces;
 using WabbitBot.Common.Data.Utilities;
 using WabbitBot.Core.Leaderboards;
+using WabbitBot.Core.Leaderboards.Data.Interface;
 
 namespace WabbitBot.Core.Leaderboards.Data
 {
-    public class SeasonRepository : BaseJsonRepository<Season>
+    public class SeasonRepository : BaseJsonRepository<Season>, ISeasonRepository
     {
         private static readonly string[] Columns = new[]
         {

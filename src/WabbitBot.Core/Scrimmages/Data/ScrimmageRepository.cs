@@ -18,7 +18,7 @@ namespace WabbitBot.Core.Scrimmages.Data
             "Id", "Team1Id", "Team2Id", "Team1RosterIds", "Team2RosterIds",
             "GameSize", "CreatedAt", "StartedAt", "CompletedAt", "WinnerId",
             "Status", "Team1Rating", "Team2Rating", "RatingChange", "RatingMultiplier",
-            "ChallengeExpiresAt", "IsAccepted", "BestOf"
+            "Team1Confidence", "Team2Confidence", "ChallengeExpiresAt", "IsAccepted", "BestOf"
         };
 
         public ScrimmageRepository(IDatabaseConnection connection)
@@ -50,6 +50,8 @@ namespace WabbitBot.Core.Scrimmages.Data
                 Team2Rating = reader.GetInt32(reader.GetOrdinal("Team2Rating")),
                 RatingChange = reader.GetInt32(reader.GetOrdinal("RatingChange")),
                 RatingMultiplier = reader.GetDouble(reader.GetOrdinal("RatingMultiplier")),
+                Team1Confidence = reader.GetDouble(reader.GetOrdinal("Team1Confidence")),
+                Team2Confidence = reader.GetDouble(reader.GetOrdinal("Team2Confidence")),
                 ChallengeExpiresAt = reader.IsDBNull(reader.GetOrdinal("ChallengeExpiresAt")) ? null : reader.GetDateTime(reader.GetOrdinal("ChallengeExpiresAt")),
                 IsAccepted = reader.GetBoolean(reader.GetOrdinal("IsAccepted")),
                 BestOf = reader.GetInt32(reader.GetOrdinal("BestOf"))
@@ -75,6 +77,8 @@ namespace WabbitBot.Core.Scrimmages.Data
                 entity.Team2Rating,
                 entity.RatingChange,
                 entity.RatingMultiplier,
+                entity.Team1Confidence,
+                entity.Team2Confidence,
                 entity.ChallengeExpiresAt,
                 entity.IsAccepted,
                 entity.BestOf

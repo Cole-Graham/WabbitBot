@@ -51,20 +51,6 @@ namespace WabbitBot.Core.Leaderboards.Data
             return _seasons.Values.FirstOrDefault(s => s.IsActive);
         }
 
-        public IEnumerable<Season> GetSeasonsByDateRange(DateTime startDate, DateTime endDate)
-        {
-            return _seasons.Values
-                .Where(s => s.StartDate >= startDate && s.EndDate <= endDate)
-                .OrderBy(s => s.StartDate);
-        }
-
-        public IEnumerable<Season> GetSeasonsByGameSize(GameSize gameSize)
-        {
-            return _seasons.Values
-                .Where(s => s.TeamStats.ContainsKey(gameSize))
-                .OrderBy(s => s.StartDate);
-        }
-
         public IEnumerable<SeasonTeamStats> GetTeamStats(string teamId, GameSize gameSize)
         {
             return _seasons.Values
@@ -107,6 +93,31 @@ namespace WabbitBot.Core.Leaderboards.Data
                 .SelectMany(s => s.TeamStats[gameSize].Values)
                 .Where(s => s.MatchesCount >= minMatches)
                 .OrderByDescending(s => s.WinRate);
+        }
+
+        /// <summary>
+        /// Gets the start date of the active season, or a fallback date if no active season exists.
+        /// </summary>
+        /// <param name="fallbackDaysAgo">Number of days ago to use as fallback if no active season (default: 365 days)</param>
+        /// <returns>The start date of the active season, or the fallback date.</returns>
+        public DateTime GetActiveSeasonStartDate(int fallbackDaysAgo = 365)
+        {
+            var activeSeason = GetActiveSeason();
+            return activeSeason?.StartDate ?? DateTime.UtcNow.AddDays(-fallbackDaysAgo);
+        }
+
+        public IEnumerable<Season> GetSeasonsByDateRange(DateTime startDate, DateTime endDate)
+        {
+            return _seasons.Values
+                .Where(s => s.StartDate >= startDate && s.EndDate <= endDate)
+                .OrderBy(s => s.StartDate);
+        }
+
+        public IEnumerable<Season> GetSeasonsByGameSize(GameSize gameSize)
+        {
+            return _seasons.Values
+                .Where(s => s.TeamStats.ContainsKey(gameSize))
+                .OrderBy(s => s.StartDate);
         }
     }
 }

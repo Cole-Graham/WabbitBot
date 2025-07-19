@@ -21,7 +21,7 @@ namespace WabbitBot.Core.Matches.Data
         {
             "Id", "Team1Id", "Team2Id", "Team1PlayerIds", "Team2PlayerIds",
             "GameSize", "CreatedAt", "StartedAt", "CompletedAt", "WinnerId",
-            "Status", "Stage", "ParentId", "ParentType", "BestOf"
+            "Status", "Stage", "ParentId", "ParentType", "BestOf", "PlayToCompletion"
         };
 
         private readonly IGameRepository _gameRepository;

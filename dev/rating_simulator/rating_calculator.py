@@ -45,8 +45,6 @@ VARIETY_CONFIG = {
 
 # Multiplier Parameters
 MULTIPLIER_CONFIG = {
-    # Minimum possible multiplier
-    "min_multiplier": 0.5,
     # Maximum possible multiplier
     "max_multiplier": 2.0,
 }
@@ -270,7 +268,7 @@ class RatingCalculator:
         winner_variety_bonus: float,
         loser_variety_bonus: float,
         rating_range: float,  # Total range of leaderboard
-    ) -> Tuple[int, int]:
+    ) -> Tuple[int, int, float, float]:
         """Calculate rating change for a match.
 
         Matches the C# implementation:
@@ -288,7 +286,99 @@ class RatingCalculator:
           - 100% gap: 0.0 (no weight)
 
         Returns:
-            Tuple[int, int]: (winner_rating_change, loser_rating_change)
+            Tuple[int, int, float, float]: (winner_change, loser_change, winner_multiplier, loser_multiplier)
+        """
+        return self._calculate_rating_change_common(
+            winner_rating=winner_rating,
+            loser_rating=loser_rating,
+            winner_confidence=winner_confidence,
+            loser_confidence=loser_confidence,
+            winner_variety_bonus=winner_variety_bonus,
+            loser_variety_bonus=loser_variety_bonus,
+            rating_range=rating_range,
+            winner_games_played=0,
+            loser_games_played=0,
+            variety_bonus_games_threshold=0,  # Always apply variety bonuses
+            catch_up_bonus_config=None,  # No catch-up bonus
+        )
+
+    def calculate_rating_change_for_scenario(
+        self,
+        winner_rating: int,
+        loser_rating: int,
+        winner_confidence: float,
+        loser_confidence: float,
+        winner_variety_bonus: float,
+        loser_variety_bonus: float,
+        rating_range: float,
+        winner_games_played: int = 0,
+        loser_games_played: int = 0,
+        variety_bonus_games_threshold: int = 0,
+        catch_up_bonus_config: Dict = None,
+    ) -> Tuple[int, int, float, float]:
+        """Calculate rating change for scenario simulations with scenario-specific parameters.
+
+        Args:
+            winner_rating: Rating of the winner
+            loser_rating: Rating of the loser
+            winner_confidence: Confidence of the winner
+            loser_confidence: Confidence of the loser
+            winner_variety_bonus: Variety bonus for the winner
+            loser_variety_bonus: Variety bonus for the loser
+            rating_range: Total range of leaderboard
+            winner_games_played: Number of games played by winner
+            loser_games_played: Number of games played by loser
+            variety_bonus_games_threshold: Only apply variety bonuses after this many games (0 = always apply)
+            catch_up_bonus_config: Catch-up bonus configuration dict with keys: enabled, target_rating, threshold, max_bonus
+
+        Returns:
+            Tuple[int, int, float, float]: (winner_change, loser_change, winner_multiplier, loser_multiplier)
+        """
+        return self._calculate_rating_change_common(
+            winner_rating=winner_rating,
+            loser_rating=loser_rating,
+            winner_confidence=winner_confidence,
+            loser_confidence=loser_confidence,
+            winner_variety_bonus=winner_variety_bonus,
+            loser_variety_bonus=loser_variety_bonus,
+            rating_range=rating_range,
+            winner_games_played=winner_games_played,
+            loser_games_played=loser_games_played,
+            variety_bonus_games_threshold=variety_bonus_games_threshold,
+            catch_up_bonus_config=catch_up_bonus_config,
+        )
+
+    def _calculate_rating_change_common(
+        self,
+        winner_rating: int,
+        loser_rating: int,
+        winner_confidence: float,
+        loser_confidence: float,
+        winner_variety_bonus: float,
+        loser_variety_bonus: float,
+        rating_range: float,
+        winner_games_played: int = 0,
+        loser_games_played: int = 0,
+        variety_bonus_games_threshold: int = 0,
+        catch_up_bonus_config: Dict = None,
+    ) -> Tuple[int, int, float, float]:
+        """Common rating change calculation logic used by both standard and scenario calculators.
+
+        Args:
+            winner_rating: Rating of the winner
+            loser_rating: Rating of the loser
+            winner_confidence: Confidence of the winner
+            loser_confidence: Confidence of the loser
+            winner_variety_bonus: Variety bonus for the winner
+            loser_variety_bonus: Variety bonus for the loser
+            rating_range: Total range of leaderboard
+            winner_games_played: Number of games played by winner
+            loser_games_played: Number of games played by loser
+            variety_bonus_games_threshold: Only apply variety bonuses after this many games (0 = always apply)
+            catch_up_bonus_config: Catch-up bonus configuration dict with keys: enabled, target_rating, threshold, max_bonus
+
+        Returns:
+            Tuple[int, int, float, float]: (winner_change, loser_change, winner_multiplier, loser_multiplier)
         """
         # Calculate expected score using ELO formula
         expected_score = 1.0 / (
@@ -300,6 +390,13 @@ class RatingCalculator:
 
         # Calculate base rating change (K * (actual - expected))
         base_change = self.base_rating_change * (1 - expected_score)
+
+        # Apply variety bonus threshold if configured
+        if variety_bonus_games_threshold > 0:
+            if winner_games_played < variety_bonus_games_threshold:
+                winner_variety_bonus = 0.0
+            if loser_games_played < variety_bonus_games_threshold:
+                loser_variety_bonus = 0.0
 
         # Calculate confidence multipliers for each player (1.0 to 2.0 based on confidence)
         winner_confidence_multiplier = 2.0 - winner_confidence
@@ -327,32 +424,48 @@ class RatingCalculator:
                 # Loser is higher rated, apply scaling to their change
                 gap_scaling = cosine_scaling
 
-        # Calculate final multipliers for each player
-        # Both players use the same formula: (1.0 + variety_bonus) * confidence_multiplier
+        # Calculate final multipliers - always use different logic for winners vs losers
+        # Winners: positive variety = more gain (higher multiplier)
+        # Losers: negative variety = more loss (higher multiplier)
         winner_multiplier = (1.0 + winner_variety_bonus) * winner_confidence_multiplier
         loser_multiplier = (1.0 + loser_variety_bonus) * loser_confidence_multiplier
 
-        # Clamp multipliers between min and max values
-        winner_multiplier = max(
-            MULTIPLIER_CONFIG["min_multiplier"],
-            min(MULTIPLIER_CONFIG["max_multiplier"], winner_multiplier),
-        )
-        loser_multiplier = max(
-            MULTIPLIER_CONFIG["min_multiplier"],
-            min(MULTIPLIER_CONFIG["max_multiplier"], loser_multiplier),
-        )
+        # Clamp multipliers to maximum value only
+        winner_multiplier = min(MULTIPLIER_CONFIG["max_multiplier"], winner_multiplier)
+        loser_multiplier = min(MULTIPLIER_CONFIG["max_multiplier"], loser_multiplier)
+
+        # Apply catch-up bonus if enabled
+        winner_catchup_bonus = 1.0
+        loser_catchup_bonus = 1.0
+
+        if catch_up_bonus_config and catch_up_bonus_config.get("enabled", False):
+            target_rating = catch_up_bonus_config.get("target_rating", 1500)
+            threshold = catch_up_bonus_config.get("threshold", 200)
+            max_bonus = catch_up_bonus_config.get("max_bonus", 1.0)
+
+            # Apply catch-up bonus to winner if below target
+            if winner_rating < target_rating:
+                distance = target_rating - winner_rating
+                if distance > threshold:
+                    # Use exponential decay for the bonus
+                    scale = threshold / 2
+                    progress = 1 - math.exp(-distance / scale)
+                    winner_catchup_bonus = 1.0 + (progress * max_bonus)
 
         # Calculate final rating changes
         if winner_rating > loser_rating:
             # Winner is higher rated, apply gap scaling to their change
-            winner_change = int(base_change * winner_multiplier * gap_scaling)
-            loser_change = int(-base_change * loser_multiplier)
+            winner_change = int(
+                base_change * winner_multiplier * gap_scaling * winner_catchup_bonus
+            )
+            loser_change = int(-base_change * loser_multiplier * loser_catchup_bonus)
         else:
             # Loser is higher rated, apply gap scaling to their change
-            winner_change = int(base_change * winner_multiplier)
-            loser_change = int(-base_change * loser_multiplier * gap_scaling)
+            winner_change = int(base_change * winner_multiplier * winner_catchup_bonus)
+            loser_change = int(
+                -base_change * loser_multiplier * gap_scaling * loser_catchup_bonus
+            )
 
-        # Store the final multiplier in the match data for reporting
         return winner_change, loser_change, winner_multiplier, loser_multiplier
 
     def check_proven_potential(self, current_match: Dict, match_history: List[Dict]):
@@ -384,8 +497,13 @@ class RatingCalculator:
             # Only consider matches where the player had low confidence
             if (
                 player_confidence_at_time
-                > RATING_CONFIG["max_confidence_for_proven_potential"]
+                >= RATING_CONFIG["max_confidence_for_proven_potential"]
             ):
+                continue
+
+            # Only consider matches where the opponent had high confidence (established player)
+            opponent_confidence_at_time = match["opponent_confidence"]
+            if opponent_confidence_at_time < 1.0:
                 continue
 
             # Calculate original rating gap
@@ -402,71 +520,60 @@ class RatingCalculator:
             if "applied_thresholds" not in match:
                 match["applied_thresholds"] = set()
 
-            # Calculate the next threshold to check (in multiples of 10%)
-            next_threshold = (
+            # Calculate all unapplied thresholds that have been reached
+            # Find the highest threshold that has been reached but not yet applied
+            max_applied = (
+                max(match["applied_thresholds"]) if match["applied_thresholds"] else 0
+            )
+
+            # Calculate all thresholds that should be applied
+            # Start from the next threshold after max_applied and go up to the gap closure
+            thresholds_to_apply = []
+            current_threshold = (
                 math.floor(
-                    max(match["applied_thresholds"], default=0)
-                    / RATING_CONFIG["proven_potential_gap_threshold"]
+                    max_applied / RATING_CONFIG["proven_potential_gap_threshold"]
                 )
                 + 1
             ) * RATING_CONFIG["proven_potential_gap_threshold"]
 
-            # Only apply adjustment if we've crossed the next threshold
-            if gap_closure_percent < next_threshold:
+            while current_threshold <= gap_closure_percent:
+                if current_threshold not in match["applied_thresholds"]:
+                    thresholds_to_apply.append(current_threshold)
+                current_threshold += RATING_CONFIG["proven_potential_gap_threshold"]
+
+            # If no thresholds to apply, skip
+            if not thresholds_to_apply:
                 continue
 
-            # Skip if we've already applied this threshold
-            if next_threshold in match["applied_thresholds"]:
-                continue
+                # Calculate compensation based on gap closure percentage
+            # The compensation should be proportional to how much of the gap has been closed
+            # Use the original rating changes and scale them by the gap closure percentage
 
-            # Recalculate the ELO change using current ratings
-            # The expected score should be higher when the player's rating is higher
-            expected_score = 1.0 / (
-                1.0
-                + math.pow(
-                    10,
-                    (player_rating_at_time - opponent_rating_at_time)
-                    / RATING_CONFIG["elo_divisor"],
-                )
+            # Get the original rating changes for both players
+            original_player_change = match["player_rating_change"]
+            original_opponent_change = match["opponent_rating_change"]
+
+            # Calculate total compensation from all thresholds to apply
+            # The compensation should be the highest threshold reached
+            total_compensation_percentage = (
+                max(thresholds_to_apply) if thresholds_to_apply else 0
             )
 
-            # Calculate base rating change
-            base_change = self.base_rating_change * (1 - expected_score)
+            # Apply compensation to the original rating changes
+            # Both players get compensation proportional to their original changes
+            # Keep decimal precision to avoid rating drift
+            player_adjustment = original_player_change * total_compensation_percentage
+            opponent_adjustment = (
+                original_opponent_change * total_compensation_percentage
+            )
 
-            # Calculate confidence multiplier
-            confidence_multiplier = 1.0 + (1.0 - player_confidence_at_time)
+            # Store both adjustments
+            rating_adjustment = player_adjustment
+            opponent_rating_adjustment = opponent_adjustment
 
-            # Calculate final rating change
-            new_rating_change = int(base_change * confidence_multiplier)
-
-            # Calculate the difference between original and new rating change
-            original_change = match["rating_change"]
-            rating_adjustment = (
-                original_change - new_rating_change
-            )  # Reversed to get correct sign
-
-            # Apply the rating adjustment to both players
-            if match["player_won"]:
-                # Player was stronger than their rating suggested, so opponent gets points back
-                match["opponent_rating_after"] += rating_adjustment
-                # Store the rating adjustment in the match data for reporting
-                if "proven_potential_adjustment" not in match:
-                    match["proven_potential_adjustment"] = 0
-                match["proven_potential_adjustment"] = (
-                    rating_adjustment  # Positive because opponent gains points
-                )
-            else:
-                # Player was weaker than their rating suggested, so opponent loses points
-                match["opponent_rating_after"] -= rating_adjustment
-                # Store the rating adjustment in the match data for reporting
-                if "proven_potential_adjustment" not in match:
-                    match["proven_potential_adjustment"] = 0
-                match["proven_potential_adjustment"] = (
-                    -rating_adjustment  # Negative because opponent loses points
-                )
-
-            # Mark this threshold as applied
-            match["applied_thresholds"].add(next_threshold)
+            # Mark all thresholds as applied
+            for threshold in thresholds_to_apply:
+                match["applied_thresholds"].add(threshold)
 
             # Create the complete detail record
             detail_record = {
@@ -475,11 +582,14 @@ class RatingCalculator:
                 "current_gap": current_gap,
                 "gap_closed": gap_closed,
                 "gap_closure_percent": gap_closure_percent,
-                "original_rating_change": original_change,
-                "new_rating_change": new_rating_change,
-                "rating_adjustment": rating_adjustment,
+                "original_player_change": original_player_change,
+                "original_opponent_change": original_opponent_change,
+                "compensation_percentage": total_compensation_percentage,
+                "thresholds_applied": thresholds_to_apply,
+                "player_adjustment": player_adjustment,
+                "opponent_adjustment": opponent_adjustment,
+                "rating_adjustment": rating_adjustment,  # Keep for backward compatibility
                 "applied_to_both": True,
-                "threshold_applied": next_threshold,
             }
 
             # Store detailed calculations in the current match

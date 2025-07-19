@@ -36,10 +36,11 @@ namespace WabbitBot.Common.Data.Schema.Migrations
                         Team2Rating INTEGER NOT NULL,
                         RatingChange INTEGER NOT NULL,
                         RatingMultiplier REAL NOT NULL,
+                        Team1Confidence REAL NOT NULL DEFAULT 0.0,
+                        Team2Confidence REAL NOT NULL DEFAULT 0.0,
                         ChallengeExpiresAt DATETIME NULL,
                         IsAccepted BOOLEAN NOT NULL,
                         BestOf INTEGER NOT NULL DEFAULT 1,
-                        CreatedAt DATETIME NOT NULL,
                         UpdatedAt DATETIME NOT NULL
                     )", new { }, transaction);
 

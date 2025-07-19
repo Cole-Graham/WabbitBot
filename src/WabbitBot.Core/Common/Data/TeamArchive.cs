@@ -13,8 +13,8 @@ namespace WabbitBot.Core.Common.Data
         private static readonly string[] Columns = new[]
         {
             "Id", "Name", "TeamCaptainId", "TeamSize", "MaxRosterSize",
-            "Roster", "CreatedAt", "LastActive", "Stats", "Tag", "Description",
-            "UpdatedAt", "ArchivedAt"
+            "Roster", "LastActive", "Tag", "Description", "IsArchived", "ArchivedAt",
+            "CreatedAt", "UpdatedAt"
         };
 
         public TeamArchive(IDatabaseConnection connection)
@@ -34,9 +34,10 @@ namespace WabbitBot.Core.Common.Data
                 Roster = JsonUtil.Deserialize<List<TeamMember>>(reader.GetString(reader.GetOrdinal("Roster"))) ?? new(),
                 CreatedAt = reader.GetDateTime(reader.GetOrdinal("CreatedAt")),
                 LastActive = reader.GetDateTime(reader.GetOrdinal("LastActive")),
-                Stats = JsonUtil.Deserialize<Dictionary<GameSize, TeamStats>>(reader.GetString(reader.GetOrdinal("Stats"))) ?? new(),
                 Tag = reader.IsDBNull(reader.GetOrdinal("Tag")) ? null : reader.GetString(reader.GetOrdinal("Tag")),
                 Description = reader.IsDBNull(reader.GetOrdinal("Description")) ? null : reader.GetString(reader.GetOrdinal("Description")),
+                IsArchived = reader.GetBoolean(reader.GetOrdinal("IsArchived")),
+                ArchivedAt = reader.IsDBNull(reader.GetOrdinal("ArchivedAt")) ? null : (DateTime?)reader.GetDateTime(reader.GetOrdinal("ArchivedAt")),
                 UpdatedAt = reader.GetDateTime(reader.GetOrdinal("UpdatedAt"))
             };
         }
@@ -53,9 +54,9 @@ namespace WabbitBot.Core.Common.Data
                 Roster = JsonUtil.Serialize(entity.Roster),
                 entity.CreatedAt,
                 entity.LastActive,
-                Stats = JsonUtil.Serialize(entity.Stats),
                 entity.Tag,
                 entity.Description,
+                entity.IsArchived,
                 entity.UpdatedAt,
                 ArchivedAt = DateTime.UtcNow
             };

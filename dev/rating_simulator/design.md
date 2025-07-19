@@ -63,7 +63,7 @@ The bonus calculation takes into account several factors:
    - Uses Shannon entropy to measure the diversity of a player's opponent pool
    - Calculates weighted entropy for each player based on their opponent distribution
    - Higher entropy means more diverse opponent selection
-   - Only opponents within MAX_GAP_PERCENT (40%) of the player's rating count towards the variety score
+   - Only opponents within MAX_GAP_PERCENT (20%) of the player's rating count towards the variety score
    - This ensures players are rewarded for maintaining variety within their skill range
    - Formula: `playerVarietyEntropy = -Σ(weight * log2(weight))` for each opponent
    - Formula: `entropy_difference = player_entropy - average_entropy`
