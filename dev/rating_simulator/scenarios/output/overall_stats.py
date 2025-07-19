@@ -135,7 +135,7 @@ def write_overall_stats(f, players: List, results: List[Dict]) -> None:
 
     # Write overall statistics table with dynamic widths
     f.write(f"| {'Metric':<{metric_width}} | {'Value':>{value_width}} |\n")
-    f.write(f"|{'-' * metric_width}|{'-' * value_width}|\n")
+    f.write(f"| {'-' * metric_width} | {'-' * value_width} |\n")
     for row in overall_stats_rows:
         f.write(
             f"| {row['metric']:<{metric_width}} | {row['value']:>{value_width}} |\n"
@@ -157,7 +157,7 @@ def write_overall_stats(f, players: List, results: List[Dict]) -> None:
     # Write match statistics with dynamic widths
     f.write("## Match Statistics\n\n")
     f.write(f"| {'Metric':<{match_metric_width}} | {'Value':>{match_value_width}} |\n")
-    f.write(f"|{'-' * match_metric_width}|{'-' * match_value_width}|\n")
+    f.write(f"| {'-' * match_metric_width} | {'-' * match_value_width} |\n")
     for row in match_stats_rows:
         f.write(
             f"| {row['metric']:<{match_metric_width}} | {row['value']:>{match_value_width}} |\n"
@@ -173,7 +173,7 @@ def write_overall_stats(f, players: List, results: List[Dict]) -> None:
     # Write win rate analysis
     write_win_rate_analysis(f, players, player_wins, player_games)
 
-    # Write top 10 players
+    # Write top 100 players
     write_top_players(f, players, player_wins, player_games, results)
 
     # Write proven potential statistics
@@ -249,7 +249,7 @@ def write_target_achievement(
         f"| {'Target Rating':<{target_width}} | {'Players':>{players_width}} | {'Achieved':>{achieved_width}} | {'% Achieved':>{percent_width}} | {'Avg Final Rating':>{avg_rating_width}} |\n"
     )
     f.write(
-        f"|{'-' * target_width}|{'-' * players_width}|{'-' * achieved_width}|{'-' * percent_width}|{'-' * avg_rating_width}|\n"
+        f"| {'-' * target_width} | {'-' * players_width} | {'-' * achieved_width} | {'-' * percent_width} | {'-' * avg_rating_width} |\n"
     )
     for row in target_rows:
         f.write(
@@ -308,7 +308,9 @@ def write_rating_distribution(
     f.write(
         f"| {'Rating Range':<{range_width}} | {'Players':>{dist_players_width}} | {'% of Total':>{percent_width}} |\n"
     )
-    f.write(f"|{'-' * range_width}|{'-' * dist_players_width}|{'-' * percent_width}|\n")
+    f.write(
+        f"| {'-' * range_width} | {'-' * dist_players_width} | {'-' * percent_width} |\n"
+    )
     for row in dist_rows:
         f.write(
             f"| {row['range']:<{range_width}} | {row['players']:>{dist_players_width}} | {row['percent']:>{percent_width}} |\n"
@@ -387,7 +389,9 @@ def write_win_rate_analysis(
     f.write(
         f"| {'Rating Range':<{win_range_width}} | {'Avg Win Rate':>{win_rate_width}} | {'Games per Player':>{games_width}} |\n"
     )
-    f.write(f"|{'-' * win_range_width}|{'-' * win_rate_width}|{'-' * games_width}|\n")
+    f.write(
+        f"| {'-' * win_range_width} | {'-' * win_rate_width} | {'-' * games_width} |\n"
+    )
     for row in win_rows:
         f.write(
             f"| {row['range']:<{win_range_width}} | {row['win_rate']:>{win_rate_width}} | {row['games']:>{games_width}} |\n"
@@ -490,7 +494,7 @@ def write_top_players(
         f"| {'Rank':<{rank_width}} | {'Player':<{name_width}} | {'Final Rating':>{final_rating_width}} | {'Target Rating':>{target_rating_width}} | {'Win Rate':>{win_rate_width}} | {'Games Played':>{games_played_width}} | {'Variety Bonus':>{variety_bonus_width}} |\n"
     )
     f.write(
-        f"|{'-' * rank_width}|{'-' * name_width}|{'-' * final_rating_width}|{'-' * target_rating_width}|{'-' * win_rate_width}|{'-' * games_played_width}|{'-' * variety_bonus_width}|\n"
+        f"| {'-' * rank_width} | {'-' * name_width} | {'-' * final_rating_width} | {'-' * target_rating_width} | {'-' * win_rate_width} | {'-' * games_played_width} | {'-' * variety_bonus_width} |\n"
     )
     for row in top_players_rows:
         f.write(
@@ -527,7 +531,7 @@ def write_proven_potential_stats(f, results: List[Dict], players: List = None) -
 
             # Calculate total benefit for this player
             for detail in player_pp_details:
-                player_pp_benefits[player_id] += detail.get("rating_adjustment", 0)
+                player_pp_benefits[player_id] += detail.get("player_adjustment", 0)
 
         if opponent_pp_details:
             total_pp_matches += 1
@@ -537,7 +541,7 @@ def write_proven_potential_stats(f, results: List[Dict], players: List = None) -
 
             # Calculate total benefit for this opponent
             for detail in opponent_pp_details:
-                player_pp_benefits[opponent_id] += detail.get("rating_adjustment", 0)
+                player_pp_benefits[opponent_id] += detail.get("opponent_adjustment", 0)
 
     # Calculate statistics
     total_matches = len(results)
@@ -586,7 +590,7 @@ def write_proven_potential_stats(f, results: List[Dict], players: List = None) -
 
     # Write overall proven potential statistics with dynamic widths
     f.write(f"| {'Metric':<{pp_metric_width}} | {'Value':>{pp_value_width}} |\n")
-    f.write(f"|{'-' * pp_metric_width}|{'-' * pp_value_width}|\n")
+    f.write(f"| {'-' * pp_metric_width} | {'-' * pp_value_width} |\n")
     for row in pp_stats_rows:
         f.write(
             f"| {row['metric']:<{pp_metric_width}} | {row['value']:>{pp_value_width}} |\n"
@@ -621,7 +625,7 @@ def write_proven_potential_stats(f, results: List[Dict], players: List = None) -
             f"| {'Rank':<{pp_adj_rank_width}} | {'Player':<{pp_adj_player_width}} | {'PP Adjustments':>{pp_adj_adjustments_width}} | {'Total Benefit':>{pp_adj_benefit_width}} |\n"
         )
         f.write(
-            f"|{'-' * pp_adj_rank_width}|{'-' * pp_adj_player_width}|{'-' * pp_adj_adjustments_width}|{'-' * pp_adj_benefit_width}|\n"
+            f"| {'-' * pp_adj_rank_width} | {'-' * pp_adj_player_width} | {'-' * pp_adj_adjustments_width} | {'-' * pp_adj_benefit_width} |\n"
         )
         for row in pp_adj_rows:
             f.write(
@@ -680,7 +684,7 @@ def write_proven_potential_stats(f, results: List[Dict], players: List = None) -
             f"| {'Rank':<{pp_benefit_rank_width}} | {'Player':<{pp_benefit_player_width}} | {'Total Benefit':>{pp_benefit_benefit_width}} | {'PP Adjustments':>{pp_benefit_adjustments_width}} | {'Games Played':>{pp_benefit_games_width}} | {'Target Rating':>{pp_benefit_target_width}} | {'Avg Opponent Target':>{pp_benefit_avg_opponent_width}} |\n"
         )
         f.write(
-            f"|{'-' * pp_benefit_rank_width}|{'-' * pp_benefit_player_width}|{'-' * pp_benefit_benefit_width}|{'-' * pp_benefit_adjustments_width}|{'-' * pp_benefit_games_width}|{'-' * pp_benefit_target_width}|{'-' * pp_benefit_avg_opponent_width}|\n"
+            f"| {'-' * pp_benefit_rank_width} | {'-' * pp_benefit_player_width} | {'-' * pp_benefit_benefit_width} | {'-' * pp_benefit_adjustments_width} | {'-' * pp_benefit_games_width} | {'-' * pp_benefit_target_width} | {'-' * pp_benefit_avg_opponent_width} |\n"
         )
         for row in pp_benefit_rows:
             f.write(

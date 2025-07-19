@@ -47,9 +47,9 @@ MATCH_CONFIG = {
 # Ladder Reset Scenario Parameters
 LADDER_RESET_CONFIG = {
     # Number of players in the ladder
-    "num_players": 20,
+    "num_players": 100,
     # Number of matches to simulate
-    "num_matches": 800,
+    "num_matches": 8800,
     # Target rating distribution (rating, percentage)
     "target_rating_distribution": [
         (1300, 0.1),  # 10% of players target 1300
@@ -64,7 +64,7 @@ LADDER_RESET_CONFIG = {
     "late_joiners": {
         "enabled": True,
         "late_joiner_percentage": 0.20,  # 20% of total players join later
-        "join_after_matches": 400,  # Join after this many matches
-        "join_interval": 50,  # Join every N matches
+        "join_after_matches": 3000,  # Join after this many matches
+        "join_interval": 150,  # Join every N matches
     },
 }

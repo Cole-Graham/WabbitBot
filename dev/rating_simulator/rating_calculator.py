@@ -12,7 +12,7 @@ RATING_CONFIG = {
     # Minimum rating possible
     "minimum_rating": 600,
     # Base K-factor for ELO calculations
-    "base_rating_change": 64.0,
+    "base_rating_change": 40.0,
     # ELO rating divisor (default 400)
     "elo_divisor": 400.0,
     # Maximum matches to look back for proven potential
@@ -426,17 +426,17 @@ class RatingCalculator:
 
         # Calculate final multipliers - always use different logic for winners vs losers
         # Winners: positive variety = more gain (higher multiplier)
-        # Losers: negative variety = more loss (higher multiplier)
+        # Losers: positive variety = less loss (lower multiplier)
         winner_multiplier = winner_confidence_multiplier + winner_variety_bonus
-        loser_multiplier = loser_confidence_multiplier + loser_variety_bonus
+        loser_multiplier = loser_confidence_multiplier - loser_variety_bonus
 
-        # Clamp multipliers to maximum value only
+        # Clamp multipliers to maximum value only (before catchup bonus)
         winner_multiplier = min(MULTIPLIER_CONFIG["max_multiplier"], winner_multiplier)
         loser_multiplier = min(MULTIPLIER_CONFIG["max_multiplier"], loser_multiplier)
 
-        # Apply catch-up bonus if enabled
-        winner_catchup_bonus = 1.0
-        loser_catchup_bonus = 1.0
+        # Apply catch-up bonus if enabled (additive after other multipliers)
+        winner_catchup_bonus = 0.0
+        loser_catchup_bonus = 0.0
 
         if catch_up_bonus_config and catch_up_bonus_config.get("enabled", False):
             target_rating = catch_up_bonus_config.get("target_rating", 1500)
@@ -450,20 +450,22 @@ class RatingCalculator:
                     # Use exponential decay for the bonus
                     scale = threshold / 2
                     progress = 1 - math.exp(-distance / scale)
-                    winner_catchup_bonus = 1.0 + (progress * max_bonus)
+                    winner_catchup_bonus = progress * max_bonus
 
-        # Calculate final rating changes
+        # Calculate final rating changes with additive catchup bonus
         if winner_rating > loser_rating:
             # Winner is higher rated, apply gap scaling to their change
             winner_change = int(
-                base_change * winner_multiplier * gap_scaling * winner_catchup_bonus
+                base_change * (winner_multiplier + winner_catchup_bonus) * gap_scaling
             )
-            loser_change = int(-base_change * loser_multiplier * loser_catchup_bonus)
+            loser_change = int(-base_change * (loser_multiplier + loser_catchup_bonus))
         else:
             # Loser is higher rated, apply gap scaling to their change
-            winner_change = int(base_change * winner_multiplier * winner_catchup_bonus)
+            winner_change = int(
+                base_change * (winner_multiplier + winner_catchup_bonus)
+            )
             loser_change = int(
-                -base_change * loser_multiplier * gap_scaling * loser_catchup_bonus
+                -base_change * (loser_multiplier + loser_catchup_bonus) * gap_scaling
             )
 
         return winner_change, loser_change, winner_multiplier, loser_multiplier
@@ -542,6 +544,7 @@ class RatingCalculator:
                 + 1
             ) * RATING_CONFIG["proven_potential_gap_threshold"]
 
+            # Only apply thresholds that haven't been applied yet and are within the gap closure
             while current_threshold <= gap_closure_percent:
                 if current_threshold not in match["applied_thresholds"]:
                     thresholds_to_apply.append(current_threshold)
@@ -551,7 +554,7 @@ class RatingCalculator:
             if not thresholds_to_apply:
                 continue
 
-                # Calculate compensation based on gap closure percentage
+            # Calculate compensation based on gap closure percentage
             # The compensation should be proportional to how much of the gap has been closed
             # Use the original rating changes and scale them by the gap closure percentage
 
@@ -559,10 +562,10 @@ class RatingCalculator:
             original_player_change = match["player_rating_change"]
             original_opponent_change = match["opponent_rating_change"]
 
-            # Calculate total compensation from all thresholds to apply
-            # The compensation should be the highest threshold reached
+            # Calculate incremental compensation from new thresholds only
+            # The compensation should be the highest new threshold reached
             total_compensation_percentage = (
-                max(thresholds_to_apply) if thresholds_to_apply else 0
+                max(thresholds_to_apply) - max_applied if thresholds_to_apply else 0
             )
 
             # Apply compensation to the original rating changes
@@ -573,30 +576,32 @@ class RatingCalculator:
                 original_opponent_change * total_compensation_percentage
             )
 
-            # Store both adjustments
-            rating_adjustment = player_adjustment
-            opponent_rating_adjustment = opponent_adjustment
-
             # Mark all thresholds as applied
             for threshold in thresholds_to_apply:
                 match["applied_thresholds"].add(threshold)
 
-            # Create the complete detail record
-            detail_record = {
-                "previous_match_number": match["match_number"],
-                "original_gap": original_gap,
-                "current_gap": current_gap,
-                "gap_closed": gap_closed,
-                "gap_closure_percent": gap_closure_percent,
-                "original_player_change": original_player_change,
-                "original_opponent_change": original_opponent_change,
-                "compensation_percentage": total_compensation_percentage,
-                "thresholds_applied": thresholds_to_apply,
-                "player_adjustment": player_adjustment,
-                "opponent_adjustment": opponent_adjustment,
-                "rating_adjustment": rating_adjustment,  # Keep for backward compatibility
-                "applied_to_both": True,
-            }
+            # Only add details if there's actual compensation to apply
+            if abs(player_adjustment) > 0.01 or abs(opponent_adjustment) > 0.01:
+                # Store both adjustments
+                rating_adjustment = player_adjustment
+                opponent_rating_adjustment = opponent_adjustment
 
-            # Store detailed calculations in the current match
-            current_match["proven_potential_details"].append(detail_record)
+                # Create the complete detail record
+                detail_record = {
+                    "previous_match_number": match["match_number"],
+                    "original_gap": original_gap,
+                    "current_gap": current_gap,
+                    "gap_closed": gap_closed,
+                    "gap_closure_percent": gap_closure_percent,
+                    "original_player_change": original_player_change,
+                    "original_opponent_change": original_opponent_change,
+                    "compensation_percentage": total_compensation_percentage,
+                    "thresholds_applied": thresholds_to_apply,
+                    "player_adjustment": player_adjustment,
+                    "opponent_adjustment": opponent_adjustment,
+                    "rating_adjustment": rating_adjustment,  # Keep for backward compatibility
+                    "applied_to_both": True,
+                }
+
+                # Store detailed calculations in the current match
+                current_match["proven_potential_details"].append(detail_record)

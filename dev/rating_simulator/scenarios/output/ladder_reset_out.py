@@ -166,35 +166,40 @@ def write_simple_match_details(f, match: Dict) -> None:
     winner_change = player_change if player_won else opponent_change
     loser_change = opponent_change if player_won else player_change
 
-    # Write the simple table format
-    f.write("| Category                 | Details                    |\n")
-    f.write("|--------------------------|----------------------------|\n")
-    f.write(f"| Challenger               | {player_id} |\n")
-    f.write(f"| Opponent                 | {opponent_id} |\n")
-    f.write(
-        f"| Result                   | {'Win' if player_won else 'Loss'}                        |\n"
-    )
-    f.write(
-        f"| Challenger Rating        | {match['player_rating_before']:.1f} -> {match['player_rating_after']:.1f}           |\n"
-    )
-    f.write(
-        f"| Opponent Rating          | {match['opponent_rating_before']:.1f} -> {match['opponent_rating_after']:.1f}           |\n"
-    )
-    f.write(
-        f"| Win Probability          | {match['win_probability']*100:.1f}%                      |\n"
-    )
-    f.write(
-        f"| Challenger Confidence    | {match['player_confidence']:.2f}                       |\n"
-    )
-    f.write(
-        f"| Opponent Confidence      | {match['opponent_confidence']:.2f}                       |\n"
-    )
-    f.write(
-        f"| Challenger Variety Bonus | {match.get('p1_variety_bonus', 0.0):.2f}                       |\n"
-    )
-    f.write(
-        f"| Opponent Variety Bonus   | {match.get('p2_variety_bonus', 0.0):.2f}                       |\n"
-    )
+    # Prepare data for dynamic column width calculation
+    table_rows = [
+        {"category": "Challenger", "details": player_id},
+        {"category": "Opponent", "details": opponent_id},
+        {"category": "Result", "details": "Win" if player_won else "Loss"},
+        {
+            "category": "Challenger Rating",
+            "details": f"{match['player_rating_before']:.1f} -> {match['player_rating_after']:.1f}",
+        },
+        {
+            "category": "Opponent Rating",
+            "details": f"{match['opponent_rating_before']:.1f} -> {match['opponent_rating_after']:.1f}",
+        },
+        {
+            "category": "Win Probability",
+            "details": f"{match['win_probability']*100:.1f}%",
+        },
+        {
+            "category": "Challenger Confidence",
+            "details": f"{match['player_confidence']:.2f}",
+        },
+        {
+            "category": "Opponent Confidence",
+            "details": f"{match['opponent_confidence']:.2f}",
+        },
+        {
+            "category": "Challenger Variety Bonus",
+            "details": f"{match.get('p1_variety_bonus', 0.0):.2f}",
+        },
+        {
+            "category": "Opponent Variety Bonus",
+            "details": f"{match.get('p2_variety_bonus', 0.0):.2f}",
+        },
+    ]
 
     # Determine winner and loser multipliers
     if player_won:
@@ -204,40 +209,37 @@ def write_simple_match_details(f, match: Dict) -> None:
         winner_multiplier = match["p2_multiplier"]
         loser_multiplier = match["p1_multiplier"]
 
-    f.write(
-        f"| Rating Changes           | Winner: {winner_change:.1f}, Loser: {loser_change:.1f} |\n"
+    table_rows.extend(
+        [
+            {
+                "category": "Rating Changes",
+                "details": f"Winner: {winner_change:.1f}, Loser: {loser_change:.1f}",
+            },
+            {
+                "category": "Multipliers",
+                "details": f"Winner: {winner_multiplier:.2f}, Loser: {loser_multiplier:.2f}",
+            },
+        ]
     )
-    f.write(
-        f"| Multipliers              | Winner: {winner_multiplier:.2f}, Loser: {loser_multiplier:.2f}  |\n"
-    )
 
-    # Add proven potential details if available
-    proven_potential_details = match.get("proven_potential_details", [])
-    opponent_proven_potential_details = match.get(
-        "opponent_proven_potential_details", []
-    )
+    # Calculate column widths
+    def get_max_width(header, rows, key):
+        if not rows:
+            return len(header)
+        return max(
+            len(header),
+            max(len(str(row.get(key, ""))) for row in rows),
+        )
 
-    if proven_potential_details or opponent_proven_potential_details:
-        f.write("| Proven Potential        | ")
-        if proven_potential_details:
-            f.write(f"Player: {len(proven_potential_details)} adjustments")
-        if opponent_proven_potential_details:
-            if proven_potential_details:
-                f.write(", ")
-            f.write(f"Opponent: {len(opponent_proven_potential_details)} adjustments")
-        f.write(" |\n")
+    category_width = get_max_width("Category", table_rows, "category")
+    details_width = get_max_width("Details", table_rows, "details")
 
-        # Show details of proven potential adjustments
-        for i, detail in enumerate(proven_potential_details[:3]):  # Show first 3
-            f.write(
-                f"| PP Detail {i+1}           | Historical Match {detail['previous_match_number']}: {detail['gap_closure_percent']:.1%} gap closed, {detail['rating_adjustment']:+.0f} pts |\n"
-            )
+    # Write header with dynamic widths
+    f.write(f"| {'Category':<{category_width}} | {'Details':<{details_width}} |\n")
+    f.write(f"| {'-' * category_width} | {'-' * details_width} |\n")
 
-        for i, detail in enumerate(
-            opponent_proven_potential_details[:3]
-        ):  # Show first 3
-            # Note: This shows compensation going to the opponent from the historical match
-            # The actual player receiving compensation is from the historical match, not the current opponent
-            f.write(
-                f"| Opp PP Detail {i+1}      | Historical Match {detail['previous_match_number']} opponent: {detail['gap_closure_percent']:.1%} gap closed, {detail['rating_adjustment']:+.0f} pts |\n"
-            )
+    # Write data rows with dynamic widths
+    for row in table_rows:
+        f.write(
+            f"| {row['category']:<{category_width}} | {row['details']:<{details_width}} |\n"
+        )

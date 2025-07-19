@@ -11,6 +11,8 @@ Usage:
 Options:
     --match <number>           Look up a specific match number
     --range <start>-<end>      Look up a range of matches (e.g., 1-10)
+    --player <name>            Look up all matches for a specific player (by name or ID)
+    --pp-player <name>         Look up all matches that have proven potential adjustment details for a specific player
     --output <filename>        Output file name (default: match_details.md)
     --data-file <path>         Specify a specific data file (default: most recent)
     --list-recent              List recent simulation files
@@ -180,40 +182,48 @@ def format_match_details(
         loser_multiplier = match["p1_multiplier"]
 
     # Write the table format matching the original
-    output.append("| Category                 | Details                    |")
-    output.append("|--------------------------|----------------------------|")
-    output.append(f"| Challenger               | {challenger_name} |")
-    output.append(f"| Opponent                 | {opponent_name} |")
-    output.append(
-        f"| Result                   | {'Win' if match['player_won'] else 'Loss'}                        |"
-    )
-    output.append(
-        f"| Challenger Rating        | {match['player_rating_before']:.1f} -> {match['player_rating_after']:.1f}           |"
-    )
-    output.append(
-        f"| Opponent Rating          | {match['opponent_rating_before']:.1f} -> {match['opponent_rating_after']:.1f}           |"
-    )
-    output.append(
-        f"| Win Probability          | {match['win_probability']*100:.1f}%                      |"
-    )
-    output.append(
-        f"| Challenger Confidence    | {match['player_confidence']:.2f}                       |"
-    )
-    output.append(
-        f"| Opponent Confidence      | {match['opponent_confidence']:.2f}                       |"
-    )
-    output.append(
-        f"| Challenger Variety Bonus | {match['p1_variety_bonus']:.2f}                       |"
-    )
-    output.append(
-        f"| Opponent Variety Bonus   | {match['p2_variety_bonus']:.2f}                       |"
-    )
-    output.append(
-        f"| Rating Changes           | Winner: {winner_change:.1f}, Loser: {loser_change:.1f} |"
-    )
-    output.append(
-        f"| Multipliers              | Winner: {winner_multiplier:.2f}, Loser: {loser_multiplier:.2f}  |"
-    )
+    # Prepare data for dynamic column width calculation
+    table_rows = [
+        {"category": "Challenger", "details": challenger_name},
+        {"category": "Opponent", "details": opponent_name},
+        {"category": "Result", "details": "Win" if match["player_won"] else "Loss"},
+        {
+            "category": "Challenger Rating",
+            "details": f"{match['player_rating_before']:.1f} -> {match['player_rating_after']:.1f}",
+        },
+        {
+            "category": "Opponent Rating",
+            "details": f"{match['opponent_rating_before']:.1f} -> {match['opponent_rating_after']:.1f}",
+        },
+        {
+            "category": "Win Probability",
+            "details": f"{match['win_probability']*100:.1f}%",
+        },
+        {
+            "category": "Challenger Confidence",
+            "details": f"{match['player_confidence']:.2f}",
+        },
+        {
+            "category": "Opponent Confidence",
+            "details": f"{match['opponent_confidence']:.2f}",
+        },
+        {
+            "category": "Challenger Variety Bonus",
+            "details": f"{match['p1_variety_bonus']:.2f}",
+        },
+        {
+            "category": "Opponent Variety Bonus",
+            "details": f"{match['p2_variety_bonus']:.2f}",
+        },
+        {
+            "category": "Rating Changes",
+            "details": f"Winner: {winner_change:.1f}, Loser: {loser_change:.1f}",
+        },
+        {
+            "category": "Multipliers",
+            "details": f"Winner: {winner_multiplier:.2f}, Loser: {loser_multiplier:.2f}",
+        },
+    ]
 
     # Add proven potential details if available
     proven_potential_details = match.get("proven_potential_details", [])
@@ -222,16 +232,18 @@ def format_match_details(
     )
 
     if proven_potential_details or opponent_proven_potential_details:
-        output.append("| Proven Potential        | ")
+        pp_summary = []
         if proven_potential_details:
-            output.append(f"Player: {len(proven_potential_details)} adjustments")
+            pp_summary.append(f"Player: {len(proven_potential_details)} adjustments")
         if opponent_proven_potential_details:
             if proven_potential_details:
-                output.append(", ")
-            output.append(
+                pp_summary.append(", ")
+            pp_summary.append(
                 f"Opponent: {len(opponent_proven_potential_details)} adjustments"
             )
-        output.append(" |")
+        table_rows.append(
+            {"category": "Proven Potential", "details": "".join(pp_summary)}
+        )
 
         # Show details of proven potential adjustments
         for i, detail in enumerate(proven_potential_details[:3]):  # Show first 3
@@ -253,8 +265,11 @@ def format_match_details(
                 except StopIteration:
                     pass  # Keep the generic names if match not found
 
-            output.append(
-                f"| PP Detail {i+1}           | Match {detail['previous_match_number']} - {original_player_name} gets {detail['player_adjustment']:+.0f} pts, {original_opponent_name} gets {detail['opponent_adjustment']:+.0f} pts compensation: {detail['gap_closure_percent']:.1%} gap closed |"
+            table_rows.append(
+                {
+                    "category": f"PP Detail {i+1}",
+                    "details": f"Match {detail['previous_match_number']} - {original_player_name} gets {detail['player_adjustment']:+.1f} pts, {original_opponent_name} gets {detail['opponent_adjustment']:+.1f} pts compensation: {detail['compensation_percentage']:.1%} ({detail['gap_closure_percent']:.1%} gap closed)",
+                }
             )
 
         for i, detail in enumerate(
@@ -289,9 +304,34 @@ def format_match_details(
                 except StopIteration:
                     pass  # Keep the generic name if match not found
 
-            output.append(
-                f"| Opp PP Detail {i+1}      | Match {detail['previous_match_number']} - {original_player_name} gets {detail['player_adjustment']:+.0f} pts, {original_opponent_name} gets {detail['opponent_adjustment']:+.0f} pts compensation: {detail['gap_closure_percent']:.1%} gap closed |"
+            table_rows.append(
+                {
+                    "category": f"Opp PP Detail {i+1}",
+                    "details": f"Match {detail['previous_match_number']} - {original_player_name} gets {detail['player_adjustment']:+.1f} pts, {original_opponent_name} gets {detail['opponent_adjustment']:+.1f} pts compensation: {detail['compensation_percentage']:.1%} ({detail['gap_closure_percent']:.1%} gap closed)",
+                }
             )
+
+    # Calculate column widths
+    def get_max_width(header, rows, key):
+        if not rows:
+            return len(header)
+        return max(
+            len(header),
+            max(len(str(row.get(key, ""))) for row in rows),
+        )
+
+    category_width = get_max_width("Category", table_rows, "category")
+    details_width = get_max_width("Details", table_rows, "details")
+
+    # Write header with dynamic widths
+    output.append(f"| {'Category':<{category_width}} | {'Details':<{details_width}} |")
+    output.append(f"| {'-' * category_width} | {'-' * details_width} |")
+
+    # Write data rows with dynamic widths
+    for row in table_rows:
+        output.append(
+            f"| {row['category']:<{category_width}} | {row['details']:<{details_width}} |"
+        )
 
     return "\n".join(output)
 
@@ -350,6 +390,95 @@ def find_player_matches(
             player_matches.append(match["match_number"])
 
     return sorted(player_matches)
+
+
+def find_pp_adjustment_matches(
+    matches: List[Dict], players: Dict[str, Dict], player_query: str
+) -> List[int]:
+    """Find all match numbers that have proven potential adjustment details for a specific player.
+
+    Args:
+        matches: List of all matches
+        players: Dictionary mapping player IDs to player data
+        player_query: Player name or ID to search for
+
+    Returns:
+        List of match numbers that have PP adjustments for the player
+    """
+    pp_matches = []
+
+    # Try to find the player by name or ID
+    player_id = None
+    player_name = None
+
+    # First try exact match by ID
+    if player_query in players:
+        player_id = player_query
+        player_name = players[player_query]["name"]
+    else:
+        # Try to find by name (case-insensitive)
+        for pid, player_data in players.items():
+            if player_data["name"].lower() == player_query.lower():
+                player_id = pid
+                player_name = player_data["name"]
+                break
+
+    if not player_id:
+        # Try partial name match
+        for pid, player_data in players.items():
+            if player_query.lower() in player_data["name"].lower():
+                player_id = pid
+                player_name = player_data["name"]
+                break
+
+    if not player_id:
+        print(f"Error: Player '{player_query}' not found.")
+        print("Available players:")
+        for pid, player_data in players.items():
+            print(f"  - {player_data['name']} (ID: {pid})")
+        return []
+
+    print(f"Found player: {player_name} (ID: {player_id})")
+
+    # Find all matches that have PP adjustments for this player
+    for match in matches:
+        # Check proven potential details for the main player in this match
+        proven_potential_details = match.get("proven_potential_details", [])
+        for detail in proven_potential_details:
+            # Check if this PP adjustment is for our target player
+            # The detail contains information about which previous match it's adjusting
+            # We need to check if our player was involved in that previous match
+            original_match_number = detail["previous_match_number"]
+
+            # Find the original match to see if our player was involved
+            for original_match in matches:
+                if original_match["match_number"] == original_match_number:
+                    if (
+                        original_match["player_id"] == player_id
+                        or original_match["opponent_id"] == player_id
+                    ):
+                        pp_matches.append(match["match_number"])
+                        break
+
+        # Check opponent proven potential details
+        opponent_proven_potential_details = match.get(
+            "opponent_proven_potential_details", []
+        )
+        for detail in opponent_proven_potential_details:
+            # Check if this PP adjustment is for our target player
+            original_match_number = detail["previous_match_number"]
+
+            # Find the original match to see if our player was involved
+            for original_match in matches:
+                if original_match["match_number"] == original_match_number:
+                    if (
+                        original_match["player_id"] == player_id
+                        or original_match["opponent_id"] == player_id
+                    ):
+                        pp_matches.append(match["match_number"])
+                        break
+
+    return sorted(list(set(pp_matches)))  # Remove duplicates
 
 
 def lookup_matches(
@@ -489,6 +618,12 @@ def main():
     )
 
     parser.add_argument(
+        "--pp-player",
+        type=str,
+        help="Look up all matches that have proven potential adjustment details for a specific player (by name or ID)",
+    )
+
+    parser.add_argument(
         "--output",
         type=str,
         default=None,
@@ -561,6 +696,27 @@ def main():
                 player_name = player_data["name"]
                 break
 
+    if args.pp_player:
+        pp_matches = find_pp_adjustment_matches(matches, players, args.pp_player)
+        if not pp_matches:
+            print(
+                f"No proven potential adjustments found for player '{args.pp_player}'"
+            )
+            return
+        match_numbers.extend(pp_matches)
+        print(
+            f"Found {len(pp_matches)} matches with proven potential adjustments for player '{args.pp_player}'"
+        )
+
+        # Get player name for filename
+        for pid, player_data in players.items():
+            if (
+                player_data["name"].lower() == args.pp_player.lower()
+                or args.pp_player.lower() in player_data["name"].lower()
+            ):
+                player_name = player_data["name"]
+                break
+
     if not match_numbers:
         print(
             "Error: No matches specified. Use --match, --range, or --player to specify matches."
@@ -587,7 +743,14 @@ def main():
             if player_name:
                 # Clean player name for filename (replace spaces and special chars)
                 clean_player_name = player_name.replace(" ", "_").replace("-", "_")
-                output_file = f"match_lookup_{clean_player_name}_{timestamp_part}.md"
+                if args.pp_player:
+                    output_file = (
+                        f"match_lookup_pp_{clean_player_name}_{timestamp_part}.md"
+                    )
+                else:
+                    output_file = (
+                        f"match_lookup_{clean_player_name}_{timestamp_part}.md"
+                    )
             else:
                 output_file = f"match_lookup_{timestamp_part}.md"
         else:
@@ -595,7 +758,10 @@ def main():
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             if player_name:
                 clean_player_name = player_name.replace(" ", "_").replace("-", "_")
-                output_file = f"match_lookup_{clean_player_name}_{timestamp}.md"
+                if args.pp_player:
+                    output_file = f"match_lookup_pp_{clean_player_name}_{timestamp}.md"
+                else:
+                    output_file = f"match_lookup_{clean_player_name}_{timestamp}.md"
             else:
                 output_file = f"match_lookup_{timestamp}.md"
 

@@ -47,14 +47,245 @@ def save_simulation_results(
 
         # Write match history table
         f.write("## Match History\n\n")
+
+        # Prepare data for match history table to calculate column widths
+        match_history_rows = []
+        for match in results:
+            # Get opponent adjustment from match data
+            opponent_adjustment = match.get("proven_potential_adjustment", 0)
+            player_adjustment = (
+                -opponent_adjustment
+            )  # Player adjustment is opposite of opponent
+
+            # Calculate original ratings (before proven potential adjustments)
+            original_player_after = match["player_rating_before"] + (
+                match["rating_change"]
+                if match["player_won"]
+                else -match["rating_change"]
+            )
+            original_opponent_after = match["opponent_rating_before"] + (
+                -match["rating_change"]
+                if match["player_won"]
+                else match["rating_change"]
+            )
+
+            # Calculate player and opponent changes
+            player_change = (
+                match["rating_change"]
+                if match["player_won"]
+                else -match["rating_change"]
+            )
+            opponent_change = (
+                -match["rating_change"]
+                if match["player_won"]
+                else match["rating_change"]
+            )
+
+            # Extract opponent number from opponent_id (e.g. "Opponent11" -> "11")
+            opponent_num = match["opponent_id"].replace("Opponent", "")
+
+            match_history_rows.append(
+                {
+                    "match": str(match["match_number"]),
+                    "player_rating": f"{match['player_rating_before']}->{original_player_after}",
+                    "opponent_rating": f"{match['opponent_rating_before']}->{original_opponent_after}",
+                    "result": "W" if match["player_won"] else "L",
+                    "player_change": f"{player_change:+d}",
+                    "opponent_change": f"{opponent_change:+d}",
+                    "win_prob": f"{match['win_probability']:.2f}",
+                    "confidence": f"{match['player_confidence']:.2f}",
+                    "variety_bonus": f"{match['player_variety_bonus']:.2f}",
+                    "multiplier": f"{match['final_multiplier']:.2f}",
+                    "player_pp_adj": f"{player_adjustment:+.1f}",
+                    "opponent_pp_adj": f"{opponent_adjustment:+.1f}",
+                    "opp_var_score": f"{match.get('opponent_variety_bonus', 0):.2f}",
+                    "opp_num": opponent_num,
+                }
+            )
+
+        # Calculate column widths
+        def get_max_width(header1, header2, rows, key):
+            if not rows:
+                return max(len(header1), len(header2))
+            return max(
+                len(header1),
+                len(header2),
+                max(len(str(row.get(key, ""))) for row in rows),
+            )
+
+        # Define headers
+        headers_row1 = {
+            "match": "Match",
+            "player_rating": "Player",
+            "opponent_rating": "Opponent",
+            "result": "Result",
+            "player_change": "Player",
+            "opponent_change": "Opponent",
+            "win_prob": "Win",
+            "confidence": "Conf",
+            "variety_bonus": "Var",
+            "multiplier": "Final",
+            "player_pp_adj": "Player",
+            "opponent_pp_adj": "Opponent",
+            "opp_var_score": "Opp Var",
+            "opp_num": "Opp",
+        }
+
+        headers_row2 = {
+            "match": "",
+            "player_rating": "Rating",
+            "opponent_rating": "Rating",
+            "result": "",
+            "player_change": "Change",
+            "opponent_change": "Change",
+            "win_prob": "Prob",
+            "confidence": "",
+            "variety_bonus": "Bonus",
+            "multiplier": "Mult",
+            "player_pp_adj": "PP Adj",
+            "opponent_pp_adj": "PP Adj",
+            "opp_var_score": "Score",
+            "opp_num": "Num",
+        }
+
+        column_widths = {
+            "match": get_max_width(
+                headers_row1["match"],
+                headers_row2["match"],
+                match_history_rows,
+                "match",
+            ),
+            "player_rating": get_max_width(
+                headers_row1["player_rating"],
+                headers_row2["player_rating"],
+                match_history_rows,
+                "player_rating",
+            ),
+            "opponent_rating": get_max_width(
+                headers_row1["opponent_rating"],
+                headers_row2["opponent_rating"],
+                match_history_rows,
+                "opponent_rating",
+            ),
+            "result": get_max_width(
+                headers_row1["result"],
+                headers_row2["result"],
+                match_history_rows,
+                "result",
+            ),
+            "player_change": get_max_width(
+                headers_row1["player_change"],
+                headers_row2["player_change"],
+                match_history_rows,
+                "player_change",
+            ),
+            "opponent_change": get_max_width(
+                headers_row1["opponent_change"],
+                headers_row2["opponent_change"],
+                match_history_rows,
+                "opponent_change",
+            ),
+            "win_prob": get_max_width(
+                headers_row1["win_prob"],
+                headers_row2["win_prob"],
+                match_history_rows,
+                "win_prob",
+            ),
+            "confidence": get_max_width(
+                headers_row1["confidence"],
+                headers_row2["confidence"],
+                match_history_rows,
+                "confidence",
+            ),
+            "variety_bonus": get_max_width(
+                headers_row1["variety_bonus"],
+                headers_row2["variety_bonus"],
+                match_history_rows,
+                "variety_bonus",
+            ),
+            "multiplier": get_max_width(
+                headers_row1["multiplier"],
+                headers_row2["multiplier"],
+                match_history_rows,
+                "multiplier",
+            ),
+            "player_pp_adj": get_max_width(
+                headers_row1["player_pp_adj"],
+                headers_row2["player_pp_adj"],
+                match_history_rows,
+                "player_pp_adj",
+            ),
+            "opponent_pp_adj": get_max_width(
+                headers_row1["opponent_pp_adj"],
+                headers_row2["opponent_pp_adj"],
+                match_history_rows,
+                "opponent_pp_adj",
+            ),
+            "opp_var_score": get_max_width(
+                headers_row1["opp_var_score"],
+                headers_row2["opp_var_score"],
+                match_history_rows,
+                "opp_var_score",
+            ),
+            "opp_num": get_max_width(
+                headers_row1["opp_num"],
+                headers_row2["opp_num"],
+                match_history_rows,
+                "opp_num",
+            ),
+        }
+
+        # Write header rows with dynamic widths
         f.write(
-            "| Match | Player     | Opponent   | Result | Player | Opponent | Win  | Conf  | Var   | Final  | Player  | Opponent | Opp Var | Opp  |\n"
+            f"| {headers_row1['match']:<{column_widths['match']}} | "
+            f"{headers_row1['player_rating']:<{column_widths['player_rating']}} | "
+            f"{headers_row1['opponent_rating']:<{column_widths['opponent_rating']}} | "
+            f"{headers_row1['result']:<{column_widths['result']}} | "
+            f"{headers_row1['player_change']:<{column_widths['player_change']}} | "
+            f"{headers_row1['opponent_change']:<{column_widths['opponent_change']}} | "
+            f"{headers_row1['win_prob']:<{column_widths['win_prob']}} | "
+            f"{headers_row1['confidence']:<{column_widths['confidence']}} | "
+            f"{headers_row1['variety_bonus']:<{column_widths['variety_bonus']}} | "
+            f"{headers_row1['multiplier']:<{column_widths['multiplier']}} | "
+            f"{headers_row1['player_pp_adj']:<{column_widths['player_pp_adj']}} | "
+            f"{headers_row1['opponent_pp_adj']:<{column_widths['opponent_pp_adj']}} | "
+            f"{headers_row1['opp_var_score']:<{column_widths['opp_var_score']}} | "
+            f"{headers_row1['opp_num']:<{column_widths['opp_num']}} |\n"
         )
+
         f.write(
-            "|       | Rating     | Rating     |        | Change | Change   | Prob |       | Bonus | Mult   | PP Adj  | PP Adj   | Score   | Num  |\n"
+            f"| {headers_row2['match']:<{column_widths['match']}} | "
+            f"{headers_row2['player_rating']:<{column_widths['player_rating']}} | "
+            f"{headers_row2['opponent_rating']:<{column_widths['opponent_rating']}} | "
+            f"{headers_row2['result']:<{column_widths['result']}} | "
+            f"{headers_row2['player_change']:<{column_widths['player_change']}} | "
+            f"{headers_row2['opponent_change']:<{column_widths['opponent_change']}} | "
+            f"{headers_row2['win_prob']:<{column_widths['win_prob']}} | "
+            f"{headers_row2['confidence']:<{column_widths['confidence']}} | "
+            f"{headers_row2['variety_bonus']:<{column_widths['variety_bonus']}} | "
+            f"{headers_row2['multiplier']:<{column_widths['multiplier']}} | "
+            f"{headers_row2['player_pp_adj']:<{column_widths['player_pp_adj']}} | "
+            f"{headers_row2['opponent_pp_adj']:<{column_widths['opponent_pp_adj']}} | "
+            f"{headers_row2['opp_var_score']:<{column_widths['opp_var_score']}} | "
+            f"{headers_row2['opp_num']:<{column_widths['opp_num']}} |\n"
         )
+
+        # Write separator with dynamic widths (with spaces)
         f.write(
-            "|-------|------------|------------|--------|--------|----------|------|-------|-------|--------|---------|----------|---------|------|\n"
+            f"| {'-' * column_widths['match']} |"
+            f" {'-' * column_widths['player_rating']} |"
+            f" {'-' * column_widths['opponent_rating']} |"
+            f" {'-' * column_widths['result']} |"
+            f" {'-' * column_widths['player_change']} |"
+            f" {'-' * column_widths['opponent_change']} |"
+            f" {'-' * column_widths['win_prob']} |"
+            f" {'-' * column_widths['confidence']} |"
+            f" {'-' * column_widths['variety_bonus']} |"
+            f" {'-' * column_widths['multiplier']} |"
+            f" {'-' * column_widths['player_pp_adj']} |"
+            f" {'-' * column_widths['opponent_pp_adj']} |"
+            f" {'-' * column_widths['opp_var_score']} |"
+            f" {'-' * column_widths['opp_num']} |\n"
         )
 
         # Calculate summary statistics
@@ -84,106 +315,245 @@ def save_simulation_results(
             total_player_pp_adj += player_adjustment
             total_opponent_pp_adj += opponent_adjustment
 
-            # Calculate original ratings (before proven potential adjustments)
-            original_player_after = match["player_rating_before"] + (
-                match["rating_change"]
-                if match["player_won"]
-                else -match["rating_change"]
-            )
-            original_opponent_after = match["opponent_rating_before"] + (
-                -match["rating_change"]
-                if match["player_won"]
-                else match["rating_change"]
-            )
-
-            # Format each column with exact width
-            match_num = f"{match['match_number']:<5}"
-            player = f"{match['player_rating_before']}->{original_player_after}"
-            opponent = f"{match['opponent_rating_before']}->{original_opponent_after}"
-            result = f"{'W' if match['player_won'] else 'L':<6}"
-
-            # Calculate player and opponent changes
-            player_change = (
-                match["rating_change"]
-                if match["player_won"]
-                else -match["rating_change"]
-            )
-            opponent_change = (
-                -match["rating_change"]
-                if match["player_won"]
-                else match["rating_change"]
-            )
-
-            # Format changes with signs
-            player_change_str = f"{player_change:+d}".ljust(6)
-            opponent_change_str = f"{opponent_change:+d}".ljust(8)
-
-            win_prob = f"{match['win_probability']:<4.2f}"
-            confidence = f"{match['player_confidence']:<5.2f}"
-            variety_bonus = f"{match['player_variety_bonus']:<5.2f}"
-            multiplier = f"{match['final_multiplier']:<6.2f}"
-
-            # Format proven potential adjustments
-            player_pp_adj = f"{player_adjustment:+7.1f}"
-            opponent_pp_adj = f"{opponent_adjustment:+8.1f}"
-
-            # Extract opponent number from opponent_id (e.g. "Opponent11" -> "11")
-            opponent_num = match["opponent_id"].replace("Opponent", "")
-
-            # Format opponent variety score and number
-            opp_var_score = f"{match.get('opponent_variety_bonus', 0):<7.2f}"
-            opp_num = f"{opponent_num:<4}"
-
+        # Write data rows with calculated widths
+        for row in match_history_rows:
             f.write(
-                f"| {match_num} | {player:<10} | {opponent:<10} | {result} | {player_change_str} | {opponent_change_str} | {win_prob} | {confidence} | {variety_bonus} | {multiplier} | {player_pp_adj} | {opponent_pp_adj} | {opp_var_score} | {opp_num} |\n"
+                f"| {row['match']:<{column_widths['match']}} | "
+                f"{row['player_rating']:<{column_widths['player_rating']}} | "
+                f"{row['opponent_rating']:<{column_widths['opponent_rating']}} | "
+                f"{row['result']:<{column_widths['result']}} | "
+                f"{row['player_change']:<{column_widths['player_change']}} | "
+                f"{row['opponent_change']:<{column_widths['opponent_change']}} | "
+                f"{row['win_prob']:<{column_widths['win_prob']}} | "
+                f"{row['confidence']:<{column_widths['confidence']}} | "
+                f"{row['variety_bonus']:<{column_widths['variety_bonus']}} | "
+                f"{row['multiplier']:<{column_widths['multiplier']}} | "
+                f"{row['player_pp_adj']:<{column_widths['player_pp_adj']}} | "
+                f"{row['opponent_pp_adj']:<{column_widths['opponent_pp_adj']}} | "
+                f"{row['opp_var_score']:<{column_widths['opp_var_score']}} | "
+                f"{row['opp_num']:<{column_widths['opp_num']}} |\n"
             )
 
         # Write summary statistics
         f.write("\n## Summary Statistics\n\n")
-        f.write("|           Metric           | Value  |\n")
-        f.write("|----------------------------|--------|\n")
-        f.write(f"|      Total Matches         | {total_wins + total_losses:<6} |\n")
-        f.write(f"|          Wins              | {total_wins:<6} |\n")
-        f.write(f"|         Losses             | {total_losses:<6} |\n")
-        f.write(f"|        Win Rate            | {total_wins/(total_wins + total_losses):<6.2%} |\n")
-        f.write(f"|    Average Opponent ELO    | {total_opponent_elo/(total_wins + total_losses):<6.0f} |\n")
-        f.write(f"|  Average Win Probability   | {total_win_prob/(total_wins + total_losses):<6.2%} |\n")
-        f.write(f"| Total Opponent Adjustments | {total_opponent_adj:<+6d} |\n")
-        f.write(f"|    Final Player Rating     | {results[-1]['player_rating_after']:<6} |\n")
-        f.write(f"|   Final Opponent Rating    | {results[-1]['opponent_rating_after']:<6} |\n")
-        f.write(f"|    Total Player PP Adj     | {total_player_pp_adj:<+6d} |\n")
-        f.write(f"|   Total Opponent PP Adj    | {total_opponent_pp_adj:<+6d} |\n")
+
+        # Prepare data for summary statistics table
+        summary_stats_rows = [
+            {"metric": "Total Matches", "value": str(total_wins + total_losses)},
+            {"metric": "Wins", "value": str(total_wins)},
+            {"metric": "Losses", "value": str(total_losses)},
+            {
+                "metric": "Win Rate",
+                "value": f"{total_wins/(total_wins + total_losses):.2%}",
+            },
+            {
+                "metric": "Average Opponent ELO",
+                "value": f"{total_opponent_elo/(total_wins + total_losses):.0f}",
+            },
+            {
+                "metric": "Average Win Probability",
+                "value": f"{total_win_prob/(total_wins + total_losses):.2%}",
+            },
+            {
+                "metric": "Total Opponent Adjustments",
+                "value": f"{total_opponent_adj:+d}",
+            },
+            {
+                "metric": "Final Player Rating",
+                "value": str(results[-1]["player_rating_after"]),
+            },
+            {
+                "metric": "Final Opponent Rating",
+                "value": str(results[-1]["opponent_rating_after"]),
+            },
+            {"metric": "Total Player PP Adj", "value": f"{total_player_pp_adj:+d}"},
+            {"metric": "Total Opponent PP Adj", "value": f"{total_opponent_pp_adj:+d}"},
+        ]
+
+        # Calculate column widths for summary statistics
+        summary_metric_width = get_max_width("Metric", summary_stats_rows, "metric")
+        summary_value_width = get_max_width("Value", summary_stats_rows, "value")
+
+        # Write summary statistics table with dynamic widths
+        f.write(
+            f"| {'Metric':<{summary_metric_width}} | {'Value':>{summary_value_width}} |\n"
+        )
+        f.write(f"| {'-' * summary_metric_width} | {'-' * summary_value_width} |\n")
+        for row in summary_stats_rows:
+            f.write(
+                f"| {row['metric']:<{summary_metric_width}} | {row['value']:>{summary_value_width}} |\n"
+            )
 
         # Write proven potential details
         f.write("\n## Proven Potential Details\n\n")
-        f.write(
-            "| Match | Previous | Original | Current |  Gap   | Gap    | Original | New    | Rating  | Applied   |\n"
-        )
-        f.write(
-            "|       | Match    | Gap      | Gap     | Closed | %      | Change   | Change | Adj     | Threshold |\n"
-        )
-        f.write(
-            "|-------|----------|----------|---------|--------|--------|----------|--------|---------|-----------|\n"
-        )
 
+        # Prepare data for proven potential details table
+        pp_details_rows = []
         for match in results:
             if "proven_potential_details" in match:
                 for detail in match["proven_potential_details"]:
-                    # Format each column with proper width
-                    match_num = f"{match['match_number']:<5}"
-                    prev_match = f"{detail['previous_match_number']:<8}"
-                    orig_gap = f"{detail['original_gap']:<8.0f}"
-                    curr_gap = f"{detail['current_gap']:<7.0f}"
-                    gap_closed = f"{detail['gap_closed']:<6.0f}"
-                    gap_pct = f"{detail['gap_closure_percent']:<6.1%}"
-                    orig_change = f"{detail['original_rating_change']:<+8d}"
-                    new_change = f"{detail['new_rating_change']:<+6d}"
-                    rating_adj = f"{detail['rating_adjustment']:<+6d}"
-                    threshold = f"{detail['threshold_applied']:<9.1%}"
-
-                    f.write(
-                        f"| {match_num} | {prev_match} | {orig_gap} | {curr_gap} | {gap_closed} | {gap_pct} | {orig_change:<8} | {new_change:<4} | {rating_adj:<7} | {threshold} |\n"
+                    pp_details_rows.append(
+                        {
+                            "match": str(match["match_number"]),
+                            "prev_match": str(detail["previous_match_number"]),
+                            "orig_gap": f"{detail['original_gap']:.0f}",
+                            "curr_gap": f"{detail['current_gap']:.0f}",
+                            "gap_closed": f"{detail['gap_closed']:.0f}",
+                            "gap_pct": f"{detail['gap_closure_percent']:.1%}",
+                            "orig_change": f"{detail['original_rating_change']:+d}",
+                            "new_change": f"{detail['new_rating_change']:+d}",
+                            "rating_adj": f"{detail['rating_adjustment']:+d}",
+                            "threshold": f"{detail['threshold_applied']:.1%}",
+                        }
                     )
+
+        if pp_details_rows:
+            # Define headers for proven potential details
+            pp_headers_row1 = {
+                "match": "Match",
+                "prev_match": "Previous",
+                "orig_gap": "Original",
+                "curr_gap": "Current",
+                "gap_closed": "Gap",
+                "gap_pct": "Gap",
+                "orig_change": "Original",
+                "new_change": "New",
+                "rating_adj": "Rating",
+                "threshold": "Applied",
+            }
+
+            pp_headers_row2 = {
+                "match": "",
+                "prev_match": "Match",
+                "orig_gap": "Gap",
+                "curr_gap": "Gap",
+                "gap_closed": "Closed",
+                "gap_pct": "%",
+                "orig_change": "Change",
+                "new_change": "Change",
+                "rating_adj": "Adj",
+                "threshold": "Threshold",
+            }
+
+            # Calculate column widths for proven potential details
+            pp_column_widths = {
+                "match": get_max_width(
+                    pp_headers_row1["match"],
+                    pp_headers_row2["match"],
+                    pp_details_rows,
+                    "match",
+                ),
+                "prev_match": get_max_width(
+                    pp_headers_row1["prev_match"],
+                    pp_headers_row2["prev_match"],
+                    pp_details_rows,
+                    "prev_match",
+                ),
+                "orig_gap": get_max_width(
+                    pp_headers_row1["orig_gap"],
+                    pp_headers_row2["orig_gap"],
+                    pp_details_rows,
+                    "orig_gap",
+                ),
+                "curr_gap": get_max_width(
+                    pp_headers_row1["curr_gap"],
+                    pp_headers_row2["curr_gap"],
+                    pp_details_rows,
+                    "curr_gap",
+                ),
+                "gap_closed": get_max_width(
+                    pp_headers_row1["gap_closed"],
+                    pp_headers_row2["gap_closed"],
+                    pp_details_rows,
+                    "gap_closed",
+                ),
+                "gap_pct": get_max_width(
+                    pp_headers_row1["gap_pct"],
+                    pp_headers_row2["gap_pct"],
+                    pp_details_rows,
+                    "gap_pct",
+                ),
+                "orig_change": get_max_width(
+                    pp_headers_row1["orig_change"],
+                    pp_headers_row2["orig_change"],
+                    pp_details_rows,
+                    "orig_change",
+                ),
+                "new_change": get_max_width(
+                    pp_headers_row1["new_change"],
+                    pp_headers_row2["new_change"],
+                    pp_details_rows,
+                    "new_change",
+                ),
+                "rating_adj": get_max_width(
+                    pp_headers_row1["rating_adj"],
+                    pp_headers_row2["rating_adj"],
+                    pp_details_rows,
+                    "rating_adj",
+                ),
+                "threshold": get_max_width(
+                    pp_headers_row1["threshold"],
+                    pp_headers_row2["threshold"],
+                    pp_details_rows,
+                    "threshold",
+                ),
+            }
+
+            # Write header rows for proven potential details
+            f.write(
+                f"| {pp_headers_row1['match']:<{pp_column_widths['match']}} | "
+                f"{pp_headers_row1['prev_match']:<{pp_column_widths['prev_match']}} | "
+                f"{pp_headers_row1['orig_gap']:<{pp_column_widths['orig_gap']}} | "
+                f"{pp_headers_row1['curr_gap']:<{pp_column_widths['curr_gap']}} | "
+                f"{pp_headers_row1['gap_closed']:<{pp_column_widths['gap_closed']}} | "
+                f"{pp_headers_row1['gap_pct']:<{pp_column_widths['gap_pct']}} | "
+                f"{pp_headers_row1['orig_change']:<{pp_column_widths['orig_change']}} | "
+                f"{pp_headers_row1['new_change']:<{pp_column_widths['new_change']}} | "
+                f"{pp_headers_row1['rating_adj']:<{pp_column_widths['rating_adj']}} | "
+                f"{pp_headers_row1['threshold']:<{pp_column_widths['threshold']}} |\n"
+            )
+
+            f.write(
+                f"| {pp_headers_row2['match']:<{pp_column_widths['match']}} | "
+                f"{pp_headers_row2['prev_match']:<{pp_column_widths['prev_match']}} | "
+                f"{pp_headers_row2['orig_gap']:<{pp_column_widths['orig_gap']}} | "
+                f"{pp_headers_row2['curr_gap']:<{pp_column_widths['curr_gap']}} | "
+                f"{pp_headers_row2['gap_closed']:<{pp_column_widths['gap_closed']}} | "
+                f"{pp_headers_row2['gap_pct']:<{pp_column_widths['gap_pct']}} | "
+                f"{pp_headers_row2['orig_change']:<{pp_column_widths['orig_change']}} | "
+                f"{pp_headers_row2['new_change']:<{pp_column_widths['new_change']}} | "
+                f"{pp_headers_row2['rating_adj']:<{pp_column_widths['rating_adj']}} | "
+                f"{pp_headers_row2['threshold']:<{pp_column_widths['threshold']}} |\n"
+            )
+
+            # Write separator for proven potential details
+            f.write(
+                f"| {'-' * pp_column_widths['match']} |"
+                f" {'-' * pp_column_widths['prev_match']} |"
+                f" {'-' * pp_column_widths['orig_gap']} |"
+                f" {'-' * pp_column_widths['curr_gap']} |"
+                f" {'-' * pp_column_widths['gap_closed']} |"
+                f" {'-' * pp_column_widths['gap_pct']} |"
+                f" {'-' * pp_column_widths['orig_change']} |"
+                f" {'-' * pp_column_widths['new_change']} |"
+                f" {'-' * pp_column_widths['rating_adj']} |"
+                f" {'-' * pp_column_widths['threshold']} |\n"
+            )
+
+            # Write data rows for proven potential details
+            for row in pp_details_rows:
+                f.write(
+                    f"| {row['match']:<{pp_column_widths['match']}} | "
+                    f"{row['prev_match']:<{pp_column_widths['prev_match']}} | "
+                    f"{row['orig_gap']:<{pp_column_widths['orig_gap']}} | "
+                    f"{row['curr_gap']:<{pp_column_widths['curr_gap']}} | "
+                    f"{row['gap_closed']:<{pp_column_widths['gap_closed']}} | "
+                    f"{row['gap_pct']:<{pp_column_widths['gap_pct']}} | "
+                    f"{row['orig_change']:<{pp_column_widths['orig_change']}} | "
+                    f"{row['new_change']:<{pp_column_widths['new_change']}} | "
+                    f"{row['rating_adj']:<{pp_column_widths['rating_adj']}} | "
+                    f"{row['threshold']:<{pp_column_widths['threshold']}} |\n"
+                )
 
         # Write detailed match information
         f.write("\n## Detailed Match Information\n\n")
@@ -237,7 +607,7 @@ def save_simulation_results(
 
             # Write proven potential adjustments
             f.write("#### Opponent Rating Adjustments\n\n")
-            
+
             # Define headers in two rows
             headers_row1 = {
                 "prev_match": "Previous",
@@ -247,9 +617,9 @@ def save_simulation_results(
                 "gap_pct": "Closure",
                 "orig_change": "Original",
                 "new_change": "New",
-                "opponent_adj": "Opponent"
+                "opponent_adj": "Opponent",
             }
-            
+
             headers_row2 = {
                 "prev_match": "Match",
                 "orig_gap": "Gap",
@@ -258,16 +628,16 @@ def save_simulation_results(
                 "gap_pct": "%",
                 "orig_change": "Change",
                 "new_change": "Change",
-                "opponent_adj": "Adjustment"
+                "opponent_adj": "Adjustment",
             }
-            
+
             # Store all rows of data first
             rows = []
             if "proven_potential_details" in match:
                 for detail in match["proven_potential_details"]:
                     adjustment = detail["rating_adjustment"]
                     opponent_adj_sign = "+" if adjustment > 0 else "-"
-                    
+
                     row = {
                         "prev_match": str(detail["previous_match_number"]),
                         "orig_gap": str(detail["original_gap"]),
@@ -276,10 +646,10 @@ def save_simulation_results(
                         "gap_pct": f"{detail['gap_closure_percent']*100:.2f}%",
                         "orig_change": str(detail["original_rating_change"]),
                         "new_change": str(detail["new_rating_change"]),
-                        "opponent_adj": f"{opponent_adj_sign}{abs(adjustment):.2f}"
+                        "opponent_adj": f"{opponent_adj_sign}{abs(adjustment):.2f}",
                     }
                     rows.append(row)
-            
+
             # Calculate max width for each column including both header rows
             def get_max_width(header1, header2, rows, key):
                 if not rows:
@@ -340,7 +710,7 @@ def save_simulation_results(
                     "opponent_adj",
                 ),
             }
-            
+
             # Write header rows
             f.write(
                 f"| {headers_row1['prev_match']:<{column_widths['prev_match']}} | "
@@ -352,7 +722,7 @@ def save_simulation_results(
                 f"{headers_row1['new_change']:>{column_widths['new_change']}} | "
                 f"{headers_row1['opponent_adj']:>{column_widths['opponent_adj']}} |\n"
             )
-            
+
             f.write(
                 f"| {headers_row2['prev_match']:<{column_widths['prev_match']}} | "
                 f"{headers_row2['orig_gap']:<{column_widths['orig_gap']}} | "
@@ -363,7 +733,7 @@ def save_simulation_results(
                 f"{headers_row2['new_change']:>{column_widths['new_change']}} | "
                 f"{headers_row2['opponent_adj']:>{column_widths['opponent_adj']}} |\n"
             )
-            
+
             # Write separator
             f.write(
                 f"|{'-' * (column_widths['prev_match'] + 2)}|"
@@ -375,7 +745,7 @@ def save_simulation_results(
                 f"{'-' * (column_widths['new_change'] + 2)}|"
                 f"{'-' * (column_widths['opponent_adj'] + 2)}|\n"
             )
-            
+
             # Write data rows with calculated widths
             for row in rows:
                 f.write(
