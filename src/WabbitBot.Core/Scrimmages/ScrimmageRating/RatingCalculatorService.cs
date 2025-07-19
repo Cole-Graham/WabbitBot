@@ -560,9 +560,9 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
                 var team1ConfidenceMultiplier = 2.0 - team1Confidence;
                 var team2ConfidenceMultiplier = 2.0 - team2Confidence;
 
-                // Calculate final multipliers: (1.0 + variety_effect) * confidence_multiplier
-                var team1Multiplier = (1.0 + team1VarietyEffect) * team1ConfidenceMultiplier;
-                var team2Multiplier = (1.0 + team2VarietyEffect) * team2ConfidenceMultiplier;
+                // Calculate final multipliers: confidence_multiplier + variety_effect
+                var team1Multiplier = team1ConfidenceMultiplier + team1VarietyEffect;
+                var team2Multiplier = team2ConfidenceMultiplier + team2VarietyEffect;
 
                 // Clamp multipliers to maximum value only (matching Python implementation)
                 team1Multiplier = Math.Min(team1Multiplier, MAX_MULTIPLIER);

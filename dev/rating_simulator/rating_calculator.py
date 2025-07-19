@@ -10,13 +10,13 @@ RATING_CONFIG = {
     # Base rating for new players/teams
     "starting_rating": 1500,
     # Minimum rating possible
-    "minimum_rating": 1300,
+    "minimum_rating": 600,
     # Base K-factor for ELO calculations
-    "base_rating_change": 16.0,
+    "base_rating_change": 64.0,
     # ELO rating divisor (default 400)
     "elo_divisor": 400.0,
     # Maximum matches to look back for proven potential
-    "max_matches_for_proven_potential": 10,
+    "max_matches_for_proven_potential": 16,
     # Maximum confidence to consider for proven potential
     "max_confidence_for_proven_potential": 1.0,  # Only consider matches where player had low confidence
     # Gap closure threshold for proven potential (e.g. 0.1 means every 10% of gap closed)
@@ -427,8 +427,8 @@ class RatingCalculator:
         # Calculate final multipliers - always use different logic for winners vs losers
         # Winners: positive variety = more gain (higher multiplier)
         # Losers: negative variety = more loss (higher multiplier)
-        winner_multiplier = (1.0 + winner_variety_bonus) * winner_confidence_multiplier
-        loser_multiplier = (1.0 + loser_variety_bonus) * loser_confidence_multiplier
+        winner_multiplier = winner_confidence_multiplier + winner_variety_bonus
+        loser_multiplier = loser_confidence_multiplier + loser_variety_bonus
 
         # Clamp multipliers to maximum value only
         winner_multiplier = min(MULTIPLIER_CONFIG["max_multiplier"], winner_multiplier)
@@ -474,14 +474,20 @@ class RatingCalculator:
         current_rating = current_match["player_rating_after"]
 
         # Get recent matches for this player
-        player_matches = [
+        # First, get all matches for this player in chronological order
+        all_player_matches = [
             m
             for m in match_history
             if m["player_id"] == player_id
             and m["match_number"] < current_match["match_number"]
-            and m["match_number"]
-            >= current_match["match_number"]
-            - RATING_CONFIG["max_matches_for_proven_potential"]
+        ]
+
+        # Sort by match number to get chronological order
+        all_player_matches.sort(key=lambda x: x["match_number"])
+
+        # Take the most recent matches up to the lookback limit
+        player_matches = all_player_matches[
+            -RATING_CONFIG["max_matches_for_proven_potential"] :
         ]
 
         # Initialize proven potential details list for current match

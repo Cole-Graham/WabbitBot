@@ -147,13 +147,21 @@ def format_match_details(
         output.append(f"#### Match {match['match_number']}")
     output.append("")
 
-    # Get player names
-    challenger_name = players.get(match["player_id"], {}).get(
-        "name", match["player_id"]
-    )
-    opponent_name = players.get(match["opponent_id"], {}).get(
-        "name", match["opponent_id"]
-    )
+    # Get player names and target ratings
+    challenger_data = players.get(match["player_id"], {})
+    opponent_data = players.get(match["opponent_id"], {})
+
+    challenger_name = challenger_data.get("name", match["player_id"])
+    opponent_name = opponent_data.get("name", match["opponent_id"])
+
+    # Add target ratings in brackets if available
+    challenger_target = challenger_data.get("target_rating")
+    opponent_target = opponent_data.get("target_rating")
+
+    if challenger_target is not None:
+        challenger_name = f"{challenger_name} ({challenger_target})"
+    if opponent_target is not None:
+        opponent_name = f"{opponent_name} ({opponent_target})"
 
     # Calculate rating changes
     challenger_change = match["player_rating_after"] - match["player_rating_before"]

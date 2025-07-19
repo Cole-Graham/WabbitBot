@@ -230,7 +230,7 @@ def write_simple_match_details(f, match: Dict) -> None:
         # Show details of proven potential adjustments
         for i, detail in enumerate(proven_potential_details[:3]):  # Show first 3
             f.write(
-                f"| PP Detail {i+1}           | Historical Match {detail['previous_match_number']}: {detail['gap_closure_percent']:.1%} gap closed, {detail['rating_adjustment']:+d} pts |\n"
+                f"| PP Detail {i+1}           | Historical Match {detail['previous_match_number']}: {detail['gap_closure_percent']:.1%} gap closed, {detail['rating_adjustment']:+.0f} pts |\n"
             )
 
         for i, detail in enumerate(
@@ -239,5 +239,5 @@ def write_simple_match_details(f, match: Dict) -> None:
             # Note: This shows compensation going to the opponent from the historical match
             # The actual player receiving compensation is from the historical match, not the current opponent
             f.write(
-                f"| Opp PP Detail {i+1}      | Historical Match {detail['previous_match_number']} opponent: {detail['gap_closure_percent']:.1%} gap closed, {detail['rating_adjustment']:+d} pts |\n"
+                f"| Opp PP Detail {i+1}      | Historical Match {detail['previous_match_number']} opponent: {detail['gap_closure_percent']:.1%} gap closed, {detail['rating_adjustment']:+.0f} pts |\n"
             )
