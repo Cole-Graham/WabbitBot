@@ -22,6 +22,7 @@ namespace WabbitBot.Common.Data.Schema
         public const int CreateTournaments = 7;
         public const int CreateLeaderboards = 8;
         public const int CreateSeasons = 9;
+        public const int CreateProvenPotentialRecords = 10;
     }
 
     public class SchemaManager

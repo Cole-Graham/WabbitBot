@@ -268,7 +268,7 @@ class RatingCalculator:
         winner_variety_bonus: float,
         loser_variety_bonus: float,
         rating_range: float,  # Total range of leaderboard
-    ) -> Tuple[int, int, float, float]:
+    ) -> Tuple[float, float, float, float]:
         """Calculate rating change for a match.
 
         Matches the C# implementation:
@@ -298,7 +298,6 @@ class RatingCalculator:
             rating_range=rating_range,
             winner_games_played=0,
             loser_games_played=0,
-            variety_bonus_games_threshold=0,  # Always apply variety bonuses
             catch_up_bonus_config=None,  # No catch-up bonus
         )
 
@@ -313,9 +312,8 @@ class RatingCalculator:
         rating_range: float,
         winner_games_played: int = 0,
         loser_games_played: int = 0,
-        variety_bonus_games_threshold: int = 0,
         catch_up_bonus_config: Dict = None,
-    ) -> Tuple[int, int, float, float]:
+    ) -> Tuple[float, float, float, float]:
         """Calculate rating change for scenario simulations with scenario-specific parameters.
 
         Args:
@@ -328,11 +326,10 @@ class RatingCalculator:
             rating_range: Total range of leaderboard
             winner_games_played: Number of games played by winner
             loser_games_played: Number of games played by loser
-            variety_bonus_games_threshold: Only apply variety bonuses after this many games (0 = always apply)
             catch_up_bonus_config: Catch-up bonus configuration dict with keys: enabled, target_rating, threshold, max_bonus
 
         Returns:
-            Tuple[int, int, float, float]: (winner_change, loser_change, winner_multiplier, loser_multiplier)
+            Tuple[float, float, float, float]: (winner_change, loser_change, winner_multiplier, loser_multiplier)
         """
         return self._calculate_rating_change_common(
             winner_rating=winner_rating,
@@ -344,7 +341,6 @@ class RatingCalculator:
             rating_range=rating_range,
             winner_games_played=winner_games_played,
             loser_games_played=loser_games_played,
-            variety_bonus_games_threshold=variety_bonus_games_threshold,
             catch_up_bonus_config=catch_up_bonus_config,
         )
 
@@ -359,9 +355,8 @@ class RatingCalculator:
         rating_range: float,
         winner_games_played: int = 0,
         loser_games_played: int = 0,
-        variety_bonus_games_threshold: int = 0,
         catch_up_bonus_config: Dict = None,
-    ) -> Tuple[int, int, float, float]:
+    ) -> Tuple[float, float, float, float]:
         """Common rating change calculation logic used by both standard and scenario calculators.
 
         Args:
@@ -374,11 +369,10 @@ class RatingCalculator:
             rating_range: Total range of leaderboard
             winner_games_played: Number of games played by winner
             loser_games_played: Number of games played by loser
-            variety_bonus_games_threshold: Only apply variety bonuses after this many games (0 = always apply)
             catch_up_bonus_config: Catch-up bonus configuration dict with keys: enabled, target_rating, threshold, max_bonus
 
         Returns:
-            Tuple[int, int, float, float]: (winner_change, loser_change, winner_multiplier, loser_multiplier)
+            Tuple[float, float, float, float]: (winner_change, loser_change, winner_multiplier, loser_multiplier)
         """
         # Calculate expected score using ELO formula
         expected_score = 1.0 / (
@@ -391,12 +385,12 @@ class RatingCalculator:
         # Calculate base rating change (K * (actual - expected))
         base_change = self.base_rating_change * (1 - expected_score)
 
-        # Apply variety bonus threshold if configured
-        if variety_bonus_games_threshold > 0:
-            if winner_games_played < variety_bonus_games_threshold:
-                winner_variety_bonus = 0.0
-            if loser_games_played < variety_bonus_games_threshold:
-                loser_variety_bonus = 0.0
+        # Apply variety bonus threshold based on confidence (not games played)
+        # Variety bonus is only applied when players have reached 1.0 confidence
+        if winner_confidence < 1.0:
+            winner_variety_bonus = 0.0
+        if loser_confidence < 1.0:
+            loser_variety_bonus = 0.0
 
         # Calculate confidence multipliers for each player (1.0 to 2.0 based on confidence)
         winner_confidence_multiplier = 2.0 - winner_confidence
@@ -455,16 +449,14 @@ class RatingCalculator:
         # Calculate final rating changes with additive catchup bonus
         if winner_rating > loser_rating:
             # Winner is higher rated, apply gap scaling to their change
-            winner_change = int(
+            winner_change = (
                 base_change * (winner_multiplier + winner_catchup_bonus) * gap_scaling
             )
-            loser_change = int(-base_change * (loser_multiplier + loser_catchup_bonus))
+            loser_change = -base_change * (loser_multiplier + loser_catchup_bonus)
         else:
             # Loser is higher rated, apply gap scaling to their change
-            winner_change = int(
-                base_change * (winner_multiplier + winner_catchup_bonus)
-            )
-            loser_change = int(
+            winner_change = base_change * (winner_multiplier + winner_catchup_bonus)
+            loser_change = (
                 -base_change * (loser_multiplier + loser_catchup_bonus) * gap_scaling
             )
 

@@ -81,20 +81,20 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
             // Use SeasonRatingService to apply the rating adjustment
             // This ensures all rating updates go through the Season system
             await _seasonRatingService.ApplyRatingChangeAsync(
-                evt.Team1Id,
+                evt.ChallengerId,
                 evt.GameSize,
                 evt.Adjustment,
                 evt.Reason
             );
 
             await _seasonRatingService.ApplyRatingChangeAsync(
-                evt.Team2Id,
+                evt.OpponentId,
                 evt.GameSize,
                 evt.Adjustment,
                 evt.Reason
             );
 
-            Console.WriteLine($"Proven Potential Adjustment Applied: {evt.Team1Id} and {evt.Team2Id} (+{evt.Adjustment}) via Season system");
+            Console.WriteLine($"Proven Potential Adjustment Applied: {evt.ChallengerId} and {evt.OpponentId} (+{evt.Adjustment}) via Season system");
         }
     }
 }

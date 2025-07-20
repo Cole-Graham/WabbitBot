@@ -40,9 +40,6 @@ class LadderResetScenario(BaseScenario):
         )
 
         # Scenario-specific rating parameters
-        self.variety_bonus_games_threshold = (
-            20  # Only apply variety bonuses after 20 games
-        )
         self.catch_up_bonus_config = {
             "enabled": True,
             "target_rating": self.intended_average,

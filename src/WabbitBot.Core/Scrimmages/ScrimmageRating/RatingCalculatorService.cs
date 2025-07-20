@@ -18,17 +18,27 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
         private readonly ICoreEventBus _eventBus;
         private readonly ICoreErrorHandler _errorHandler;
         private readonly SeasonRatingService _seasonRatingService;
-        private const double MAX_GAP_PERCENT = 0.2; // 20% of rating range
-        private const double BASE_RATING_CHANGE = 16.0; // K-factor changed from 32 to 16
+
+        // Rating System Constants (matching Python implementation)
+        private const double ELO_DIVISOR = 400.0; // Standard ELO sensitivity
+        private const int MINIMUM_RATING = 600;
+        private const double BASE_RATING_CHANGE = 40.0; // Match Python: base K-factor for ELO calculations
         private const double MAX_VARIETY_BONUS = 0.2;  // +20% max bonus for high variety
         private const double MIN_VARIETY_BONUS = -0.1; // -10% penalty for low variety
         private const int VARIETY_WINDOW_DAYS = 30;
+        private const double MAX_GAP_PERCENT = 0.2; // 20% of rating range
+
+        // Catch-up bonus configuration (matching Python ladder reset scenario)
+        private const int CATCH_UP_TARGET_RATING = 1500; // Intended average rating
+        private const int CATCH_UP_THRESHOLD = 200; // Rating difference threshold
+        private const double CATCH_UP_MAX_BONUS = 1.0; // Maximum bonus multiplier
+        private const bool CATCH_UP_ENABLED = true; // Enable/disable catch-up bonus
 
         // Multiplier configuration
         private const double MAX_MULTIPLIER = 2.0;
-        private const int VARIETY_BONUS_GAMES_THRESHOLD = 20; // Only apply variety bonuses after 20 games
+        private const int VARIETY_BONUS_GAMES_THRESHOLD = 20; // Match Python: max_confidence_games
 
-        // Configuration option to enable/disable time-based filtering for variety calculations
+        // Configuration option to enable/disable time-based match filtering for variety calculations (VARIETY_WINDOW_DAYS)
         // Can be changed at runtime through configuration
         private bool UseTimeBasedVarietyFiltering { get; set; } = false;
 
@@ -286,7 +296,7 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
             double entropyDifference = teamVarietyEntropy - averageVarietyEntropy;
 
             // Bonus scales proportionally with difference from average
-            double relativeDiff = entropyDifference / (averageVarietyEntropy == 0 ? 1 : averageVarietyEntropy);
+            double relativeDiff = entropyDifference / (Math.Abs(averageVarietyEntropy) == 0 ? 1 : Math.Abs(averageVarietyEntropy));
 
             // Scale the bonus based on games played relative to average
             double gamesPlayedRatio = Math.Min(teamMatchesPlayed / averageMatchesPlayed, 1.0);
@@ -535,7 +545,8 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
             string team2Id,
             int team1Rating,
             int team2Rating,
-            GameSize gameSize)
+            GameSize gameSize,
+            bool team1Won = true)
         {
             try
             {
@@ -547,22 +558,27 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
                 var team1VarietyBonus = await CalculateVarietyBonusAsync(team1Id, team1Rating, gameSize);
                 var team2VarietyBonus = await CalculateVarietyBonusAsync(team2Id, team2Rating, gameSize);
 
-                // Get games played for each team to determine if variety bonuses should be applied
-                var team1GamesPlayed = await GetTeamMatchesPlayedAsync(team1Id, gameSize);
-                var team2GamesPlayed = await GetTeamMatchesPlayedAsync(team2Id, gameSize);
+                // Apply variety bonus threshold based on confidence (not games played)
+                // Variety bonus is only applied when players have reached 1.0 confidence
+                if (team1Confidence < 1.0)
+                    team1VarietyBonus = 0.0;
+                if (team2Confidence < 1.0)
+                    team2VarietyBonus = 0.0;
 
-                // Calculate individual multipliers for each team
-                // Only apply variety bonuses after threshold games (matching Python implementation)
-                var team1VarietyEffect = team1GamesPlayed >= VARIETY_BONUS_GAMES_THRESHOLD ? team1VarietyBonus : 0.0;
-                var team2VarietyEffect = team2GamesPlayed >= VARIETY_BONUS_GAMES_THRESHOLD ? team2VarietyBonus : 0.0;
-
-                // Calculate confidence multipliers (2.0 - confidence for lower confidence = higher multiplier)
+                // Calculate confidence multipliers for each player (1.0 to 2.0 based on confidence)
                 var team1ConfidenceMultiplier = 2.0 - team1Confidence;
                 var team2ConfidenceMultiplier = 2.0 - team2Confidence;
 
-                // Calculate final multipliers: confidence_multiplier + variety_effect
-                var team1Multiplier = team1ConfidenceMultiplier + team1VarietyEffect;
-                var team2Multiplier = team2ConfidenceMultiplier + team2VarietyEffect;
+                // Calculate final multipliers - use different logic for winners vs losers
+                // Winners: positive variety = more gain (higher multiplier)
+                // Losers: positive variety = less loss (lower multiplier)
+                var team1Multiplier = team1Won
+                    ? team1ConfidenceMultiplier + team1VarietyBonus  // Winner: add variety bonus
+                    : team1ConfidenceMultiplier - team1VarietyBonus; // Loser: subtract variety bonus
+
+                var team2Multiplier = !team1Won
+                    ? team2ConfidenceMultiplier + team2VarietyBonus  // Winner: add variety bonus
+                    : team2ConfidenceMultiplier - team2VarietyBonus; // Loser: subtract variety bonus
 
                 // Clamp multipliers to maximum value only (matching Python implementation)
                 team1Multiplier = Math.Min(team1Multiplier, MAX_MULTIPLIER);
@@ -587,24 +603,38 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
             string team2Id,
             int team1Rating,
             int team2Rating,
-            GameSize gameSize)
+            GameSize gameSize,
+            int team1Score = 0,
+            int team2Score = 0)
         {
             try
             {
+                // Determine who won based on scores
+                bool team1Won = team1Score > team2Score;
+                bool team2Won = team2Score > team1Score;
+
+                // If no scores provided, assume team1 won (for backward compatibility)
+                if (team1Score == 0 && team2Score == 0)
+                {
+                    team1Won = true;
+                    team2Won = false;
+                }
+
                 // Calculate expected outcome using ELO formula
-                double expectedOutcome = 1.0 / (1.0 + Math.Pow(10.0, (team2Rating - team1Rating) / 400.0));
+                double expectedOutcome = 1.0 / (1.0 + Math.Pow(10.0, (team2Rating - team1Rating) / ELO_DIVISOR));
 
                 // Calculate base rating change (K * (actual - expected))
                 // For team1, actual outcome is 1 if they win, 0 if they lose
-                double baseChange = BASE_RATING_CHANGE * (1.0 - expectedOutcome);
+                double actualOutcome = team1Won ? 1.0 : 0.0;
+                double baseChange = BASE_RATING_CHANGE * (actualOutcome - expectedOutcome);
 
                 // Get individual multipliers for each team
-                var (team1Multiplier, team2Multiplier) = await CalculateRatingMultipliersAsync(team1Id, team2Id, team1Rating, team2Rating, gameSize);
+                var (team1Multiplier, team2Multiplier) = await CalculateRatingMultipliersAsync(team1Id, team2Id, team1Rating, team2Rating, gameSize, team1Won);
 
                 // Calculate rating gap scaling to prevent shadow-boxing
-                // Get current rating range to calculate max gap (20% of total range)
+                // Get current rating range to calculate max gap (40% / 2 = 20% of total range)
                 var ratingRange = await GetCurrentRatingRangeAsync();
-                double maxGap = (ratingRange.Max - ratingRange.Min) * 0.2; // 20% of total range
+                double maxGap = (ratingRange.Max - ratingRange.Min) * 0.4 / 2.0;
                 double ratingGap = Math.Abs(team1Rating - team2Rating);
 
                 // Initialize gap scaling (no effect by default)
@@ -634,19 +664,38 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
                     }
                 }
 
-                // Calculate final rating changes with gap scaling
-                double team1Change = baseChange * team1Multiplier;
-                double team2Change = -baseChange * team2Multiplier;
+                // Apply catch-up bonus if enabled (additive after other multipliers)
+                double team1CatchUpBonus = 0.0;
+                double team2CatchUpBonus = 0.0;
 
-                // Apply gap scaling to the appropriate team
-                if (team1Rating > team2Rating)
+                if (CATCH_UP_ENABLED)
                 {
-                    // Team1 is higher rated, apply gap scaling to their change
+                    // Apply catch-up bonus to winner if below target
+                    if (team1Won && team1Rating < CATCH_UP_TARGET_RATING)
+                    {
+                        team1CatchUpBonus = CalculateCatchUpBonus(team1Rating, CATCH_UP_TARGET_RATING, CATCH_UP_THRESHOLD, CATCH_UP_MAX_BONUS);
+                    }
+                    else if (team2Won && team2Rating < CATCH_UP_TARGET_RATING)
+                    {
+                        team2CatchUpBonus = CalculateCatchUpBonus(team2Rating, CATCH_UP_TARGET_RATING, CATCH_UP_THRESHOLD, CATCH_UP_MAX_BONUS);
+                    }
+                }
+
+                // Calculate final rating changes with additive catchup bonus
+                double team1Change = baseChange * (team1Multiplier + team1CatchUpBonus);
+                double team2Change = -baseChange * (team2Multiplier + team2CatchUpBonus);
+
+                // Apply gap scaling correctly: only apply to higher-rated team when they WIN
+                // If team1 is higher rated and wins, apply gap scaling to team1
+                // If team2 is higher rated and wins, apply gap scaling to team2
+                if (team1Rating > team2Rating && team1Won)
+                {
+                    // Team1 is higher rated and wins, apply gap scaling to their change
                     team1Change *= gapScaling;
                 }
-                else if (team2Rating > team1Rating)
+                else if (team2Rating > team1Rating && team2Won)
                 {
-                    // Team2 is higher rated, apply gap scaling to their change
+                    // Team2 is higher rated and wins, apply gap scaling to their change
                     team2Change *= gapScaling;
                 }
 
@@ -660,6 +709,30 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
         }
 
 
+
+        /// <summary>
+        /// Calculates catch-up bonus for a player below the target rating.
+        /// Matches Python implementation: exponential decay based on distance from target.
+        /// </summary>
+        /// <param name="playerRating">Current player rating</param>
+        /// <param name="targetRating">Target rating to converge toward</param>
+        /// <param name="threshold">Rating difference threshold before bonus applies</param>
+        /// <param name="maxBonus">Maximum bonus multiplier</param>
+        /// <returns>Catch-up bonus multiplier (0.0 to maxBonus)</returns>
+        private static double CalculateCatchUpBonus(int playerRating, int targetRating, int threshold, double maxBonus)
+        {
+            if (playerRating >= targetRating)
+                return 0.0;
+
+            var distance = targetRating - playerRating;
+            if (distance <= threshold)
+                return 0.0;
+
+            // Use exponential decay for the bonus (matching Python)
+            var scale = threshold / 2.0;
+            var progress = 1.0 - Math.Exp(-distance / scale);
+            return progress * maxBonus;
+        }
 
         /// <summary>
         /// Calculates the confidence level for a team based on games played.

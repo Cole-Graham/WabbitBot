@@ -235,9 +235,7 @@ class ScenarioSimulator:
             loser_games_played = p1.games_played
 
         # Get scenario-specific parameters
-        variety_bonus_games_threshold = getattr(
-            self.scenario, "variety_bonus_games_threshold", 0
-        )
+
         catch_up_bonus_config = getattr(self.scenario, "catch_up_bonus_config", None)
 
         # Calculate rating changes using the scenario-specific rating calculator
@@ -252,7 +250,6 @@ class ScenarioSimulator:
                 rating_range,
                 winner_games_played,
                 loser_games_played,
-                variety_bonus_games_threshold,
                 catch_up_bonus_config,
             )
         )
@@ -590,9 +587,6 @@ class ScenarioSimulator:
         Args:
             output_dir: Directory to save output files
         """
-        # Create output directory if it doesn't exist
-        os.makedirs(output_dir, exist_ok=True)
-
         # Use the results from the last simulation run
         results = self.last_results
 

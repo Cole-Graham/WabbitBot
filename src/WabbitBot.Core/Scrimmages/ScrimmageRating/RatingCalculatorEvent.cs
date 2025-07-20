@@ -14,8 +14,8 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
 
     public class ApplyProvenPotentialAdjustmentEvent : ICoreEvent
     {
-        public string Team1Id { get; init; } = string.Empty;
-        public string Team2Id { get; init; } = string.Empty;
+        public string ChallengerId { get; init; } = string.Empty;
+        public string OpponentId { get; init; } = string.Empty;
         public int Adjustment { get; init; }
         public GameSize GameSize { get; init; }
         public string Reason { get; init; } = string.Empty;

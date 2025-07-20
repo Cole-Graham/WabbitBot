@@ -19,15 +19,15 @@ def save_ladder_reset_results(
     Args:
         players: List of player objects
         results: List of match results
-        output_dir: Directory to save output files (relative to workspace root)
+        output_dir: Directory to save output files (relative to dev/rating_simulator/)
     """
-    # Get the workspace root directory (3 levels up from this file)
-    workspace_root = os.path.dirname(
+    # Get the dev/rating_simulator directory (3 levels up from this file)
+    simulator_dir = os.path.dirname(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     )
 
     # Create the full path to the output directory
-    output_path = os.path.join(workspace_root, output_dir)
+    output_path = os.path.join(simulator_dir, output_dir)
 
     # Create output directory if it doesn't exist
     os.makedirs(output_path, exist_ok=True)

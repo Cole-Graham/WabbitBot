@@ -13,9 +13,9 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
         public ProvenPotentialRepository(IDatabaseConnection connection)
             : base(connection, "ProvenPotentialRecords", new[]
             {
-                "OriginalMatchId", "Team1Id", "Team2Id", "Team1Rating", "Team2Rating",
-                "Team1Confidence", "Team2Confidence", "AppliedThresholds", "RatingAdjustment",
-                "LastCheckedAt", "IsComplete"
+                "OriginalMatchId", "ChallengerId", "OpponentId", "ChallengerRating", "OpponentRating",
+                "ChallengerConfidence", "OpponentConfidence", "AppliedThresholds", "ChallengerOriginalRatingChange",
+                "OpponentOriginalRatingChange", "RatingAdjustment", "LastCheckedAt", "IsComplete"
             })
         {
         }
@@ -23,7 +23,7 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
         public async Task<IEnumerable<ProvenPotentialRecord>> GetActiveRecordsForTeamAsync(string teamId)
         {
             return await QueryAsync(
-                "Team1Id = @TeamId OR Team2Id = @TeamId AND IsComplete = 0",
+                "(ChallengerId = @TeamId OR OpponentId = @TeamId) AND IsComplete = 0",
                 new { TeamId = teamId }
             );
         }

@@ -93,21 +93,23 @@ namespace WabbitBot.Core.Scrimmages
 
     public class RatingAdjustment
     {
-        public string Team1Id { get; set; } = string.Empty;
-        public string Team2Id { get; set; } = string.Empty;
+        public string ChallengerId { get; set; } = string.Empty;
+        public string OpponentId { get; set; } = string.Empty;
         public int Adjustment { get; set; }
     }
 
     public class CreateProvenPotentialRecordRequest
     {
         public Guid MatchId { get; set; }
-        public string Team1Id { get; set; } = string.Empty;
-        public string Team2Id { get; set; } = string.Empty;
-        public int Team1Rating { get; set; }
-        public int Team2Rating { get; set; }
-        public double Team1Confidence { get; set; }
-        public double Team2Confidence { get; set; }
-        public int RatingChange { get; set; }
+        public string ChallengerId { get; set; } = string.Empty;
+        public string OpponentId { get; set; } = string.Empty;
+        public int ChallengerRating { get; set; }
+        public int OpponentRating { get; set; }
+        public double ChallengerConfidence { get; set; }
+        public double OpponentConfidence { get; set; }
+        public double ChallengerOriginalRatingChange { get; set; }
+        public double OpponentOriginalRatingChange { get; set; }
+        public GameSize GameSize { get; set; }
     }
 
     public class CreateProvenPotentialRecordResponse
