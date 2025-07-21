@@ -17,7 +17,6 @@ namespace WabbitBot.Core.Common.Models
         public bool IsArchived { get; set; }
         public DateTime? ArchivedAt { get; set; }
         public string? Tag { get; set; }
-        public string? Description { get; set; }
 
         [JsonIgnore]
         public List<TeamMember> Roster { get; set; } = new();
@@ -147,7 +146,17 @@ namespace WabbitBot.Core.Common.Models
 
         public List<string> GetCorePlayerIds()
         {
-            return Roster.Where(m => m.IsActive && m.Role == TeamRole.Core).Select(m => m.PlayerId).ToList();
+            return Roster.Where(m => m.IsActive && (m.Role == TeamRole.Core || m.Role == TeamRole.Captain)).Select(m => m.PlayerId).ToList();
+        }
+
+        public List<string> GetCaptainIds()
+        {
+            return Roster.Where(m => m.IsActive && m.Role == TeamRole.Captain).Select(m => m.PlayerId).ToList();
+        }
+
+        public bool IsCaptain(string playerId)
+        {
+            return Roster.Exists(m => m.PlayerId == playerId && m.IsActive && m.Role == TeamRole.Captain);
         }
 
         public bool IsValidForGameSize(GameSize gameSize)
@@ -166,6 +175,7 @@ namespace WabbitBot.Core.Common.Models
 
     public enum TeamRole
     {
+        Captain,
         Core,
         Substitute
     }

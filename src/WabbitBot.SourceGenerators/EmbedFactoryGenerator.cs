@@ -28,7 +28,7 @@ public class EmbedFactoryGenerator : ISourceGenerator
         // Generate the factory code
         var sourceBuilder = new StringBuilder(@"
 using DSharpPlus.Entities;
-using WabbitBot.DiscBot.DiscBot.Embeds;
+using WabbitBot.DiscBot.DSharpPlus.Embeds;
 
 namespace WabbitBot.DiscBot.DSharpPlus.Generated;
 

@@ -1,0 +1,22 @@
+{
+    "token": "your-bot-token-here",
+    "logLevel": "Information",
+    "serverId": null,
+    "channels": {
+        "botChannel": null,
+        "replayChannel": null,
+        "deckChannel": null,
+        "signupChannel": null,
+        "standingsChannel": null,
+        "scrimmageChannel": null
+    },
+    "roles": {
+        "whitelisted": null,
+        "admin": null,
+        "moderator": null
+    },
+    "activity": {
+        "type": "Playing",
+        "name": "Wabbit Wars"
+    }
+}

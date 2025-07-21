@@ -2,8 +2,7 @@ using System;
 using System.Threading.Tasks;
 using DSharpPlus.Commands;
 using DSharpPlus.Commands.ContextChecks;
-using Microsoft.Extensions.DependencyInjection;
-using WabbitBot.Common.Services.Interfaces;
+using WabbitBot.DiscBot.DSharpPlus;
 
 namespace WabbitBot.DiscBot.DSharpPlus.Attributes
 {
@@ -17,11 +16,8 @@ namespace WabbitBot.DiscBot.DSharpPlus.Attributes
         {
             try
             {
-                // Get the permission service from DI
-                var permissionService = context.ServiceProvider.GetRequiredService<IPermissionService>();
-
                 // Check if the user has the whitelisted role
-                bool hasRole = await permissionService.HasWhitelistedRoleAsync(context.User.Id);
+                bool hasRole = await PermissionService.HasWhitelistedRoleAsync(context.User, context.Guild);
 
                 // Return null if successful, error message otherwise
                 return hasRole ? null : "You need the Whitelisted role to use this command.";

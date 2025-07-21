@@ -1,14 +1,14 @@
 using System;
 using System.Threading.Tasks;
-using WabbitBot.Common.Data.Interfaces;
 using WabbitBot.Common.Data.Schema.Interface;
+using WabbitBot.Common.Data.Interfaces;
 using WabbitBot.Common.Data.Utilities;
 
 namespace WabbitBot.Common.Data.Schema.Migrations
 {
     public class CreateScrimmagesTable : IMigration
     {
-        public int Order => MigrationOrder.CreateScrimmages;
+        public int Order => 1;
         public string Description => "Create initial Scrimmages table";
 
         public async Task UpAsync(IDatabaseConnection connection)
@@ -27,30 +27,32 @@ namespace WabbitBot.Common.Data.Schema.Migrations
                         Team1RosterIds TEXT NOT NULL,
                         Team2RosterIds TEXT NOT NULL,
                         GameSize INTEGER NOT NULL,
-                        CreatedAt DATETIME NOT NULL,
-                        StartedAt DATETIME NULL,
-                        CompletedAt DATETIME NULL,
-                        WinnerId TEXT NULL,
+                        StartedAt TEXT,
+                        CompletedAt TEXT,
+                        WinnerId TEXT,
                         Status INTEGER NOT NULL,
                         Team1Rating INTEGER NOT NULL,
                         Team2Rating INTEGER NOT NULL,
-                        RatingChange INTEGER NOT NULL,
-                        RatingMultiplier REAL NOT NULL,
-                        Team1Confidence REAL NOT NULL DEFAULT 0.0,
-                        Team2Confidence REAL NOT NULL DEFAULT 0.0,
-                        ChallengeExpiresAt DATETIME NULL,
-                        IsAccepted BOOLEAN NOT NULL,
-                        BestOf INTEGER NOT NULL DEFAULT 1,
-                        UpdatedAt DATETIME NOT NULL
+                        Team1RatingChange REAL NOT NULL,
+                        Team2RatingChange REAL NOT NULL,
+                        Team1Confidence REAL NOT NULL,
+                        Team2Confidence REAL NOT NULL,
+                        ChallengeExpiresAt TEXT,
+                        IsAccepted INTEGER NOT NULL,
+                        BestOf INTEGER NOT NULL,
+                        CreatedAt TEXT NOT NULL,
+                        UpdatedAt TEXT NOT NULL
                     )", new { }, transaction);
 
                 // Create indexes for faster lookups
                 await QueryUtil.ExecuteNonQueryAsync(conn, @"
-                    CREATE INDEX IF NOT EXISTS idx_scrimmages_team1id ON Scrimmages(Team1Id)", new { }, transaction);
+                    CREATE INDEX IF NOT EXISTS IX_Scrimmages_Team1Id ON Scrimmages(Team1Id)", new { }, transaction);
                 await QueryUtil.ExecuteNonQueryAsync(conn, @"
-                    CREATE INDEX IF NOT EXISTS idx_scrimmages_team2id ON Scrimmages(Team2Id)", new { }, transaction);
+                    CREATE INDEX IF NOT EXISTS IX_Scrimmages_Team2Id ON Scrimmages(Team2Id)", new { }, transaction);
                 await QueryUtil.ExecuteNonQueryAsync(conn, @"
-                    CREATE INDEX IF NOT EXISTS idx_scrimmages_status ON Scrimmages(Status)", new { }, transaction);
+                    CREATE INDEX IF NOT EXISTS IX_Scrimmages_Status ON Scrimmages(Status)", new { }, transaction);
+                await QueryUtil.ExecuteNonQueryAsync(conn, @"
+                    CREATE INDEX IF NOT EXISTS IX_Scrimmages_CreatedAt ON Scrimmages(CreatedAt)", new { }, transaction);
 
                 transaction.Commit();
             }

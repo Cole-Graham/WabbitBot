@@ -15,7 +15,7 @@ namespace WabbitBot.Core.Common.Data
         private static readonly string[] Columns = new[]
         {
             "Id", "Name", "TeamCaptainId", "TeamSize", "MaxRosterSize",
-            "Roster", "LastActive", "Tag", "Description", "IsArchived", "ArchivedAt",
+            "Roster", "LastActive", "Tag", "IsArchived", "ArchivedAt",
             "CreatedAt", "UpdatedAt"
         };
 

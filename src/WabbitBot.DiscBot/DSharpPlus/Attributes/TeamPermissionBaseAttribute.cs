@@ -4,10 +4,10 @@ using System.Threading.Tasks;
 using DSharpPlus.Commands;
 using DSharpPlus.Commands.ContextChecks;
 using DSharpPlus.Commands.Trees;
-using Microsoft.Extensions.DependencyInjection;
 using WabbitBot.Core.Common.Models;
 using WabbitBot.Common.Models;
 using WabbitBot.Core.Common.Data.Interface;
+using WabbitBot.DiscBot.DSharpPlus;
 
 namespace WabbitBot.DiscBot.DSharpPlus.Attributes
 {
@@ -39,12 +39,11 @@ namespace WabbitBot.DiscBot.DSharpPlus.Attributes
             try
             {
                 // First make sure the user has the whitelisted role
-                var permissionService = context.ServiceProvider.GetRequiredService<IPermissionService>();
-                // if (!await permissionService.HasWhitelistedRoleAsync(context.User.Id))
+                // if (!await PermissionService.HasWhitelistedRoleAsync(context.User, context.Guild))
                 //     return "You need the Whitelisted role to use this command.";
 
                 // If it's an admin, they can bypass team permission checks
-                if (await permissionService.HasAdminPrivilegesAsync(context.User.Id))
+                if (await PermissionService.HasAdminPrivilegesAsync(context.User, context.Guild))
                     return null; // Success - Admin bypass
 
                 // Find the team parameter from arguments
@@ -59,13 +58,10 @@ namespace WabbitBot.DiscBot.DSharpPlus.Attributes
                 if (string.IsNullOrEmpty(teamParameter))
                     return $"Parameter '{TeamParameterName}' cannot be empty.";
 
-                // Get the team service
-                var teamService = context.ServiceProvider.GetRequiredService<ITeamRepository>();
-
                 // Get the team (could be by ID or name)
                 var team = teamParameter.StartsWith("team-")
-                    ? await teamService.GetByNameAsync(teamParameter)
-                    : await teamService.GetByTagAsync(teamParameter);
+                    ? await TeamLookupService.GetByNameAsync(teamParameter)
+                    : await TeamLookupService.GetByTagAsync(teamParameter);
 
                 // If team not found, fail
                 if (team == null)

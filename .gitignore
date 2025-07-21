@@ -421,6 +421,10 @@ src/output/bin/
 src/output/config.json
 !src/output/config.template.json
 
+# Configuration files (ignore actual config, allow templates)
+src/config.json
+!src/config.template.json
+
 # Custom map configurations
 src/WabbitBot.Core/Config/maps.json
 !src/WabbitBot.Core/Config/maps.default.json

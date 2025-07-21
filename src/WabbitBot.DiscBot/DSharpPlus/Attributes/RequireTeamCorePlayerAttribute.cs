@@ -2,7 +2,7 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using DSharpPlus.Commands;
-using WabbitBot.Common.Models.Rating;
+using WabbitBot.Core.Common.Models;
 
 namespace WabbitBot.DiscBot.DSharpPlus.Attributes
 {
@@ -28,8 +28,7 @@ namespace WabbitBot.DiscBot.DSharpPlus.Attributes
         protected override Task<string?> PerformTeamPermissionCheckAsync(CommandContext context, Team team)
         {
             // Check if the user is a core player of the team
-            bool isCorePlayer = team.CorePlayers != null &&
-                               team.CorePlayers.Any(p => p.Id == context.User.Id);
+            bool isCorePlayer = team.GetCorePlayerIds().Contains(context.User.Id.ToString());
 
             return isCorePlayer
                 ? Task.FromResult<string?>(null) // Success 

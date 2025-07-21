@@ -1,12 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Linq;
 using System.Threading.Tasks;
 using WabbitBot.Common.Data;
 using WabbitBot.Common.Data.Interfaces;
 using WabbitBot.Common.Data.Utilities;
-using WabbitBot.Core.Scrimmages;
 using WabbitBot.Core.Common.Models;
+using WabbitBot.Core.Scrimmages;
 
 namespace WabbitBot.Core.Scrimmages.Data
 {
@@ -14,15 +15,27 @@ namespace WabbitBot.Core.Scrimmages.Data
     {
         private static readonly string[] Columns = new[]
         {
-            "Id", "Team1Id", "Team2Id", "Team1RosterIds", "Team2RosterIds",
-            "GameSize", "CreatedAt", "StartedAt", "CompletedAt", "WinnerId",
-            "Status", "Team1Rating", "Team2Rating", "RatingChange", "RatingMultiplier",
-            "Team1Confidence", "Team2Confidence", "ChallengeExpiresAt", "IsAccepted", "BestOf", "UpdatedAt", "ArchivedAt"
+            "Id", "Team1Id", "Team2Id", "Team1RosterIds", "Team2RosterIds", "GameSize",
+            "StartedAt", "CompletedAt", "WinnerId", "Status", "Team1Rating", "Team2Rating",
+            "Team1RatingChange", "Team2RatingChange", "Team1Confidence", "Team2Confidence",
+            "ChallengeExpiresAt", "IsAccepted", "BestOf", "CreatedAt", "UpdatedAt", "ArchivedAt"
         };
 
         public ScrimmageArchive(IDatabaseConnection connection)
-            : base(connection, "ArchivedScrimmages", Columns, dateColumn: "ArchivedAt")
+            : base(connection, "ScrimmageArchive", Columns, dateColumn: "ArchivedAt")
         {
+        }
+
+        public async Task<IEnumerable<Scrimmage>> GetScrimmagesByTeamAsync(string teamId)
+        {
+            var sql = $"SELECT * FROM {_tableName} WHERE Team1Id = @TeamId OR Team2Id = @TeamId ORDER BY CreatedAt DESC";
+            return await QueryAsync(sql, new { TeamId = teamId });
+        }
+
+        public async Task<IEnumerable<Scrimmage>> GetScrimmagesSinceAsync(DateTime since)
+        {
+            var sql = $"SELECT * FROM {_tableName} WHERE CreatedAt >= @Since ORDER BY CreatedAt DESC";
+            return await QueryAsync(sql, new { Since = since.ToString("O") });
         }
 
         protected override Scrimmage MapEntity(IDataReader reader)
@@ -32,24 +45,24 @@ namespace WabbitBot.Core.Scrimmages.Data
                 Id = Guid.Parse(reader.GetString(reader.GetOrdinal("Id"))),
                 Team1Id = reader.GetString(reader.GetOrdinal("Team1Id")),
                 Team2Id = reader.GetString(reader.GetOrdinal("Team2Id")),
-                Team1RosterIds = reader.GetString(reader.GetOrdinal("Team1RosterIds")).Split(',').ToList(),
-                Team2RosterIds = reader.GetString(reader.GetOrdinal("Team2RosterIds")).Split(',').ToList(),
+                Team1RosterIds = JsonUtil.Deserialize<List<string>>(reader.GetString(reader.GetOrdinal("Team1RosterIds"))) ?? new List<string>(),
+                Team2RosterIds = JsonUtil.Deserialize<List<string>>(reader.GetString(reader.GetOrdinal("Team2RosterIds"))) ?? new List<string>(),
                 GameSize = (GameSize)reader.GetInt32(reader.GetOrdinal("GameSize")),
-                CreatedAt = reader.GetDateTime(reader.GetOrdinal("CreatedAt")),
-                StartedAt = reader.IsDBNull(reader.GetOrdinal("StartedAt")) ? null : reader.GetDateTime(reader.GetOrdinal("StartedAt")),
-                CompletedAt = reader.IsDBNull(reader.GetOrdinal("CompletedAt")) ? null : reader.GetDateTime(reader.GetOrdinal("CompletedAt")),
+                StartedAt = reader.IsDBNull(reader.GetOrdinal("StartedAt")) ? null : DateTime.Parse(reader.GetString(reader.GetOrdinal("StartedAt"))),
+                CompletedAt = reader.IsDBNull(reader.GetOrdinal("CompletedAt")) ? null : DateTime.Parse(reader.GetString(reader.GetOrdinal("CompletedAt"))),
                 WinnerId = reader.IsDBNull(reader.GetOrdinal("WinnerId")) ? null : reader.GetString(reader.GetOrdinal("WinnerId")),
                 Status = (ScrimmageStatus)reader.GetInt32(reader.GetOrdinal("Status")),
                 Team1Rating = reader.GetInt32(reader.GetOrdinal("Team1Rating")),
                 Team2Rating = reader.GetInt32(reader.GetOrdinal("Team2Rating")),
-                RatingChange = reader.GetInt32(reader.GetOrdinal("RatingChange")),
-                RatingMultiplier = reader.GetDouble(reader.GetOrdinal("RatingMultiplier")),
+                Team1RatingChange = reader.GetDouble(reader.GetOrdinal("Team1RatingChange")),
+                Team2RatingChange = reader.GetDouble(reader.GetOrdinal("Team2RatingChange")),
                 Team1Confidence = reader.GetDouble(reader.GetOrdinal("Team1Confidence")),
                 Team2Confidence = reader.GetDouble(reader.GetOrdinal("Team2Confidence")),
-                ChallengeExpiresAt = reader.IsDBNull(reader.GetOrdinal("ChallengeExpiresAt")) ? null : reader.GetDateTime(reader.GetOrdinal("ChallengeExpiresAt")),
-                IsAccepted = reader.GetBoolean(reader.GetOrdinal("IsAccepted")),
+                ChallengeExpiresAt = reader.IsDBNull(reader.GetOrdinal("ChallengeExpiresAt")) ? null : DateTime.Parse(reader.GetString(reader.GetOrdinal("ChallengeExpiresAt"))),
+                IsAccepted = reader.GetInt32(reader.GetOrdinal("IsAccepted")) != 0,
                 BestOf = reader.GetInt32(reader.GetOrdinal("BestOf")),
-                UpdatedAt = reader.GetDateTime(reader.GetOrdinal("UpdatedAt"))
+                CreatedAt = DateTime.Parse(reader.GetString(reader.GetOrdinal("CreatedAt"))),
+                UpdatedAt = DateTime.Parse(reader.GetString(reader.GetOrdinal("UpdatedAt")))
             };
         }
 
@@ -60,57 +73,26 @@ namespace WabbitBot.Core.Scrimmages.Data
                 Id = entity.Id.ToString(),
                 entity.Team1Id,
                 entity.Team2Id,
-                Team1RosterIds = string.Join(",", entity.Team1RosterIds),
-                Team2RosterIds = string.Join(",", entity.Team2RosterIds),
+                Team1RosterIds = JsonUtil.Serialize(entity.Team1RosterIds),
+                Team2RosterIds = JsonUtil.Serialize(entity.Team2RosterIds),
                 GameSize = (int)entity.GameSize,
-                entity.CreatedAt,
-                entity.StartedAt,
-                entity.CompletedAt,
+                StartedAt = entity.StartedAt?.ToString("O"),
+                CompletedAt = entity.CompletedAt?.ToString("O"),
                 entity.WinnerId,
                 Status = (int)entity.Status,
                 entity.Team1Rating,
                 entity.Team2Rating,
-                entity.RatingChange,
-                entity.RatingMultiplier,
+                entity.Team1RatingChange,
+                entity.Team2RatingChange,
                 entity.Team1Confidence,
                 entity.Team2Confidence,
-                entity.ChallengeExpiresAt,
-                entity.IsAccepted,
+                ChallengeExpiresAt = entity.ChallengeExpiresAt?.ToString("O"),
+                IsAccepted = entity.IsAccepted ? 1 : 0,
                 entity.BestOf,
+                entity.CreatedAt,
                 entity.UpdatedAt,
                 ArchivedAt = DateTime.UtcNow
             };
-        }
-
-        public async Task<IEnumerable<Scrimmage>> GetTeamHistoryAsync(string teamId, int limit = 10)
-        {
-            const string sql = @"
-                SELECT * FROM ArchivedScrimmages 
-                WHERE (Team1Id = @TeamId OR Team2Id = @TeamId)
-                ORDER BY ArchivedAt DESC
-                LIMIT @Limit";
-
-            return await QueryAsync(sql, new { TeamId = teamId, Limit = limit });
-        }
-
-        public async Task<IEnumerable<Scrimmage>> GetByStatusAsync(ScrimmageStatus status)
-        {
-            const string sql = @"
-                SELECT * FROM ArchivedScrimmages 
-                WHERE Status = @Status
-                ORDER BY ArchivedAt DESC";
-
-            return await QueryAsync(sql, new { Status = (int)status });
-        }
-
-        public async Task<IEnumerable<Scrimmage>> GetByGameSizeAsync(GameSize gameSize)
-        {
-            const string sql = @"
-                SELECT * FROM ArchivedScrimmages 
-                WHERE GameSize = @GameSize
-                ORDER BY ArchivedAt DESC";
-
-            return await QueryAsync(sql, new { GameSize = (int)gameSize });
         }
     }
 }

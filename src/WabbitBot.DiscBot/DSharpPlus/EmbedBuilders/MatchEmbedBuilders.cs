@@ -1,5 +1,6 @@
 using DSharpPlus.Entities;
 using WabbitBot.Core.Matches;
+using WabbitBot.Core.Scrimmages;
 using WabbitBot.DiscBot.DiscBot.Interfaces;
 using WabbitBot.DiscBot.DSharpPlus.Embeds;
 
@@ -34,9 +35,9 @@ public class MatchEmbedBuilders : IMatchEmbedBuilder
         return Task.FromResult<IMatchEmbed>(new DSharpPlusMatchEmbed(embed));
     }
 
-    public Task<IMatchEmbed> BuildScrimmageEmbed(Match match)
+    public Task<IMatchEmbed> BuildScrimmageEmbed(Match match, Scrimmage scrimmage)
     {
-        MatchEmbed embed = match.Stage switch
+        ScrimmageEmbed embed = match.Stage switch
         {
             MatchStage.MapBan => new ScrimmageMapBanEmbed(),
             MatchStage.DeckSubmission => new ScrimmageDeckSubmissionEmbed(),
@@ -47,6 +48,8 @@ public class MatchEmbedBuilders : IMatchEmbedBuilder
         };
 
         embed.SetMatch(match);
+        embed.SetScrimmage(scrimmage);
+
         return Task.FromResult<IMatchEmbed>(new DSharpPlusMatchEmbed(embed));
     }
 }

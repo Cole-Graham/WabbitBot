@@ -18,7 +18,7 @@ namespace WabbitBot.Core.Leaderboards
     {
         public Dictionary<GameSize, Dictionary<string, LeaderboardEntry>> Rankings { get; set; } = new();
         public const int InitialRating = 1000; // Starting rating changed to 1000
-        public const int KFactor = 16; // ELO rating system constant
+        public const int KFactor = 40; // ELO rating system constant
 
         public Leaderboard()
         {

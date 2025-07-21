@@ -73,4 +73,32 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
     {
         public int Rating { get; set; }
     }
+
+    public class CalculateConfidenceRequest
+    {
+        public string TeamId { get; set; } = string.Empty;
+        public GameSize GameSize { get; set; }
+    }
+
+    public class CalculateConfidenceResponse
+    {
+        public double Confidence { get; set; }
+    }
+
+    public class CalculateRatingChangeRequest
+    {
+        public string Team1Id { get; set; } = string.Empty;
+        public string Team2Id { get; set; } = string.Empty;
+        public int Team1Rating { get; set; }
+        public int Team2Rating { get; set; }
+        public GameSize GameSize { get; set; }
+        public int Team1Score { get; set; }
+        public int Team2Score { get; set; }
+    }
+
+    public class CalculateRatingChangeResponse
+    {
+        public double Team1Change { get; set; }
+        public double Team2Change { get; set; }
+    }
 }

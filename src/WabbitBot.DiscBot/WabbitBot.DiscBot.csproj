@@ -18,4 +18,8 @@
     <ProjectReference Include="..\WabbitBot.Core\WabbitBot.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Analyzer Include="..\output\bin\netstandard2.0\WabbitBot.SourceGenerators.dll" />
+  </ItemGroup>
+
 </Project>

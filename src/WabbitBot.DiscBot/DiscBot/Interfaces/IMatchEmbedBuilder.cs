@@ -1,4 +1,5 @@
 using WabbitBot.Core.Matches;
+using WabbitBot.Core.Scrimmages;
 
 namespace WabbitBot.DiscBot.DiscBot.Interfaces;
 
@@ -12,7 +13,7 @@ public interface IMatchEmbedBuilder
     /// <summary>
     /// Builds a scrimmage match embed
     /// </summary>
-    Task<IMatchEmbed> BuildScrimmageEmbed(Match match);
+    Task<IMatchEmbed> BuildScrimmageEmbed(Match match, Scrimmage scrimmage);
 }
 
 public interface IMatchEmbed

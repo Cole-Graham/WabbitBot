@@ -3,6 +3,7 @@ using WabbitBot.Common.Events.EventInterfaces;
 using WabbitBot.Common.Models;
 using WabbitBot.Core.Matches;
 using WabbitBot.Core.Common.BotCore;
+using WabbitBot.Core.Scrimmages.ScrimmageRating;
 
 namespace WabbitBot.Core.Scrimmages
 {
@@ -26,8 +27,8 @@ namespace WabbitBot.Core.Scrimmages
         public ScrimmageStatus Status { get; set; }
         public int Team1Rating { get; set; }
         public int Team2Rating { get; set; }
-        public int RatingChange { get; set; }
-        public double RatingMultiplier { get; set; } = 1.0;
+        public double Team1RatingChange { get; set; }
+        public double Team2RatingChange { get; set; }
         public double Team1Confidence { get; set; } = 0.0; // Confidence at time of match
         public double Team2Confidence { get; set; } = 0.0; // Confidence at time of match
         public DateTime? ChallengeExpiresAt { get; set; }
@@ -110,7 +111,7 @@ namespace WabbitBot.Core.Scrimmages
             // Event will be published by source generator
         }
 
-        public async Task CompleteAsync(string winnerId, int team1Rating, int team2Rating, int ratingChange, double team1Confidence = 0.0, double team2Confidence = 0.0)
+        public async Task CompleteAsync(string winnerId, int team1Score = 1, int team2Score = 0)
         {
             if (Status != ScrimmageStatus.InProgress)
                 throw new InvalidOperationException("Scrimmage can only be completed when in Progress state");
@@ -121,12 +122,48 @@ namespace WabbitBot.Core.Scrimmages
             if (winnerId != Team1Id && winnerId != Team2Id)
                 throw new ArgumentException("Winner must be one of the participating teams");
 
+            // Get current team ratings from the season system
+            var team1RatingResp = await _eventBus.RequestAsync<GetTeamRatingRequest, GetTeamRatingResponse>(
+                new GetTeamRatingRequest { TeamId = Team1Id });
+            var team2RatingResp = await _eventBus.RequestAsync<GetTeamRatingRequest, GetTeamRatingResponse>(
+                new GetTeamRatingRequest { TeamId = Team2Id });
+
+            var team1Rating = team1RatingResp?.Rating ?? 1500;
+            var team2Rating = team2RatingResp?.Rating ?? 1500;
+
+            // Calculate confidence levels at match time using the rating calculator service
+            var team1ConfidenceResp = await _eventBus.RequestAsync<CalculateConfidenceRequest, CalculateConfidenceResponse>(
+                new CalculateConfidenceRequest { TeamId = Team1Id, GameSize = GameSize });
+            var team2ConfidenceResp = await _eventBus.RequestAsync<CalculateConfidenceRequest, CalculateConfidenceResponse>(
+                new CalculateConfidenceRequest { TeamId = Team2Id, GameSize = GameSize });
+
+            var team1Confidence = team1ConfidenceResp?.Confidence ?? 0.0;
+            var team2Confidence = team2ConfidenceResp?.Confidence ?? 0.0;
+
+            // Calculate rating changes using the RatingCalculatorService
+            var ratingChangeResp = await _eventBus.RequestAsync<CalculateRatingChangeRequest, CalculateRatingChangeResponse>(
+                new CalculateRatingChangeRequest
+                {
+                    Team1Id = Team1Id,
+                    Team2Id = Team2Id,
+                    Team1Rating = team1Rating,
+                    Team2Rating = team2Rating,
+                    GameSize = GameSize,
+                    Team1Score = team1Score,
+                    Team2Score = team2Score
+                });
+
+            var team1RatingChange = ratingChangeResp?.Team1Change ?? 0.0;
+            var team2RatingChange = ratingChangeResp?.Team2Change ?? 0.0;
+
+            // Update scrimmage with calculated values
             CompletedAt = DateTime.UtcNow;
             WinnerId = winnerId;
             Status = ScrimmageStatus.Completed;
             Team1Rating = team1Rating;
             Team2Rating = team2Rating;
-            RatingChange = ratingChange;
+            Team1RatingChange = team1RatingChange;
+            Team2RatingChange = team2RatingChange;
             Team1Confidence = team1Confidence;
             Team2Confidence = team2Confidence;
 
@@ -139,8 +176,8 @@ namespace WabbitBot.Core.Scrimmages
                 MatchId = Match.Id,
                 Team1Id = Team1Id,
                 Team2Id = Team2Id,
-                Team1Score = winnerId == Team1Id ? 1 : 0,
-                Team2Score = winnerId == Team2Id ? 1 : 0,
+                Team1Score = team1Score,
+                Team2Score = team2Score,
                 GameSize = GameSize,
                 Team1Confidence = team1Confidence,
                 Team2Confidence = team2Confidence

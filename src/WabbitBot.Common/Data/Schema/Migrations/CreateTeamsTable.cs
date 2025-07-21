@@ -29,7 +29,6 @@ namespace WabbitBot.Common.Data.Schema
                         Roster TEXT NOT NULL,
                         LastActive DATETIME NOT NULL,
                         Tag TEXT,
-                        Description TEXT,
                         IsArchived BOOLEAN NOT NULL,
                         ArchivedAt DATETIME,
                         CreatedAt DATETIME NOT NULL,

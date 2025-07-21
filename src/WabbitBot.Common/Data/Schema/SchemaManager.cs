@@ -74,7 +74,7 @@ namespace WabbitBot.Common.Data.Schema
 
         private async Task<int> GetCurrentVersionAsync()
         {
-            var sql = $"SELECT MAX(Version) FROM {_schemaVersionTable}";
+            var sql = $"SELECT COALESCE(MAX(Version), 0) FROM {_schemaVersionTable}";
             var result = await QueryUtil.ExecuteScalarAsync<int>(
                 await _connection.GetConnectionAsync(),
                 sql

@@ -83,7 +83,7 @@ namespace WabbitBot.Core.Matches
             });
         }
 
-        public async Task CompleteAsync(string winnerId, int team1Rating, int team2Rating, int ratingChange)
+        public async Task CompleteAsync(string winnerId)
         {
             if (Status != MatchStatus.InProgress)
                 throw new InvalidOperationException(""Match can only be completed when in Progress state"");
@@ -94,18 +94,12 @@ namespace WabbitBot.Core.Matches
             CompletedAt = DateTime.UtcNow;
             WinnerId = winnerId;
             Status = MatchStatus.Completed;
-            Team1Rating = team1Rating;
-            Team2Rating = team2Rating;
-            RatingChange = ratingChange;
 
             await PublishEventAsync(new MatchCompletedEvent
             {
                 MatchId = Id,
                 WinnerId = winnerId,
-                CompletedAt = CompletedAt.Value,
-                Team1Rating = team1Rating,
-                Team2Rating = team2Rating,
-                RatingChange = ratingChange
+                CompletedAt = CompletedAt.Value
             });
         }
 

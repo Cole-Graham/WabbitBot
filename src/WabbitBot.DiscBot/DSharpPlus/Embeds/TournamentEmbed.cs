@@ -1,5 +1,6 @@
 using DSharpPlus.Entities;
 using WabbitBot.Core.Matches;
+using WabbitBot.DiscBot.DiscBot.Interfaces;
 
 namespace WabbitBot.DiscBot.DSharpPlus.Embeds;
 
@@ -103,7 +104,7 @@ public class TournamentMatchCompletedEmbed : TournamentEmbed
         SetTitle($"{Title} - Completed");
         SetDescription($"Winner: {GetTeamName(Match.WinnerId!)}");
 
-        // Add rating information
-        AddField("Rating Change", $"+{Match.RatingChange}", false);
+        // Note: Rating change information is not available on the Match class
+        // It was moved to the Scrimmage class and would need to be passed separately
     }
 }

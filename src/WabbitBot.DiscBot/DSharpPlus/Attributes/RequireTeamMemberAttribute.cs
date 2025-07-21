@@ -28,7 +28,7 @@ namespace WabbitBot.DiscBot.DSharpPlus.Attributes
         protected override Task<string?> PerformTeamPermissionCheckAsync(CommandContext context, Team team)
         {
             // Check if the user is a member of the team in any role
-            return team.HasPlayer(context.User.Id)
+            return team.HasPlayer(context.User.Id.ToString())
                 ? Task.FromResult<string?>(null) // Success 
                 : Task.FromResult<string?>("You must be a member of this team to use this command.");
         }

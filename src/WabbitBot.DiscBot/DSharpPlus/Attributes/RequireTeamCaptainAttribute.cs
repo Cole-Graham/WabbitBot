@@ -28,7 +28,7 @@ namespace WabbitBot.DiscBot.DSharpPlus.Attributes
         protected override Task<string?> PerformTeamPermissionCheckAsync(CommandContext context, Team team)
         {
             // Check if the user is the team captain
-            return team.TeamCaptainId == context.User.Id.ToString()
+            return team.IsCaptain(context.User.Id.ToString())
                 ? Task.FromResult<string?>(null) // Success 
                 : Task.FromResult<string?>("You must be the team captain to use this command.");
         }

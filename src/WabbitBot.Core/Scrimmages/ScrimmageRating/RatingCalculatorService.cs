@@ -6,6 +6,7 @@ using WabbitBot.Common.Events.EventInterfaces;
 using WabbitBot.Common.ErrorHandling;
 using WabbitBot.Core.Common.Models;
 using WabbitBot.Core.Scrimmages;
+
 using WabbitBot.Core.Leaderboards;
 
 namespace WabbitBot.Core.Scrimmages.ScrimmageRating

@@ -1,10 +1,19 @@
 using DSharpPlus.Entities;
 using WabbitBot.Core.Matches;
+using WabbitBot.Core.Scrimmages;
 
 namespace WabbitBot.DiscBot.DSharpPlus.Embeds;
 
 public abstract class ScrimmageEmbed : MatchEmbed
 {
+    protected Scrimmage Scrimmage { get; private set; } = null!;
+
+    public void SetScrimmage(Scrimmage scrimmage)
+    {
+        Scrimmage = scrimmage;
+        UpdateEmbed();
+    }
+
     protected override void UpdateEmbed()
     {
         SetTitle("Scrimmage Match");
@@ -68,7 +77,11 @@ public class ScrimmageMatchCompletedEmbed : ScrimmageEmbed
         SetTitle("Scrimmage - Completed");
         SetDescription($"Winner: {GetTeamName(Match.WinnerId!)}");
 
-        // Add rating information
-        AddField("Rating Change", $"+{Match.RatingChange}", false);
+        // Add rating change information from scrimmage
+        if (Scrimmage.Status == ScrimmageStatus.Completed)
+        {
+            AddField("Team 1 Rating Change", $"{Scrimmage.Team1RatingChange:+#0.0;-#0.0;+0.0}", true);
+            AddField("Team 2 Rating Change", $"{Scrimmage.Team2RatingChange:+#0.0;-#0.0;+0.0}", true);
+        }
     }
 }

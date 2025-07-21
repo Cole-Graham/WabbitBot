@@ -29,9 +29,6 @@ namespace WabbitBot.Core.Matches
     {
         public string WinnerId { get; init; } = string.Empty;
         public DateTime CompletedAt { get; init; }
-        public int Team1Rating { get; init; }
-        public int Team2Rating { get; init; }
-        public int RatingChange { get; init; }
         public string GameId { get; init; } = string.Empty;
     }
 

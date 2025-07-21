@@ -3,7 +3,7 @@ using DSharpPlus.Commands.Processors.SlashCommands.ArgumentModifiers;
 using DSharpPlus.Entities;
 using WabbitBot.Core.Common.Handlers;
 
-namespace WabbitBot.DiscBot.Commands.Providers;
+namespace WabbitBot.DiscBot.DiscBot.Commands.Providers;
 
 public class MapSizeChoiceProvider : IAutoCompleteProvider
 {

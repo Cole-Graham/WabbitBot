@@ -13,7 +13,7 @@ namespace WabbitBot.Core.Common.Data
         private static readonly string[] Columns = new[]
         {
             "Id", "Name", "TeamCaptainId", "TeamSize", "MaxRosterSize",
-            "Roster", "LastActive", "Tag", "Description", "IsArchived", "ArchivedAt",
+            "Roster", "LastActive", "Tag", "IsArchived", "ArchivedAt",
             "CreatedAt", "UpdatedAt"
         };
 
@@ -35,7 +35,6 @@ namespace WabbitBot.Core.Common.Data
                 CreatedAt = reader.GetDateTime(reader.GetOrdinal("CreatedAt")),
                 LastActive = reader.GetDateTime(reader.GetOrdinal("LastActive")),
                 Tag = reader.IsDBNull(reader.GetOrdinal("Tag")) ? null : reader.GetString(reader.GetOrdinal("Tag")),
-                Description = reader.IsDBNull(reader.GetOrdinal("Description")) ? null : reader.GetString(reader.GetOrdinal("Description")),
                 IsArchived = reader.GetBoolean(reader.GetOrdinal("IsArchived")),
                 ArchivedAt = reader.IsDBNull(reader.GetOrdinal("ArchivedAt")) ? null : (DateTime?)reader.GetDateTime(reader.GetOrdinal("ArchivedAt")),
                 UpdatedAt = reader.GetDateTime(reader.GetOrdinal("UpdatedAt"))
@@ -55,7 +54,6 @@ namespace WabbitBot.Core.Common.Data
                 entity.CreatedAt,
                 entity.LastActive,
                 entity.Tag,
-                entity.Description,
                 entity.IsArchived,
                 entity.UpdatedAt,
                 ArchivedAt = DateTime.UtcNow

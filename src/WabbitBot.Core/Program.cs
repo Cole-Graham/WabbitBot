@@ -6,7 +6,7 @@ using WabbitBot.Common.Events.EventInterfaces;
 using WabbitBot.Common.Models;
 using WabbitBot.Common.ErrorHandling;
 using WabbitBot.Core.Common.BotCore;
-using WabbitBot.Core.Common.Configuration;
+
 
 namespace WabbitBot.Core;
 
@@ -82,13 +82,16 @@ public static class Program
 
     private static async Task<BotConfiguration> LoadConfigurationAsync()
     {
-        var configPath = Path.Combine(AppContext.BaseDirectory, "config.json");
-        if (!File.Exists(configPath))
+        // Look for config file in project root (relative to executable location)
+        var configPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "config.json");
+        var fullPath = Path.GetFullPath(configPath);
+
+        if (!File.Exists(fullPath))
         {
-            throw new FileNotFoundException("Configuration file not found", configPath);
+            throw new FileNotFoundException($"Configuration file not found at: {fullPath}");
         }
 
-        var jsonString = await File.ReadAllTextAsync(configPath);
+        var jsonString = await File.ReadAllTextAsync(fullPath);
         var config = JsonSerializer.Deserialize<BotConfiguration>(jsonString)
             ?? throw new InvalidOperationException("Failed to deserialize configuration");
 
