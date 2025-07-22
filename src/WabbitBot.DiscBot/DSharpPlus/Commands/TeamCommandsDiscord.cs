@@ -2,9 +2,12 @@ using DSharpPlus;
 using DSharpPlus.Commands;
 using DSharpPlus.Commands.ContextChecks;
 using DSharpPlus.Entities;
-using WabbitBot.Common.Attributes;
+using DSharpPlus.Commands.Processors.SlashCommands.ArgumentModifiers;
+using DSharpPlus.Commands.Trees;
+using System.ComponentModel;
 using WabbitBot.DiscBot.DiscBot.Commands;
 using WabbitBot.Core.Common.Models;
+using WabbitBot.DiscBot.DSharpPlus.Attributes;
 
 namespace WabbitBot.DiscBot.DSharpPlus.Commands;
 
@@ -23,8 +26,8 @@ public partial class TeamCommandsDiscord
     [Description("Create a new team")]
     public async Task CreateTeamAsync(
         CommandContext ctx,
-        [Description("Team size (1v1, 2v2, 3v3, 4v4)")]
-        [ChoiceProvider(typeof(GameSizeChoiceProvider))]
+        [Description("Team size")]
+        [SlashChoiceProvider(typeof(TeamGameSizeChoiceProvider))]
         string size,
         [Description("Team name")]
         string teamName)
@@ -32,9 +35,9 @@ public partial class TeamCommandsDiscord
         await ctx.DeferResponseAsync();
 
         // Parse game size
-        if (!TryParseGameSize(size, out var gameSize))
+        if (!Helpers.TryParseGameSize(size, out var gameSize))
         {
-            await ctx.EditResponseAsync($"Invalid team size: {size}. Valid sizes: 1v1, 2v2, 3v3, 4v4");
+            await ctx.EditResponseAsync($"Invalid team size: {size}");
             return;
         }
 
@@ -63,13 +66,24 @@ public partial class TeamCommandsDiscord
     [Description("Get information about a team")]
     public async Task GetTeamInfoAsync(
         CommandContext ctx,
+        [Description("Team size")]
+        [SlashChoiceProvider(typeof(TeamGameSizeChoiceProvider))]
+        string size,
         [Description("Team name")]
+        [SlashAutoCompleteProvider(typeof(DynamicTeamAutoCompleteProvider))]
         string teamName)
     {
         await ctx.DeferResponseAsync();
 
+        // Parse game size
+        if (!Helpers.TryParseGameSize(size, out var gameSize))
+        {
+            await ctx.EditResponseAsync($"Invalid team size: {size}");
+            return;
+        }
+
         // Call business logic
-        var result = await TeamCommands.GetTeamInfoAsync(teamName);
+        var result = await TeamCommands.GetTeamInfoAsync(teamName, gameSize);
 
         if (!result.Success)
         {
@@ -77,7 +91,13 @@ public partial class TeamCommandsDiscord
             return;
         }
 
-        var team = result.Team!;
+        if (result.Team is null)
+        {
+            await ctx.EditResponseAsync("Team information is not available");
+            return;
+        }
+
+        var team = result.Team;
         var embed = new DiscordEmbedBuilder()
             .WithTitle($"🏆 {team.Name}")
             .WithColor(DiscordColor.Blue)
@@ -100,15 +120,16 @@ public partial class TeamCommandsDiscord
 
     [Command("invite")]
     [Description("Invite a user to your team")]
+    [RequireTeamManager("teamName")]
     public async Task InviteUserAsync(
         CommandContext ctx,
+        [Description("Your team")]
+        [SlashAutoCompleteProvider(typeof(UserManagedTeamsAutoCompleteProvider))]
+        string teamName,
         [Description("User to invite")]
         DiscordUser user)
     {
         await ctx.DeferResponseAsync();
-
-        // TODO: Get user's team from context
-        var teamName = "placeholder_team_name";
 
         // Call business logic
         var result = await TeamCommands.InviteUserAsync(teamName, ctx.User.Id.ToString(), user.Id.ToString());
@@ -146,16 +167,17 @@ public partial class TeamCommandsDiscord
     }
 
     [Command("kick")]
-    [Description("Kick a user from your team (captain only)")]
+    [Description("Kick a user from your team")]
+    [RequireTeamManager("teamName")]
     public async Task KickUserAsync(
         CommandContext ctx,
+        [Description("Your team")]
+        [SlashAutoCompleteProvider(typeof(UserManagedTeamsAutoCompleteProvider))]
+        string teamName,
         [Description("User to kick")]
         DiscordUser user)
     {
         await ctx.DeferResponseAsync();
-
-        // TODO: Validate user is captain of the team
-        var teamName = "placeholder_team_name";
 
         // Call business logic
         var result = await TeamCommands.KickUserAsync(teamName, ctx.User.Id.ToString(), user.Id.ToString());
@@ -170,25 +192,26 @@ public partial class TeamCommandsDiscord
     }
 
     [Command("position")]
-    [Description("Change a team member's position (captain only)")]
+    [Description("Change a team member's position")]
+    [RequireTeamManager("teamName")]
     public async Task ChangePositionAsync(
         CommandContext ctx,
+        [Description("Your team")]
+        [SlashAutoCompleteProvider(typeof(UserManagedTeamsAutoCompleteProvider))]
+        string teamName,
         [Description("Team member")]
         DiscordUser user,
         [Description("New position (Core, Backup)")]
-        [ChoiceProvider(typeof(TeamRoleChoiceProvider))]
+        [SlashChoiceProvider(typeof(TeamRoleChoiceProvider))]
         string position)
     {
         await ctx.DeferResponseAsync();
 
-        if (!TryParseTeamRole(position, out var teamRole))
+        if (!Helpers.TryParseTeamRole(position, out var teamRole))
         {
             await ctx.EditResponseAsync($"Invalid position: {position}. Valid positions: Core, Backup");
             return;
         }
-
-        // TODO: Validate user is captain of the team
-        var teamName = "placeholder_team_name";
 
         // Call business logic
         var result = await TeamCommands.ChangePositionAsync(teamName, ctx.User.Id.ToString(), user.Id.ToString(), teamRole);
@@ -206,16 +229,17 @@ public partial class TeamCommandsDiscord
     [Description("Promote a team member to captain (captain only)")]
     public async Task ChangeCaptainAsync(
         CommandContext ctx,
+        [Description("Your team")]
+        [SlashAutoCompleteProvider(typeof(UserCaptainTeamsAutoCompleteProvider))]
+        string teamName,
         [Description("New captain")]
-        DiscordUser user)
+        [SlashAutoCompleteProvider(typeof(TeamMemberAutoCompleteProvider))]
+        string newCaptainId)
     {
         await ctx.DeferResponseAsync();
 
-        // TODO: Validate user is captain of the team
-        var teamName = "placeholder_team_name";
-
         // Call business logic
-        var result = await TeamCommands.ChangeCaptainAsync(teamName, ctx.User.Id.ToString(), user.Id.ToString());
+        var result = await TeamCommands.ChangeCaptainAsync(teamName, ctx.User.Id.ToString(), newCaptainId);
 
         if (!result.Success)
         {
@@ -227,8 +251,9 @@ public partial class TeamCommandsDiscord
             .WithTitle("👑 Captain Changed")
             .WithDescription(result.Message ?? "Captain changed successfully")
             .WithColor(DiscordColor.Gold)
-            .AddField("New Captain", user.Mention, true)
-            .AddField("Previous Captain", ctx.User.Mention, true);
+            .AddField("New Captain", $"<@{newCaptainId}>", true)
+            .AddField("Previous Captain", ctx.User.Mention, true)
+            .AddField("Team", teamName, true);
 
         await ctx.EditResponseAsync(new DiscordWebhookBuilder().AddEmbed(embed));
     }
@@ -237,13 +262,24 @@ public partial class TeamCommandsDiscord
     [Description("Leave a team")]
     public async Task LeaveTeamAsync(
         CommandContext ctx,
+        [Description("Team size")]
+        [SlashChoiceProvider(typeof(TeamGameSizeChoiceProvider))]
+        string size,
         [Description("Team name")]
+        [SlashAutoCompleteProvider(typeof(DynamicTeamAutoCompleteProvider))]
         string teamName)
     {
         await ctx.DeferResponseAsync();
 
+        // Parse game size
+        if (!Helpers.TryParseGameSize(size, out var gameSize))
+        {
+            await ctx.EditResponseAsync($"Invalid team size: {size}");
+            return;
+        }
+
         // Call business logic
-        var result = await TeamCommands.LeaveTeamAsync(teamName, ctx.User.Id.ToString());
+        var result = await TeamCommands.LeaveTeamAsync(teamName, gameSize, ctx.User.Id.ToString());
 
         if (!result.Success)
         {
@@ -258,7 +294,11 @@ public partial class TeamCommandsDiscord
     [Description("Rename your team (captain only)")]
     public async Task RenameTeamAsync(
         CommandContext ctx,
+        [Description("Team size")]
+        [SlashChoiceProvider(typeof(TeamGameSizeChoiceProvider))]
+        string size,
         [Description("Current team name")]
+        [SlashAutoCompleteProvider(typeof(DynamicTeamAutoCompleteProvider))]
         string oldTeamName,
         [Description("New team name")]
         string newTeamName)
@@ -267,8 +307,15 @@ public partial class TeamCommandsDiscord
 
         // TODO: Validate user is captain of the team
 
+        // Parse game size
+        if (!Helpers.TryParseGameSize(size, out var gameSize))
+        {
+            await ctx.EditResponseAsync($"Invalid team size: {size}");
+            return;
+        }
+
         // Call business logic
-        var result = await TeamCommands.RenameTeamAsync(oldTeamName, newTeamName, ctx.User.Id.ToString());
+        var result = await TeamCommands.RenameTeamAsync(oldTeamName, gameSize, newTeamName, ctx.User.Id.ToString());
 
         if (!result.Success)
         {
@@ -326,15 +373,26 @@ public partial class TeamCommandsDiscord
     [Description("Disband your team (captain only)")]
     public async Task DisbandTeamAsync(
         CommandContext ctx,
+        [Description("Team size")]
+        [SlashChoiceProvider(typeof(TeamGameSizeChoiceProvider))]
+        string size,
         [Description("Team name")]
+        [SlashAutoCompleteProvider(typeof(DynamicTeamAutoCompleteProvider))]
         string teamName)
     {
         await ctx.DeferResponseAsync();
 
         // TODO: Validate user is captain of the team
 
+        // Parse game size
+        if (!Helpers.TryParseGameSize(size, out var gameSize))
+        {
+            await ctx.EditResponseAsync($"Invalid team size: {size}");
+            return;
+        }
+
         // Call business logic
-        var result = await TeamCommands.DisbandTeamAsync(teamName, ctx.User.Id.ToString());
+        var result = await TeamCommands.DisbandTeamAsync(teamName, gameSize, ctx.User.Id.ToString());
 
         if (!result.Success)
         {
@@ -356,7 +414,11 @@ public partial class TeamCommandsDiscord
     [Description("Set your team's tag (captain only)")]
     public async Task SetTeamTagAsync(
         CommandContext ctx,
+        [Description("Team size")]
+        [SlashChoiceProvider(typeof(TeamGameSizeChoiceProvider))]
+        string size,
         [Description("Team name")]
+        [SlashAutoCompleteProvider(typeof(DynamicTeamAutoCompleteProvider))]
         string teamName,
         [Description("Team tag")]
         string tag)
@@ -365,8 +427,15 @@ public partial class TeamCommandsDiscord
 
         // TODO: Validate user is captain of the team
 
+        // Parse game size
+        if (!Helpers.TryParseGameSize(size, out var gameSize))
+        {
+            await ctx.EditResponseAsync($"Invalid team size: {size}");
+            return;
+        }
+
         // Call business logic
-        var result = await TeamCommands.SetTeamTagAsync(teamName, ctx.User.Id.ToString(), tag);
+        var result = await TeamCommands.SetTeamTagAsync(teamName, gameSize, ctx.User.Id.ToString(), tag);
 
         if (!result.Success)
         {
@@ -384,54 +453,83 @@ public partial class TeamCommandsDiscord
         await ctx.EditResponseAsync(new DiscordWebhookBuilder().AddEmbed(embed));
     }
 
+    [Command("manager")]
+    [Description("Manage team manager permissions")]
+    [RequireTeamManager("teamName")]
+    public async Task SetTeamManagerAsync(
+        CommandContext ctx,
+        [Description("Your team")]
+        [SlashAutoCompleteProvider(typeof(UserManagedTeamsAutoCompleteProvider))]
+        string teamName,
+        [Description("Team member to manage")]
+        [SlashAutoCompleteProvider(typeof(TeamMemberAutoCompleteProvider))]
+        string memberId,
+        [Description("Grant manager permissions")]
+        bool isManager)
+    {
+        await ctx.DeferResponseAsync();
+
+        // Call business logic
+        var result = await TeamCommands.SetTeamManagerAsync(teamName, GameSize.TwoVTwo, ctx.User.Id.ToString(), memberId, isManager);
+
+        if (!result.Success)
+        {
+            await ctx.EditResponseAsync(result.ErrorMessage ?? "Failed to set team manager status");
+            return;
+        }
+
+        var embed = new DiscordEmbedBuilder()
+            .WithTitle("👥 Team Manager Updated")
+            .WithDescription(result.Message ?? "Team manager status updated successfully")
+            .WithColor(isManager ? DiscordColor.Green : DiscordColor.Orange)
+            .AddField("Team", teamName, true)
+            .AddField("User", $"<@{memberId}>", true)
+            .AddField("Status", isManager ? "Manager" : "Member", true);
+
+        await ctx.EditResponseAsync(new DiscordWebhookBuilder().AddEmbed(embed));
+    }
+
+    [Command("managers")]
+    [Description("List team managers")]
+    public async Task ListTeamManagersAsync(
+        CommandContext ctx,
+        [Description("Team size")]
+        [SlashChoiceProvider(typeof(TeamGameSizeChoiceProvider))]
+        string size,
+        [Description("Team name")]
+        [SlashAutoCompleteProvider(typeof(DynamicTeamAutoCompleteProvider))]
+        string teamName)
+    {
+        await ctx.DeferResponseAsync();
+
+        // Parse game size
+        if (!Helpers.TryParseGameSize(size, out var gameSize))
+        {
+            await ctx.EditResponseAsync($"Invalid team size: {size}");
+            return;
+        }
+
+        // Call business logic
+        var result = await TeamCommands.ListTeamManagersAsync(teamName, gameSize);
+
+        if (!result.Success)
+        {
+            await ctx.EditResponseAsync(result.ErrorMessage ?? "Failed to list team managers");
+            return;
+        }
+
+        var embed = new DiscordEmbedBuilder()
+            .WithTitle("👥 Team Managers")
+            .WithDescription(result.Message ?? "Team managers listed successfully")
+            .WithColor(DiscordColor.Blue)
+            .AddField("Team", teamName, true);
+
+        await ctx.EditResponseAsync(new DiscordWebhookBuilder().AddEmbed(embed));
+    }
+
 
 
     #endregion
-
-    #region Private Helper Methods
-
-    private static bool TryParseGameSize(string size, out GameSize gameSize)
-    {
-        gameSize = size.ToLowerInvariant() switch
-        {
-            "1v1" => GameSize.OneVOne,
-            "2v2" => GameSize.TwoVTwo,
-            "3v3" => GameSize.ThreeVThree,
-            "4v4" => GameSize.FourVFour,
-            _ => GameSize.OneVOne
-        };
-
-        return size.ToLowerInvariant() is "1v1" or "2v2" or "3v3" or "4v4";
-    }
-
-    private static bool TryParseTeamRole(string role, out TeamRole teamRole)
-    {
-        teamRole = role.ToLowerInvariant() switch
-        {
-            "core" => TeamRole.Core,
-            "backup" => TeamRole.Substitute,
-            _ => TeamRole.Core
-        };
-
-        return role.ToLowerInvariant() is "core" or "backup";
-    }
-
-    #endregion
-}
-
-/// <summary>
-/// Choice provider for team roles
-/// </summary>
-public class TeamRoleChoiceProvider : IChoiceProvider
-{
-    public IEnumerable<CommandChoice> GetChoices()
-    {
-        return new[]
-        {
-            new CommandChoice("Core", "Core"),
-            new CommandChoice("Backup", "Backup"),
-        };
-    }
 }
 
 /// <summary>
@@ -450,13 +548,24 @@ public partial class TeamAdminCommandsDiscord
     [Description("Archive a team (admin only)")]
     public async Task ArchiveTeamAsync(
         CommandContext ctx,
+        [Description("Team size")]
+        [SlashChoiceProvider(typeof(TeamGameSizeChoiceProvider))]
+        string size,
         [Description("Team name")]
+        [SlashAutoCompleteProvider(typeof(DynamicTeamAutoCompleteProvider))]
         string teamName)
     {
         await ctx.DeferResponseAsync();
 
+        // Parse game size
+        if (!Helpers.TryParseGameSize(size, out var gameSize))
+        {
+            await ctx.EditResponseAsync($"Invalid team size: {size}");
+            return;
+        }
+
         // Call business logic
-        var result = await TeamCommands.ArchiveTeamAsync(teamName, ctx.User.Id.ToString());
+        var result = await TeamCommands.ArchiveTeamAsync(teamName, gameSize, ctx.User.Id.ToString());
 
         if (!result.Success)
         {
@@ -478,13 +587,24 @@ public partial class TeamAdminCommandsDiscord
     [Description("Unarchive a team (admin only)")]
     public async Task UnarchiveTeamAsync(
         CommandContext ctx,
+        [Description("Team size")]
+        [SlashChoiceProvider(typeof(TeamGameSizeChoiceProvider))]
+        string size,
         [Description("Team name")]
+        [SlashAutoCompleteProvider(typeof(DynamicTeamAutoCompleteProvider))]
         string teamName)
     {
         await ctx.DeferResponseAsync();
 
+        // Parse game size
+        if (!Helpers.TryParseGameSize(size, out var gameSize))
+        {
+            await ctx.EditResponseAsync($"Invalid team size: {size}");
+            return;
+        }
+
         // Call business logic
-        var result = await TeamCommands.UnarchiveTeamAsync(teamName, ctx.User.Id.ToString());
+        var result = await TeamCommands.UnarchiveTeamAsync(teamName, gameSize, ctx.User.Id.ToString());
 
         if (!result.Success)
         {
@@ -498,6 +618,276 @@ public partial class TeamAdminCommandsDiscord
             .WithColor(DiscordColor.Green)
             .AddField("Team", teamName, true)
             .AddField("Unarchived by", ctx.User.Mention, true);
+
+        await ctx.EditResponseAsync(new DiscordWebhookBuilder().AddEmbed(embed));
+    }
+
+    [Command("create")]
+    [Description("Create a team (admin only)")]
+    public async Task AdminCreateTeamAsync(
+        CommandContext ctx,
+        [Description("Team name")]
+        string teamName,
+        [Description("Team size")]
+        [SlashChoiceProvider(typeof(TeamGameSizeChoiceProvider))]
+        string size,
+        [Description("Captain username")]
+        string captainUsername)
+    {
+        await ctx.DeferResponseAsync();
+
+        // Parse game size
+        if (!Helpers.TryParseGameSize(size, out var gameSize))
+        {
+            await ctx.EditResponseAsync($"Invalid team size: {size}");
+            return;
+        }
+
+        // Call business logic
+        var result = await TeamCommands.AdminCreateTeamAsync(teamName, gameSize, captainUsername, ctx.User.Id.ToString());
+
+        if (!result.Success)
+        {
+            await ctx.EditResponseAsync(result.ErrorMessage ?? "Failed to create team");
+            return;
+        }
+
+        var embed = new DiscordEmbedBuilder()
+            .WithTitle("🏆 Team Created (Admin)")
+            .WithDescription(result.Message ?? "Team created successfully")
+            .WithColor(DiscordColor.Green)
+            .AddField("Team Name", teamName, true)
+            .AddField("Size", size, true)
+            .AddField("Captain", captainUsername, true)
+            .AddField("Created by", ctx.User.Mention, true);
+
+        await ctx.EditResponseAsync(new DiscordWebhookBuilder().AddEmbed(embed));
+    }
+
+    [Command("delete")]
+    [Description("Delete a team (admin only)")]
+    public async Task AdminDeleteTeamAsync(
+        CommandContext ctx,
+        [Description("Team size")]
+        [SlashChoiceProvider(typeof(TeamGameSizeChoiceProvider))]
+        string size,
+        [Description("Team name")]
+        [SlashAutoCompleteProvider(typeof(DynamicTeamAutoCompleteProvider))]
+        string teamName)
+    {
+        await ctx.DeferResponseAsync();
+
+        // Parse game size
+        if (!Helpers.TryParseGameSize(size, out var gameSize))
+        {
+            await ctx.EditResponseAsync($"Invalid team size: {size}");
+            return;
+        }
+
+        // Call business logic
+        var result = await TeamCommands.AdminDeleteTeamAsync(teamName, gameSize, ctx.User.Id.ToString());
+
+        if (!result.Success)
+        {
+            await ctx.EditResponseAsync(result.ErrorMessage ?? "Failed to delete team");
+            return;
+        }
+
+        var embed = new DiscordEmbedBuilder()
+            .WithTitle("🗑️ Team Deleted (Admin)")
+            .WithDescription(result.Message ?? "Team deleted successfully")
+            .WithColor(DiscordColor.Red)
+            .AddField("Team Name", teamName, true)
+            .AddField("Size", size, true)
+            .AddField("Deleted by", ctx.User.Mention, true);
+
+        await ctx.EditResponseAsync(new DiscordWebhookBuilder().AddEmbed(embed));
+    }
+
+    [Command("add_player")]
+    [Description("Add a player to a team (admin only)")]
+    public async Task AdminAddPlayerAsync(
+        CommandContext ctx,
+        [Description("Team size")]
+        [SlashChoiceProvider(typeof(TeamGameSizeChoiceProvider))]
+        string size,
+        [Description("Team name")]
+        [SlashAutoCompleteProvider(typeof(DynamicTeamAutoCompleteProvider))]
+        string teamName,
+        [Description("Player username")]
+        string username,
+        [Description("Player role (Core, Substitute)")]
+        [SlashChoiceProvider(typeof(TeamRoleChoiceProvider))]
+        string role)
+    {
+        await ctx.DeferResponseAsync();
+
+        // Parse game size
+        if (!Helpers.TryParseGameSize(size, out var gameSize))
+        {
+            await ctx.EditResponseAsync($"Invalid team size: {size}");
+            return;
+        }
+
+        // Parse team role
+        if (!Helpers.TryParseTeamRole(role, out var teamRole))
+        {
+            await ctx.EditResponseAsync($"Invalid role: {role}. Valid roles: Core, Substitute");
+            return;
+        }
+
+        // Call business logic
+        var result = await TeamCommands.AdminAddPlayerAsync(teamName, gameSize, username, teamRole, ctx.User.Id.ToString());
+
+        if (!result.Success)
+        {
+            await ctx.EditResponseAsync(result.ErrorMessage ?? "Failed to add player");
+            return;
+        }
+
+        var embed = new DiscordEmbedBuilder()
+            .WithTitle("➕ Player Added (Admin)")
+            .WithDescription(result.Message ?? "Player added successfully")
+            .WithColor(DiscordColor.Green)
+            .AddField("Team", teamName, true)
+            .AddField("Player", username, true)
+            .AddField("Role", role, true)
+            .AddField("Added by", ctx.User.Mention, true);
+
+        await ctx.EditResponseAsync(new DiscordWebhookBuilder().AddEmbed(embed));
+    }
+
+    [Command("remove_player")]
+    [Description("Remove a player from a team (admin only)")]
+    public async Task AdminRemovePlayerAsync(
+        CommandContext ctx,
+        [Description("Team size")]
+        [SlashChoiceProvider(typeof(TeamGameSizeChoiceProvider))]
+        string size,
+        [Description("Team name")]
+        [SlashAutoCompleteProvider(typeof(DynamicTeamAutoCompleteProvider))]
+        string teamName,
+        [Description("Player username")]
+        string username)
+    {
+        await ctx.DeferResponseAsync();
+
+        // Parse game size
+        if (!Helpers.TryParseGameSize(size, out var gameSize))
+        {
+            await ctx.EditResponseAsync($"Invalid team size: {size}");
+            return;
+        }
+
+        // Call business logic
+        var result = await TeamCommands.AdminRemovePlayerAsync(teamName, gameSize, username, ctx.User.Id.ToString());
+
+        if (!result.Success)
+        {
+            await ctx.EditResponseAsync(result.ErrorMessage ?? "Failed to remove player");
+            return;
+        }
+
+        var embed = new DiscordEmbedBuilder()
+            .WithTitle("➖ Player Removed (Admin)")
+            .WithDescription(result.Message ?? "Player removed successfully")
+            .WithColor(DiscordColor.Orange)
+            .AddField("Team", teamName, true)
+            .AddField("Player", username, true)
+            .AddField("Removed by", ctx.User.Mention, true);
+
+        await ctx.EditResponseAsync(new DiscordWebhookBuilder().AddEmbed(embed));
+    }
+
+    [Command("reset_rating")]
+    [Description("Reset a team's rating (admin only)")]
+    public async Task AdminResetRatingAsync(
+        CommandContext ctx,
+        [Description("Team size")]
+        [SlashChoiceProvider(typeof(TeamGameSizeChoiceProvider))]
+        string size,
+        [Description("Team name")]
+        [SlashAutoCompleteProvider(typeof(DynamicTeamAutoCompleteProvider))]
+        string teamName)
+    {
+        await ctx.DeferResponseAsync();
+
+        // Parse game size
+        if (!Helpers.TryParseGameSize(size, out var gameSize))
+        {
+            await ctx.EditResponseAsync($"Invalid team size: {size}");
+            return;
+        }
+
+        // Call business logic
+        var result = await TeamCommands.AdminResetRatingAsync(teamName, gameSize, ctx.User.Id.ToString());
+
+        if (!result.Success)
+        {
+            await ctx.EditResponseAsync(result.ErrorMessage ?? "Failed to reset team rating");
+            return;
+        }
+
+        var embed = new DiscordEmbedBuilder()
+            .WithTitle("🔄 Rating Reset (Admin)")
+            .WithDescription(result.Message ?? "Team rating reset successfully")
+            .WithColor(DiscordColor.Yellow)
+            .AddField("Team", teamName, true)
+            .AddField("Size", size, true)
+            .AddField("Reset by", ctx.User.Mention, true);
+
+        await ctx.EditResponseAsync(new DiscordWebhookBuilder().AddEmbed(embed));
+    }
+
+    [Command("change_role")]
+    [Description("Change a player's role in a team (admin only)")]
+    public async Task AdminChangeRoleAsync(
+        CommandContext ctx,
+        [Description("Team size")]
+        [SlashChoiceProvider(typeof(TeamGameSizeChoiceProvider))]
+        string size,
+        [Description("Team name")]
+        [SlashAutoCompleteProvider(typeof(DynamicTeamAutoCompleteProvider))]
+        string teamName,
+        [Description("Player username")]
+        string username,
+        [Description("New role (Core, Substitute)")]
+        [SlashChoiceProvider(typeof(TeamRoleChoiceProvider))]
+        string newRole)
+    {
+        await ctx.DeferResponseAsync();
+
+        // Parse game size
+        if (!Helpers.TryParseGameSize(size, out var gameSize))
+        {
+            await ctx.EditResponseAsync($"Invalid team size: {size}");
+            return;
+        }
+
+        // Parse team role
+        if (!Helpers.TryParseTeamRole(newRole, out var teamRole))
+        {
+            await ctx.EditResponseAsync($"Invalid role: {newRole}. Valid roles: Core, Substitute");
+            return;
+        }
+
+        // Call business logic
+        var result = await TeamCommands.AdminChangeRoleAsync(teamName, gameSize, username, teamRole, ctx.User.Id.ToString());
+
+        if (!result.Success)
+        {
+            await ctx.EditResponseAsync(result.ErrorMessage ?? "Failed to change player role");
+            return;
+        }
+
+        var embed = new DiscordEmbedBuilder()
+            .WithTitle("🔄 Role Changed (Admin)")
+            .WithDescription(result.Message ?? "Player role changed successfully")
+            .WithColor(DiscordColor.Blue)
+            .AddField("Team", teamName, true)
+            .AddField("Player", username, true)
+            .AddField("New Role", newRole, true)
+            .AddField("Changed by", ctx.User.Mention, true);
 
         await ctx.EditResponseAsync(new DiscordWebhookBuilder().AddEmbed(embed));
     }

@@ -12,7 +12,7 @@ namespace WabbitBot.SourceGenerators;
 public class CommandGenerator : ISourceGenerator
 {
     private const string WabbitCommandAttribute = "WabbitBot.DiscBot.Attributes.WabbitCommandAttribute";
-    private const string DescriptionAttribute = "WabbitBot.DiscBot.Attributes.DescriptionAttribute";
+    private const string DescriptionAttribute = "System.ComponentModel.DescriptionAttribute";
 
     public void Initialize(GeneratorInitializationContext context)
     {

@@ -68,6 +68,25 @@ namespace WabbitBot.Core.Common.Data
             return await QueryAsync(sql, new { CaptainId = captainId });
         }
 
+        public async Task<IEnumerable<Team>> GetTeamsByMemberAsync(string memberId)
+        {
+            if (string.IsNullOrEmpty(memberId))
+            {
+                throw new ArgumentNullException(nameof(memberId));
+            }
+
+            // This is a simplified implementation that assumes the roster is stored as JSON
+            // In a real implementation, you might have a separate TeamMembers table
+            const string sql = @"
+                SELECT * FROM Teams 
+                WHERE JSON_EXTRACT(Roster, '$[*].PlayerId') LIKE @MemberIdPattern
+                AND IsArchived = 0
+                ORDER BY LastActive DESC";
+
+            var memberIdPattern = $"%{memberId}%";
+            return await QueryAsync(sql, new { MemberIdPattern = memberIdPattern });
+        }
+
         public async Task<IEnumerable<Team>> GetTeamsByGameSizeAsync(GameSize gameSize)
         {
             const string sql = @"
@@ -106,6 +125,91 @@ namespace WabbitBot.Core.Common.Data
                 sql,
                 new { TeamId = teamId, LastActive = DateTime.UtcNow }
             );
+        }
+
+        public async Task<IEnumerable<Team>> SearchTeamsAsync(string searchTerm, int limit = 25)
+        {
+            if (string.IsNullOrEmpty(searchTerm))
+            {
+                // Return most recently active teams if no search term
+                const string recentTeamsSql = @"
+                    SELECT * FROM Teams 
+                    WHERE IsArchived = 0 
+                    ORDER BY LastActive DESC 
+                    LIMIT @Limit";
+
+                return await QueryAsync(recentTeamsSql, new { Limit = limit });
+            }
+
+            // Search by name or tag, prioritizing exact matches and active teams
+            const string searchSql = @"
+                SELECT * FROM Teams 
+                WHERE IsArchived = 0 
+                AND (Name LIKE @SearchPattern OR Tag LIKE @SearchPattern)
+                ORDER BY 
+                    CASE 
+                        WHEN Name = @SearchTerm THEN 1
+                        WHEN Name LIKE @SearchTermStart THEN 2
+                        WHEN Name LIKE @SearchPattern THEN 3
+                        ELSE 4
+                    END,
+                    LastActive DESC
+                LIMIT @Limit";
+
+            var searchPattern = $"%{searchTerm}%";
+            var searchTermStart = $"{searchTerm}%";
+
+            return await QueryAsync(searchSql, new
+            {
+                SearchPattern = searchPattern,
+                SearchTerm = searchTerm,
+                SearchTermStart = searchTermStart,
+                Limit = limit
+            });
+        }
+
+        public async Task<IEnumerable<Team>> SearchTeamsByGameSizeAsync(string searchTerm, GameSize gameSize, int limit = 25)
+        {
+            if (string.IsNullOrEmpty(searchTerm))
+            {
+                // Return most recently active teams of the specified game size if no search term
+                const string recentTeamsSql = @"
+                    SELECT * FROM Teams 
+                    WHERE IsArchived = 0 
+                    AND TeamSize = @GameSize
+                    ORDER BY LastActive DESC 
+                    LIMIT @Limit";
+
+                return await QueryAsync(recentTeamsSql, new { GameSize = gameSize, Limit = limit });
+            }
+
+            // Search by name or tag, filtered by game size, prioritizing exact matches and active teams
+            const string searchSql = @"
+                SELECT * FROM Teams 
+                WHERE IsArchived = 0 
+                AND TeamSize = @GameSize
+                AND (Name LIKE @SearchPattern OR Tag LIKE @SearchPattern)
+                ORDER BY 
+                    CASE 
+                        WHEN Name = @SearchTerm THEN 1
+                        WHEN Name LIKE @SearchTermStart THEN 2
+                        WHEN Name LIKE @SearchPattern THEN 3
+                        ELSE 4
+                    END,
+                    LastActive DESC
+                LIMIT @Limit";
+
+            var searchPattern = $"%{searchTerm}%";
+            var searchTermStart = $"{searchTerm}%";
+
+            return await QueryAsync(searchSql, new
+            {
+                GameSize = gameSize,
+                SearchPattern = searchPattern,
+                SearchTerm = searchTerm,
+                SearchTermStart = searchTermStart,
+                Limit = limit
+            });
         }
     }
 }

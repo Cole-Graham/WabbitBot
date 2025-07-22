@@ -7,6 +7,7 @@ namespace WabbitBot.Common.Configuration
     public interface IBotConfigurationReader
     {
         string GetToken();
+        string GetDatabasePath();
         // Any other read-only config properties needed by DiscBot
     }
 
@@ -20,6 +21,7 @@ namespace WabbitBot.Common.Configuration
         }
 
         public string GetToken() => _config.Token;
+        public string GetDatabasePath() => _config.Database.Path;
     }
 
     public class BotConfigurationChangedEvent
@@ -37,9 +39,16 @@ namespace WabbitBot.Common.Models
         public required string Token { get; init; }
         public string LogLevel { get; init; } = "Information";
         public ulong? ServerId { get; init; } = null;
+        public DatabaseConfiguration Database { get; init; } = new();
         public ChannelsConfiguration Channels { get; init; } = new();
         public RolesConfiguration Roles { get; init; } = new();
         public ActivityConfiguration Activity { get; init; } = new();
+    }
+
+    public record DatabaseConfiguration
+    {
+        public string Path { get; init; } = "data/wabbitbot.db";
+        public int MaxPoolSize { get; init; } = 10;
     }
 
     public record ChannelsConfiguration

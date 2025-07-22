@@ -50,9 +50,9 @@ namespace WabbitBot.Common.Data.Utilities
             return newConnection;
         }
 
-        public async Task ReleaseConnectionAsync(IDatabaseConnection connection)
+        public Task ReleaseConnectionAsync(IDatabaseConnection connection)
         {
-            if (connection == null) return;
+            if (connection == null) return Task.CompletedTask;
 
             // Remove any dead connections
             foreach (var kvp in _connectionPool.Where(x => !x.Value.IsConnected))
@@ -67,7 +67,7 @@ namespace WabbitBot.Common.Data.Utilities
             if (_connectionPool.Count >= _maxPoolSize)
             {
                 connection.Dispose();
-                return;
+                return Task.CompletedTask;
             }
 
             // Otherwise keep it in the pool
@@ -79,6 +79,8 @@ namespace WabbitBot.Common.Data.Utilities
             {
                 connection.Dispose();
             }
+
+            return Task.CompletedTask;
         }
 
         public async Task CloseAllConnectionsAsync()

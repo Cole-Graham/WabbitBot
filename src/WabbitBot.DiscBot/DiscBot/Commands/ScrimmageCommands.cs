@@ -1,5 +1,6 @@
 using WabbitBot.Core.Scrimmages;
 using WabbitBot.Core.Common.Models;
+using WabbitBot.DiscBot.DSharpPlus;
 
 namespace WabbitBot.DiscBot.DiscBot.Commands;
 
@@ -10,21 +11,21 @@ public class ScrimmageCommands
 {
     #region Business Logic Methods
 
-    public async Task<ScrimmageResult> ChallengeAsync(string challengerTeamId, string opponentTeamId, GameSize gameSize)
+    public async Task<ScrimmageResult> ChallengeAsync(string challengerTeamName, string opponentTeamName, GameSize gameSize)
     {
         try
         {
-            // Validate teams exist
-            if (string.IsNullOrEmpty(challengerTeamId) || string.IsNullOrEmpty(opponentTeamId))
+            // Validate team names are provided
+            if (string.IsNullOrEmpty(challengerTeamName) || string.IsNullOrEmpty(opponentTeamName))
             {
                 return new ScrimmageResult
                 {
                     Success = false,
-                    ErrorMessage = "Both challenger and opponent team IDs are required"
+                    ErrorMessage = "Both challenger and opponent team names are required"
                 };
             }
 
-            if (challengerTeamId == opponentTeamId)
+            if (challengerTeamName == opponentTeamName)
             {
                 return new ScrimmageResult
                 {
@@ -33,17 +34,74 @@ public class ScrimmageCommands
                 };
             }
 
-            // TODO: Validate teams exist in the system
-            // This would typically involve checking against a team repository
-            await Task.CompletedTask; // Placeholder for future async repository calls
+            // Get team information from the lookup service
+            var challengerTeam = await TeamLookupService.GetByNameAsync(challengerTeamName);
+            var opponentTeam = await TeamLookupService.GetByNameAsync(opponentTeamName);
 
-            // Create the scrimmage
-            var scrimmage = Scrimmage.Create(challengerTeamId, opponentTeamId, gameSize);
+            // Validate teams exist
+            if (challengerTeam is null)
+            {
+                return new ScrimmageResult
+                {
+                    Success = false,
+                    ErrorMessage = $"Challenger team '{challengerTeamName}' not found"
+                };
+            }
+
+            if (opponentTeam is null)
+            {
+                return new ScrimmageResult
+                {
+                    Success = false,
+                    ErrorMessage = $"Opponent team '{opponentTeamName}' not found"
+                };
+            }
+
+            // Validate teams have the same game size
+            if (challengerTeam.TeamSize != gameSize)
+            {
+                return new ScrimmageResult
+                {
+                    Success = false,
+                    ErrorMessage = $"Challenger team '{challengerTeamName}' is a {WabbitBot.DiscBot.DSharpPlus.Commands.Helpers.GetGameSizeDisplay(challengerTeam.TeamSize)} team, but you selected {WabbitBot.DiscBot.DSharpPlus.Commands.Helpers.GetGameSizeDisplay(gameSize)}"
+                };
+            }
+
+            if (opponentTeam.TeamSize != gameSize)
+            {
+                return new ScrimmageResult
+                {
+                    Success = false,
+                    ErrorMessage = $"Opponent team '{opponentTeamName}' is a {WabbitBot.DiscBot.DSharpPlus.Commands.Helpers.GetGameSizeDisplay(opponentTeam.TeamSize)} team, but you selected {WabbitBot.DiscBot.DSharpPlus.Commands.Helpers.GetGameSizeDisplay(gameSize)}"
+                };
+            }
+
+            // Validate teams are not archived
+            if (challengerTeam.IsArchived)
+            {
+                return new ScrimmageResult
+                {
+                    Success = false,
+                    ErrorMessage = $"Challenger team '{challengerTeamName}' is archived and cannot participate in scrimmages"
+                };
+            }
+
+            if (opponentTeam.IsArchived)
+            {
+                return new ScrimmageResult
+                {
+                    Success = false,
+                    ErrorMessage = $"Opponent team '{opponentTeamName}' is archived and cannot participate in scrimmages"
+                };
+            }
+
+            // Create the scrimmage using team IDs
+            var scrimmage = Scrimmage.Create(challengerTeam.Id.ToString(), opponentTeam.Id.ToString(), gameSize);
 
             return new ScrimmageResult
             {
                 Success = true,
-                Message = $"Scrimmage challenge created successfully. Challenge expires in 24 hours.",
+                Message = $"Scrimmage challenge created successfully between {challengerTeamName} and {opponentTeamName}. Challenge expires in 24 hours.",
                 Scrimmage = scrimmage
             };
         }
@@ -58,6 +116,8 @@ public class ScrimmageCommands
     }
 
     #endregion
+
+
 
     #region Result Classes
 

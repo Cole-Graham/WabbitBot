@@ -2,7 +2,9 @@ using DSharpPlus;
 using DSharpPlus.Commands;
 using DSharpPlus.Commands.ContextChecks;
 using DSharpPlus.Entities;
-using WabbitBot.Common.Attributes;
+using DSharpPlus.Commands.Processors.SlashCommands.ArgumentModifiers;
+using DSharpPlus.Commands.Trees;
+using System.ComponentModel;
 using WabbitBot.DiscBot.DiscBot.Commands;
 
 namespace WabbitBot.DiscBot.DSharpPlus.Commands;
@@ -44,7 +46,7 @@ public partial class ConfigurationCommandsDiscord
     public async Task SetChannelAsync(
         CommandContext ctx,
         [Description("Channel type (bot, replay, deck, signup, standings, scrimmage)")]
-        [ChoiceProvider(typeof(ChannelTypeChoiceProvider))]
+        [SlashChoiceProvider(typeof(ChannelTypeChoiceProvider))]
         string channelType,
         [Description("Channel ID")] ulong channelId)
     {
@@ -70,7 +72,7 @@ public partial class ConfigurationCommandsDiscord
     public async Task SetRoleAsync(
         CommandContext ctx,
         [Description("Role type (whitelisted, admin, moderator)")]
-        [ChoiceProvider(typeof(RoleTypeChoiceProvider))]
+        [SlashChoiceProvider(typeof(RoleTypeChoiceProvider))]
         string roleType,
         [Description("Role ID")] ulong roleId)
     {
@@ -185,34 +187,34 @@ public partial class ConfigurationCommandsDiscord
 /// <summary>
 /// Choice provider for channel types
 /// </summary>
-public class ChannelTypeChoiceProvider : IChoiceProvider
+public class ChannelTypeChoiceProvider : global::DSharpPlus.Commands.Processors.SlashCommands.ArgumentModifiers.IChoiceProvider
 {
-    public IEnumerable<CommandChoice> GetChoices()
+    public async ValueTask<IEnumerable<DiscordApplicationCommandOptionChoice>> ProvideAsync(CommandParameter parameter)
     {
-        return new[]
+        return await Task.FromResult(new[]
         {
-            new CommandChoice("Bot Channel", "bot"),
-            new CommandChoice("Replay Channel", "replay"),
-            new CommandChoice("Deck Channel", "deck"),
-            new CommandChoice("Signup Channel", "signup"),
-            new CommandChoice("Standings Channel", "standings"),
-            new CommandChoice("Scrimmage Channel", "scrimmage"),
-        };
+            new DiscordApplicationCommandOptionChoice("Bot Channel", "bot"),
+            new DiscordApplicationCommandOptionChoice("Replay Channel", "replay"),
+            new DiscordApplicationCommandOptionChoice("Deck Channel", "deck"),
+            new DiscordApplicationCommandOptionChoice("Signup Channel", "signup"),
+            new DiscordApplicationCommandOptionChoice("Standings Channel", "standings"),
+            new DiscordApplicationCommandOptionChoice("Scrimmage Channel", "scrimmage"),
+        });
     }
 }
 
 /// <summary>
 /// Choice provider for role types
 /// </summary>
-public class RoleTypeChoiceProvider : IChoiceProvider
+public class RoleTypeChoiceProvider : global::DSharpPlus.Commands.Processors.SlashCommands.ArgumentModifiers.IChoiceProvider
 {
-    public IEnumerable<CommandChoice> GetChoices()
+    public async ValueTask<IEnumerable<DiscordApplicationCommandOptionChoice>> ProvideAsync(CommandParameter parameter)
     {
-        return new[]
+        return await Task.FromResult(new[]
         {
-            new CommandChoice("Whitelisted Role", "whitelisted"),
-            new CommandChoice("Admin Role", "admin"),
-            new CommandChoice("Moderator Role", "moderator"),
-        };
+            new DiscordApplicationCommandOptionChoice("Whitelisted Role", "whitelisted"),
+            new DiscordApplicationCommandOptionChoice("Admin Role", "admin"),
+            new DiscordApplicationCommandOptionChoice("Moderator Role", "moderator"),
+        });
     }
 }

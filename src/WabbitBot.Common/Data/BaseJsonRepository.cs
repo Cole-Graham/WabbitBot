@@ -18,7 +18,7 @@ namespace WabbitBot.Common.Data
         {
         }
 
-        protected T DeserializeJson<T>(string json)
+        protected T? DeserializeJson<T>(string json)
         {
             try
             {

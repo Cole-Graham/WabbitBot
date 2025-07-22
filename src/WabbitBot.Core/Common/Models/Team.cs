@@ -84,7 +84,8 @@ namespace WabbitBot.Core.Common.Models
                 PlayerId = playerId,
                 Role = role,
                 JoinedAt = DateTime.UtcNow,
-                IsActive = true
+                IsActive = true,
+                IsTeamManager = role == TeamRole.Captain // Captains are automatically team managers
             });
         }
 
@@ -103,7 +104,67 @@ namespace WabbitBot.Core.Common.Models
             if (member != null)
             {
                 member.Role = newRole;
+                // Captains are automatically team managers
+                if (newRole == TeamRole.Captain)
+                {
+                    member.IsTeamManager = true;
+                }
             }
+        }
+
+        public void ChangeCaptain(string newCaptainId)
+        {
+            // Find current captain
+            var currentCaptain = Roster.Find(m => m.Role == TeamRole.Captain);
+            if (currentCaptain != null)
+            {
+                // Demote current captain to Core
+                currentCaptain.Role = TeamRole.Core;
+                // Remove manager status from outgoing captain
+                currentCaptain.IsTeamManager = false;
+            }
+
+            // Find new captain
+            var newCaptain = Roster.Find(m => m.PlayerId == newCaptainId);
+            if (newCaptain != null)
+            {
+                // Promote new captain
+                newCaptain.Role = TeamRole.Captain;
+                // Ensure new captain has manager status
+                newCaptain.IsTeamManager = true;
+                // Update team captain ID
+                TeamCaptainId = newCaptainId;
+            }
+        }
+
+        public void SetTeamManagerStatus(string playerId, bool isTeamManager)
+        {
+            var member = Roster.Find(m => m.PlayerId == playerId);
+            if (member != null)
+            {
+                // Captains are always team managers and cannot be demoted
+                if (member.Role == TeamRole.Captain && !isTeamManager)
+                {
+                    throw new InvalidOperationException("Team captains cannot have their manager status removed");
+                }
+
+                member.IsTeamManager = isTeamManager;
+            }
+        }
+
+        public List<string> GetTeamManagerIds()
+        {
+            return Roster.Where(m => m.IsActive && m.IsTeamManager).Select(m => m.PlayerId).ToList();
+        }
+
+        public List<TeamMember> GetActiveMembers()
+        {
+            return Roster.Where(m => m.IsActive).ToList();
+        }
+
+        public TeamMember? GetMember(string playerId)
+        {
+            return Roster.FirstOrDefault(m => m.PlayerId == playerId);
         }
 
         public void DeactivatePlayer(string playerId)
@@ -159,6 +220,11 @@ namespace WabbitBot.Core.Common.Models
             return Roster.Exists(m => m.PlayerId == playerId && m.IsActive && m.Role == TeamRole.Captain);
         }
 
+        public bool IsTeamManager(string playerId)
+        {
+            return Roster.Exists(m => m.PlayerId == playerId && m.IsActive && m.IsTeamManager);
+        }
+
         public bool IsValidForGameSize(GameSize gameSize)
         {
             var requiredPlayers = gameSize switch
@@ -186,5 +252,6 @@ namespace WabbitBot.Core.Common.Models
         public TeamRole Role { get; set; }
         public DateTime JoinedAt { get; set; }
         public bool IsActive { get; set; }
+        public bool IsTeamManager { get; set; }
     }
 }

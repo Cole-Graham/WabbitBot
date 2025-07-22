@@ -64,7 +64,7 @@ public class TeamCommands
         }
     }
 
-    public async Task<TeamResult> GetTeamInfoAsync(string teamName)
+    public async Task<TeamResult> GetTeamInfoAsync(string teamName, GameSize gameSize)
     {
         try
         {
@@ -237,25 +237,43 @@ public class TeamCommands
     {
         try
         {
-            if (string.IsNullOrEmpty(teamName) || string.IsNullOrEmpty(newCaptainId))
+            if (string.IsNullOrEmpty(teamName))
             {
                 return new TeamResult
                 {
                     Success = false,
-                    ErrorMessage = "Team name and new captain ID are required"
+                    ErrorMessage = "Team name is required"
                 };
             }
 
-            // TODO: Validate current captain permissions
-            // TODO: Validate team exists
+            if (string.IsNullOrEmpty(newCaptainId))
+            {
+                return new TeamResult
+                {
+                    Success = false,
+                    ErrorMessage = "New captain ID is required"
+                };
+            }
+
+            if (string.IsNullOrEmpty(currentCaptainId))
+            {
+                return new TeamResult
+                {
+                    Success = false,
+                    ErrorMessage = "Current captain ID is required"
+                };
+            }
+
+            // TODO: Get team from repository
+            // TODO: Validate current user is captain of the team
             // TODO: Validate new captain is on the team
-            // TODO: Change captain
+            // TODO: Use team.ChangeCaptain(newCaptainId) to handle the role and manager changes
             await Task.CompletedTask; // Placeholder for future async repository calls
 
             return new TeamResult
             {
                 Success = true,
-                Message = $"Captain changed to {newCaptainId} in team {teamName}"
+                Message = $"Captain changed successfully from {currentCaptainId} to {newCaptainId}"
             };
         }
         catch (Exception ex)
@@ -268,7 +286,7 @@ public class TeamCommands
         }
     }
 
-    public async Task<TeamResult> LeaveTeamAsync(string teamName, string userId)
+    public async Task<TeamResult> LeaveTeamAsync(string teamName, GameSize gameSize, string userId)
     {
         try
         {
@@ -303,7 +321,7 @@ public class TeamCommands
         }
     }
 
-    public async Task<TeamResult> RenameTeamAsync(string oldTeamName, string newTeamName, string captainId)
+    public async Task<TeamResult> RenameTeamAsync(string oldTeamName, GameSize gameSize, string newTeamName, string captainId)
     {
         try
         {
@@ -373,7 +391,7 @@ public class TeamCommands
         }
     }
 
-    public async Task<TeamResult> DisbandTeamAsync(string teamName, string captainId)
+    public async Task<TeamResult> DisbandTeamAsync(string teamName, GameSize gameSize, string captainId)
     {
         try
         {
@@ -419,7 +437,7 @@ public class TeamCommands
         }
     }
 
-    public async Task<TeamResult> SetTeamTagAsync(string teamName, string captainId, string tag)
+    public async Task<TeamResult> SetTeamTagAsync(string teamName, GameSize gameSize, string captainId, string tag)
     {
         try
         {
@@ -480,7 +498,7 @@ public class TeamCommands
 
 
 
-    public async Task<TeamResult> ArchiveTeamAsync(string teamName, string adminId)
+    public async Task<TeamResult> ArchiveTeamAsync(string teamName, GameSize gameSize, string adminId)
     {
         try
         {
@@ -520,7 +538,7 @@ public class TeamCommands
         }
     }
 
-    public async Task<TeamResult> UnarchiveTeamAsync(string teamName, string adminId)
+    public async Task<TeamResult> UnarchiveTeamAsync(string teamName, GameSize gameSize, string adminId)
     {
         try
         {
@@ -556,6 +574,358 @@ public class TeamCommands
             {
                 Success = false,
                 ErrorMessage = $"Error unarchiving team: {ex.Message}"
+            };
+        }
+    }
+
+    public async Task<TeamResult> AdminCreateTeamAsync(string teamName, GameSize teamSize, string captainUsername, string adminId)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(teamName))
+            {
+                return new TeamResult
+                {
+                    Success = false,
+                    ErrorMessage = "Team name is required"
+                };
+            }
+
+            if (string.IsNullOrEmpty(captainUsername))
+            {
+                return new TeamResult
+                {
+                    Success = false,
+                    ErrorMessage = "Captain username is required"
+                };
+            }
+
+            // TODO: Validate admin permissions
+            // TODO: Get captain user ID from username
+            // TODO: Validate team name uniqueness
+            // TODO: Validate captain exists and isn't already on another team
+            await Task.CompletedTask; // Placeholder for future async repository calls
+
+            var team = new Team
+            {
+                Name = teamName,
+                TeamSize = teamSize,
+                TeamCaptainId = "placeholder_captain_id" // TODO: Get actual captain ID from username
+            };
+
+            // Add captain to roster
+            team.AddPlayer("placeholder_captain_id", TeamRole.Captain);
+
+            // TODO: Save team to repository
+
+            return new TeamResult
+            {
+                Success = true,
+                Message = $"Team '{teamName}' created successfully with {teamSize} format. Captain: {captainUsername}",
+                Team = team
+            };
+        }
+        catch (Exception ex)
+        {
+            return new TeamResult
+            {
+                Success = false,
+                ErrorMessage = $"Error creating team: {ex.Message}"
+            };
+        }
+    }
+
+    public async Task<TeamResult> AdminDeleteTeamAsync(string teamName, GameSize teamSize, string adminId)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(teamName))
+            {
+                return new TeamResult
+                {
+                    Success = false,
+                    ErrorMessage = "Team name is required"
+                };
+            }
+
+            // TODO: Validate admin permissions
+            // TODO: Get team from repository
+            await Task.CompletedTask; // Placeholder for future async repository calls
+
+            // TODO: Delete team from repository
+
+            return new TeamResult
+            {
+                Success = true,
+                Message = $"Team '{teamName}' has been deleted"
+            };
+        }
+        catch (Exception ex)
+        {
+            return new TeamResult
+            {
+                Success = false,
+                ErrorMessage = $"Error deleting team: {ex.Message}"
+            };
+        }
+    }
+
+    public async Task<TeamResult> AdminAddPlayerAsync(string teamName, GameSize teamSize, string username, TeamRole role, string adminId)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(teamName))
+            {
+                return new TeamResult
+                {
+                    Success = false,
+                    ErrorMessage = "Team name is required"
+                };
+            }
+
+            if (string.IsNullOrEmpty(username))
+            {
+                return new TeamResult
+                {
+                    Success = false,
+                    ErrorMessage = "Username is required"
+                };
+            }
+
+            // TODO: Validate admin permissions
+            // TODO: Get team from repository
+            // TODO: Get user ID from username
+            await Task.CompletedTask; // Placeholder for future async repository calls
+
+            var team = new Team(); // Placeholder
+            // TODO: team.AddPlayer("placeholder_user_id", role);
+
+            return new TeamResult
+            {
+                Success = true,
+                Message = $"Player '{username}' added to team '{teamName}' with role '{role}'",
+                Team = team
+            };
+        }
+        catch (Exception ex)
+        {
+            return new TeamResult
+            {
+                Success = false,
+                ErrorMessage = $"Error adding player: {ex.Message}"
+            };
+        }
+    }
+
+    public async Task<TeamResult> AdminRemovePlayerAsync(string teamName, GameSize teamSize, string username, string adminId)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(teamName))
+            {
+                return new TeamResult
+                {
+                    Success = false,
+                    ErrorMessage = "Team name is required"
+                };
+            }
+
+            if (string.IsNullOrEmpty(username))
+            {
+                return new TeamResult
+                {
+                    Success = false,
+                    ErrorMessage = "Username is required"
+                };
+            }
+
+            // TODO: Validate admin permissions
+            // TODO: Get team from repository
+            // TODO: Get user ID from username
+            await Task.CompletedTask; // Placeholder for future async repository calls
+
+            var team = new Team(); // Placeholder
+            // TODO: team.RemovePlayer("placeholder_user_id");
+
+            return new TeamResult
+            {
+                Success = true,
+                Message = $"Player '{username}' removed from team '{teamName}'",
+                Team = team
+            };
+        }
+        catch (Exception ex)
+        {
+            return new TeamResult
+            {
+                Success = false,
+                ErrorMessage = $"Error removing player: {ex.Message}"
+            };
+        }
+    }
+
+    public async Task<TeamResult> AdminResetRatingAsync(string teamName, GameSize teamSize, string adminId)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(teamName))
+            {
+                return new TeamResult
+                {
+                    Success = false,
+                    ErrorMessage = "Team name is required"
+                };
+            }
+
+            // TODO: Validate admin permissions
+            // TODO: Get team from repository
+            // TODO: Reset team rating to default value
+            await Task.CompletedTask; // Placeholder for future async repository calls
+
+            return new TeamResult
+            {
+                Success = true,
+                Message = $"Team '{teamName}' rating has been reset to default"
+            };
+        }
+        catch (Exception ex)
+        {
+            return new TeamResult
+            {
+                Success = false,
+                ErrorMessage = $"Error resetting team rating: {ex.Message}"
+            };
+        }
+    }
+
+    public async Task<TeamResult> AdminChangeRoleAsync(string teamName, GameSize teamSize, string username, TeamRole newRole, string adminId)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(teamName))
+            {
+                return new TeamResult
+                {
+                    Success = false,
+                    ErrorMessage = "Team name is required"
+                };
+            }
+
+            if (string.IsNullOrEmpty(username))
+            {
+                return new TeamResult
+                {
+                    Success = false,
+                    ErrorMessage = "Username is required"
+                };
+            }
+
+            // TODO: Validate admin permissions
+            // TODO: Get team from repository
+            // TODO: Get user ID from username
+            await Task.CompletedTask; // Placeholder for future async repository calls
+
+            var team = new Team(); // Placeholder
+            // TODO: team.UpdatePlayerRole("placeholder_user_id", newRole);
+
+            return new TeamResult
+            {
+                Success = true,
+                Message = $"Player '{username}' role changed to '{newRole}' in team '{teamName}'",
+                Team = team
+            };
+        }
+        catch (Exception ex)
+        {
+            return new TeamResult
+            {
+                Success = false,
+                ErrorMessage = $"Error changing player role: {ex.Message}"
+            };
+        }
+    }
+
+    public async Task<TeamResult> SetTeamManagerAsync(string teamName, GameSize gameSize, string managerId, string targetMemberId, bool isManager)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(teamName))
+            {
+                return new TeamResult
+                {
+                    Success = false,
+                    ErrorMessage = "Team name is required"
+                };
+            }
+
+            if (string.IsNullOrEmpty(targetMemberId))
+            {
+                return new TeamResult
+                {
+                    Success = false,
+                    ErrorMessage = "Target member ID is required"
+                };
+            }
+
+            if (string.IsNullOrEmpty(managerId))
+            {
+                return new TeamResult
+                {
+                    Success = false,
+                    ErrorMessage = "Manager ID is required"
+                };
+            }
+
+            // TODO: Get team from repository
+            // TODO: Validate manager has team manager permissions
+            // TODO: Validate target member is on the team
+            await Task.CompletedTask; // Placeholder for future async repository calls
+
+            var action = isManager ? "promoted to team manager" : "removed from team managers";
+            return new TeamResult
+            {
+                Success = true,
+                Message = $"Member has been {action} in team '{teamName}'"
+            };
+        }
+        catch (Exception ex)
+        {
+            return new TeamResult
+            {
+                Success = false,
+                ErrorMessage = $"Error setting team manager status: {ex.Message}"
+            };
+        }
+    }
+
+    public async Task<TeamResult> ListTeamManagersAsync(string teamName, GameSize gameSize)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(teamName))
+            {
+                return new TeamResult
+                {
+                    Success = false,
+                    ErrorMessage = "Team name is required"
+                };
+            }
+
+            // TODO: Get team from repository
+            await Task.CompletedTask; // Placeholder for future async repository calls
+
+            return new TeamResult
+            {
+                Success = true,
+                Message = $"Team managers for '{teamName}' listed successfully"
+            };
+        }
+        catch (Exception ex)
+        {
+            return new TeamResult
+            {
+                Success = false,
+                ErrorMessage = $"Error listing team managers: {ex.Message}"
             };
         }
     }

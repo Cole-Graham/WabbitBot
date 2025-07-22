@@ -24,7 +24,7 @@ namespace WabbitBot.Common.Data.Utilities
             return JsonSerializer.Serialize(obj, DefaultOptions);
         }
 
-        public static T Deserialize<T>(string json)
+        public static T? Deserialize<T>(string json)
         {
             if (string.IsNullOrEmpty(json))
             {
@@ -41,7 +41,7 @@ namespace WabbitBot.Common.Data.Utilities
             }
         }
 
-        public static object Deserialize(string json, Type type)
+        public static object? Deserialize(string json, Type type)
         {
             if (string.IsNullOrEmpty(json))
             {

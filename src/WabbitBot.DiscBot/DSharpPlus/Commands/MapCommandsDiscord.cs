@@ -4,9 +4,8 @@ using DSharpPlus.Commands.ContextChecks;
 using DSharpPlus.Commands.Processors.SlashCommands.ArgumentModifiers;
 using DSharpPlus.Entities;
 using System.Text.Json;
-using WabbitBot.Common.Attributes;
+using System.ComponentModel;
 using WabbitBot.DiscBot.DiscBot.Commands;
-using WabbitBot.DiscBot.DiscBot.Commands.Providers;
 using WabbitBot.DiscBot.DSharpPlus.Embeds;
 using WabbitBot.DiscBot.DSharpPlus.Generated;
 
@@ -28,7 +27,7 @@ namespace WabbitBot.DiscBot.DSharpPlus.Commands
         public async Task ListMapsAsync(
             CommandContext ctx,
             [Description("Filter by size (e.g., 1v1 to 4v4, or 'all' for all sizes)")]
-            [ChoiceProvider(typeof(MapSizeChoiceProvider))]
+            [SlashChoiceProvider(typeof(MapSizeChoiceProvider))]
             string size = "all",
             [Description("Show only maps in random pool (-1=all, 0=no, 1=yes)")]
             int inRandomPoolInt = -1)
@@ -88,7 +87,7 @@ namespace WabbitBot.DiscBot.DSharpPlus.Commands
         public async Task DisplayMapAsync(
             CommandContext ctx,
             [Description("Map name")]
-            [AutoCompleteProvider(typeof(MapNameAutoCompleteProvider))]
+            [SlashAutoCompleteProvider(typeof(MapNameAutoCompleteProvider))]
             string mapName)
         {
             await ctx.DeferResponseAsync();

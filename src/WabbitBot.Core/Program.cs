@@ -6,7 +6,7 @@ using WabbitBot.Common.Events.EventInterfaces;
 using WabbitBot.Common.Models;
 using WabbitBot.Common.ErrorHandling;
 using WabbitBot.Core.Common.BotCore;
-
+using WabbitBot.Common.Data;
 
 namespace WabbitBot.Core;
 
@@ -49,7 +49,7 @@ public static class Program
             ConfigurationReader = new BotConfigurationReader(config);
 
             // Initialize core business logic
-            await InitializeCoreAsync();
+            await InitializeCoreAsync(config);
 
             // Publish startup event with configuration
             // This will be picked up by DiscBot through event handlers
@@ -98,10 +98,13 @@ public static class Program
         return config;
     }
 
-    private static async Task InitializeCoreAsync()
+    private static async Task InitializeCoreAsync(BotConfiguration config)
     {
         try
         {
+            // Initialize database connection provider
+            DatabaseConnectionProvider.Initialize(config.Database.Path, config.Database.MaxPoolSize);
+
             // Initialize core services
             var initializedServices = new[] { "Database", "Cache", "EventBus" };
             await CoreEventBus.PublishAsync(new CoreServicesInitializedEvent(initializedServices));
