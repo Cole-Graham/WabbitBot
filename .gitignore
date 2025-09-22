@@ -400,7 +400,6 @@ FodyWeavers.xsd
 *.sln.iml
 
 # Misc
-.dev/
 Scrimmage_backup.txt
 .editorconfig
 rating_simulator.py
@@ -413,8 +412,10 @@ win_probability_curves.png
 *src/WabbitBot.Old
 *src/deprecated
 *docs.old
-*notes/
-dev/rating_simulator/simulation_results/
+*docs/.dev/.trash/
+*docs.veryold/
+*docs.veryveryold/
+dev/tools/rating_simulator/simulation_results/
 
 # Custom output directory
 src/output/bin/
@@ -425,14 +426,16 @@ src/output/config.json
 src/config.json
 !src/config.template.json
 
+# Backup tool configuration
+dev/tools/local_backup/logs/
+*config.ini
+!*.template.ini
+
 # Custom map configurations
 src/WabbitBot.Core/Config/maps.json
 !src/WabbitBot.Core/Config/maps.default.json
 
 # Generated source code
-src/WabbitBot.DiscBot/DSharpPlus/Generated/
+Generated/
 
-# Ignore docs directory
-docs/*
-# But allow ScrimmageRatingCalculator.md
-docs/ScrimmageRatingCalculator.md
+# data

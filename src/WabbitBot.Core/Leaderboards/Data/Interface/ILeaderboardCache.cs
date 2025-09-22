@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using WabbitBot.Common.Data.Interfaces;
 using WabbitBot.Core.Leaderboards;
@@ -7,10 +8,9 @@ namespace WabbitBot.Core.Leaderboards.Data.Interface
 {
     /// <summary>
     /// Defines the contract for caching leaderboard data.
-    /// This interface provides methods for managing leaderboard data in a cache,
-    /// supporting both individual leaderboards and collections.
+    /// This interface provides methods for managing leaderboard data in a cache.
     /// </summary>
-    public interface ILeaderboardCache : IBaseCache<Leaderboard>, ICollectionCache<Leaderboard, LeaderboardListWrapper>
+    public interface ILeaderboardCache : ICache<Leaderboard>
     {
         /// <summary>
         /// Gets a leaderboard by its ID from the cache.
@@ -25,31 +25,21 @@ namespace WabbitBot.Core.Leaderboards.Data.Interface
         /// <summary>
         /// Removes a leaderboard from the cache.
         /// </summary>
-        Task<bool> RemoveLeaderboardAsync(Guid id);
+        Task<bool> RemoveLeaderboardAsync(Guid leaderboardId);
 
         /// <summary>
         /// Checks if a leaderboard exists in the cache.
         /// </summary>
-        Task<bool> LeaderboardExistsAsync(Guid id);
+        Task<bool> LeaderboardExistsAsync(Guid leaderboardId);
 
         /// <summary>
-        /// Gets the collection of active leaderboards from the cache.
+        /// Gets the top rankings for a specific game size from cached data.
         /// </summary>
-        Task<LeaderboardListWrapper> GetActiveLeaderboardsAsync();
+        Task<IEnumerable<LeaderboardItem>> GetTopRankingsAsync(EvenTeamFormat evenTeamFormat, int count = 10);
 
         /// <summary>
-        /// Sets the collection of active leaderboards in the cache with optional expiry.
+        /// Gets team rankings for a specific team and game size from cached data.
         /// </summary>
-        Task SetActiveLeaderboardsAsync(LeaderboardListWrapper leaderboards, TimeSpan? expiry = null);
-
-        /// <summary>
-        /// Removes the collection of active leaderboards from the cache.
-        /// </summary>
-        Task<bool> RemoveActiveLeaderboardsAsync();
-
-        /// <summary>
-        /// Checks if active leaderboards exist in the cache.
-        /// </summary>
-        Task<bool> ActiveLeaderboardsExistAsync();
+        Task<IEnumerable<LeaderboardItem>> GetTeamRankingsAsync(string teamId, EvenTeamFormat evenTeamFormat);
     }
 }

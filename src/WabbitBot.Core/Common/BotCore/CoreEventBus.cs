@@ -1,6 +1,5 @@
 using WabbitBot.Common.Events;
 using WabbitBot.Common.Events.EventInterfaces;
-using System.Collections.Concurrent;
 
 namespace WabbitBot.Core.Common.BotCore;
 
@@ -80,8 +79,11 @@ public class CoreEventBus : ICoreEventBus
             }
         }
 
-        // Always forward to global bus for cross-project communication
-        tasks.Add(_globalEventBus.PublishAsync(@event));
+        // Only forward to global bus if the event is meant for global routing
+        if (@event is IEvent eventWithType && eventWithType.EventBusType == EventBusType.Global)
+        {
+            tasks.Add(_globalEventBus.PublishAsync(@event));
+        }
 
         await Task.WhenAll(tasks);
     }

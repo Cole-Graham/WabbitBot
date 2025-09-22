@@ -2,15 +2,15 @@ using System;
 using System.Threading.Tasks;
 using WabbitBot.Common.Data.Interfaces;
 using WabbitBot.Core.Leaderboards;
+using WabbitBot.Core.Common.Models;
 
 namespace WabbitBot.Core.Leaderboards.Data.Interface
 {
     /// <summary>
     /// Defines the contract for caching season data.
-    /// This interface provides methods for managing season data in a cache,
-    /// supporting both individual seasons and collections.
+    /// This interface provides methods for managing season data in a cache.
     /// </summary>
-    public interface ISeasonCache : IBaseCache<Season>, ICollectionCache<Season, SeasonListWrapper>
+    public interface ISeasonCache : ICache<Season>
     {
         /// <summary>
         /// Gets a season by its ID from the cache.
@@ -25,17 +25,17 @@ namespace WabbitBot.Core.Leaderboards.Data.Interface
         /// <summary>
         /// Removes a season from the cache.
         /// </summary>
-        Task<bool> RemoveSeasonAsync(Guid id);
+        Task<bool> RemoveSeasonAsync(Guid seasonId);
 
         /// <summary>
         /// Checks if a season exists in the cache.
         /// </summary>
-        Task<bool> SeasonExistsAsync(Guid id);
+        Task<bool> SeasonExistsAsync(Guid seasonId);
 
         /// <summary>
-        /// Gets the currently active season from the cache.
+        /// Gets the currently active season for a specific game size from the cache.
         /// </summary>
-        Task<Season?> GetActiveSeasonAsync();
+        Task<Season?> GetActiveSeasonAsync(EvenTeamFormat evenTeamFormat);
 
         /// <summary>
         /// Sets the active season in the cache with optional expiry.
@@ -43,18 +43,13 @@ namespace WabbitBot.Core.Leaderboards.Data.Interface
         Task SetActiveSeasonAsync(Season season, TimeSpan? expiry = null);
 
         /// <summary>
-        /// Removes the active season from the cache.
+        /// Removes the active season for a specific game size from the cache.
         /// </summary>
-        Task<bool> RemoveActiveSeasonAsync();
+        Task<bool> RemoveActiveSeasonAsync(EvenTeamFormat evenTeamFormat);
 
         /// <summary>
-        /// Checks if an active season exists in the cache.
+        /// Checks if an active season exists in the cache for a specific game size.
         /// </summary>
-        Task<bool> ActiveSeasonExistsAsync();
-
-        /// <summary>
-        /// Gets all seasons from the cache.
-        /// </summary>
-        Task<SeasonListWrapper> GetAllSeasonsAsync();
+        Task<bool> ActiveSeasonExistsAsync(EvenTeamFormat evenTeamFormat);
     }
 }

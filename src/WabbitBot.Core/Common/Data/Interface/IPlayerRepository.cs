@@ -6,7 +6,7 @@ using WabbitBot.Core.Common.Models;
 
 namespace WabbitBot.Core.Common.Data.Interface
 {
-    public interface IPlayerRepository : IBaseRepository<Player>
+    public interface IPlayerRepository : IRepository<Player>
     {
         Task<Player?> GetByNameAsync(string name);
         Task<IEnumerable<Player>> GetInactivePlayersAsync(TimeSpan inactivityThreshold);

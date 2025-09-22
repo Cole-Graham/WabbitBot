@@ -1,0 +1,217 @@
+using System;
+using WabbitBot.Common.Events.EventInterfaces;
+
+namespace WabbitBot.Common.Attributes
+{
+    #region Event Handler Attributes
+
+    /// <summary>
+    /// Base attribute for event handler generation.
+    /// Generates automatic event subscriptions with configurable options.
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Class)]
+    public class GenerateEventHandlerAttribute : Attribute
+    {
+        /// <summary>
+        /// The type of event bus to use for subscriptions.
+        /// </summary>
+        public EventBusType EventBusType { get; set; } = EventBusType.Core;
+
+        /// <summary>
+        /// Whether to enable performance metrics collection.
+        /// </summary>
+        public bool EnableMetrics { get; set; } = true;
+
+        /// <summary>
+        /// Whether to enable automatic error handling.
+        /// </summary>
+        public bool EnableErrorHandling { get; set; } = true;
+
+        /// <summary>
+        /// Whether to enable logging for event processing.
+        /// </summary>
+        public bool EnableLogging { get; set; } = true;
+    }
+
+    /// <summary>
+    /// Attribute to mark a class for automatic event subscription generation.
+    /// Generates InitializeAsync() method that subscribes to all handled events.
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Class)]
+    public class GenerateEventSubscriptionsAttribute : Attribute
+    {
+        /// <summary>
+        /// The type of event bus to use for subscriptions.
+        /// </summary>
+        public EventBusType EventBusType { get; set; } = EventBusType.Core;
+
+        /// <summary>
+        /// Whether to enable performance metrics collection.
+        /// </summary>
+        public bool EnableMetrics { get; set; } = true;
+
+        /// <summary>
+        /// Whether to enable automatic error handling.
+        /// </summary>
+        public bool EnableErrorHandling { get; set; } = true;
+
+        /// <summary>
+        /// Whether to enable logging for event processing.
+        /// </summary>
+        public bool EnableLogging { get; set; } = true;
+    }
+
+    /// <summary>
+    /// Attribute to mark a method as an event handler.
+    /// The method will be automatically subscribed to the event bus.
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Method)]
+    public class EventHandlerAttribute : Attribute
+    {
+        /// <summary>
+        /// The specific event type to handle. If not specified, inferred from method parameter.
+        /// </summary>
+        public string? EventType { get; set; }
+
+        /// <summary>
+        /// Priority for handler execution order (lower numbers execute first).
+        /// </summary>
+        public int Priority { get; set; } = 0;
+
+        /// <summary>
+        /// Whether this is a request-response handler.
+        /// </summary>
+        public bool IsRequestResponse { get; set; } = false;
+
+        /// <summary>
+        /// Whether to enable retry logic for this handler.
+        /// </summary>
+        public bool EnableRetry { get; set; } = false;
+
+        /// <summary>
+        /// Maximum number of retry attempts for this handler.
+        /// </summary>
+        public int MaxRetryAttempts { get; set; } = 3;
+    }
+
+    #endregion
+
+    #region Event Publisher Attributes
+
+    /// <summary>
+    /// Attribute to mark a class for ID-based event publisher source generation.
+    /// Generates automatic event publishing methods that use entity IDs instead of full entities.
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Class)]
+    public class GenerateEventPublisherAttribute : Attribute
+    {
+        /// <summary>
+        /// The type of event bus to use for publishing.
+        /// </summary>
+        public EventBusType EventBusType { get; set; } = EventBusType.Core;
+
+        /// <summary>
+        /// Whether to enable validation before publishing events.
+        /// </summary>
+        public bool EnableValidation { get; set; } = true;
+
+        /// <summary>
+        /// Whether to enable automatic timestamp generation.
+        /// </summary>
+        public bool EnableTimestamps { get; set; } = true;
+    }
+
+    #endregion
+
+    #region Error Handling Attributes
+
+    /// <summary>
+    /// Attribute to mark a class for error handler source generation.
+    /// Generates automatic error handling and recovery logic.
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Class)]
+    public class GenerateErrorHandlerAttribute : Attribute
+    {
+        /// <summary>
+        /// The type of event bus to use for error handling.
+        /// </summary>
+        public EventBusType EventBusType { get; set; } = EventBusType.Core;
+
+        /// <summary>
+        /// Whether to enable automatic logging for errors.
+        /// </summary>
+        public bool EnableLogging { get; set; } = true;
+
+        /// <summary>
+        /// Whether to enable automatic recovery strategies.
+        /// </summary>
+        public bool EnableRecovery { get; set; } = true;
+
+        /// <summary>
+        /// Whether to enable error metrics collection.
+        /// </summary>
+        public bool EnableMetrics { get; set; } = true;
+    }
+
+    /// <summary>
+    /// Attribute to mark a method as an error handler.
+    /// The method will be automatically registered for error handling.
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Method)]
+    public class ErrorHandlerAttribute : Attribute
+    {
+        /// <summary>
+        /// The specific error type to handle.
+        /// </summary>
+        public string? ErrorType { get; set; }
+
+        /// <summary>
+        /// Priority for error handler execution order (lower numbers execute first).
+        /// </summary>
+        public int Priority { get; set; } = 0;
+
+        /// <summary>
+        /// Whether this handler should attempt recovery.
+        /// </summary>
+        public bool EnableRecovery { get; set; } = false;
+
+        /// <summary>
+        /// Whether this handler should log the error.
+        /// </summary>
+        public bool EnableLogging { get; set; } = true;
+    }
+
+    #endregion
+
+    #region Utility Attributes
+
+    /// <summary>
+    /// Attribute to mark a method for metrics collection.
+    /// Automatically generates performance metrics for the method.
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Method)]
+    public class MetricsAttribute : Attribute
+    {
+        /// <summary>
+        /// The name for the metric (defaults to method name).
+        /// </summary>
+        public string? MetricName { get; set; }
+
+        /// <summary>
+        /// Whether to track execution time.
+        /// </summary>
+        public bool TrackExecutionTime { get; set; } = true;
+
+        /// <summary>
+        /// Whether to track success/failure rates.
+        /// </summary>
+        public bool TrackSuccessRate { get; set; } = true;
+
+        /// <summary>
+        /// Whether to track memory usage.
+        /// </summary>
+        public bool TrackMemoryUsage { get; set; } = false;
+    }
+
+    #endregion
+}

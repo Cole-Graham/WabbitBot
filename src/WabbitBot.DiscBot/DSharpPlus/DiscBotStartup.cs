@@ -1,34 +1,32 @@
 using WabbitBot.Common.Events;
 using WabbitBot.DiscBot.DiscBot.Events;
 using WabbitBot.Common.Configuration;
+using WabbitBot.Common.Utilities;
 
 namespace WabbitBot.DiscBot.DSharpPlus;
 
+/// <summary>
+/// Application startup orchestration for the Discord bot
+/// </summary>
 public static class DiscBotStartup
 {
-    private static IBotConfigurationReader? _configReader;
-
-    // This will be called when the assembly loads
-    static DiscBotStartup()
+    /// <summary>
+    /// Initialize the Discord bot and its event infrastructure
+    /// </summary>
+    public static async Task InitializeAsync(IBotConfigurationService configReader)
     {
-        // This is a simple initialization to get handlers registered
-        // The actual handler instances will subscribe to events
-        RegisterEventHandlers();
-    }
+        // Database is already initialized in Program.cs (Core project)
 
-    private static void RegisterEventHandlers()
-    {
-        // Get the global event bus from Common provider
-        var globalEventBus = GlobalEventBusProvider.GetGlobalEventBus();
+        // Initialize thumbnail utility with configuration
+        // Note: ThumbnailUtility is initialized in both Core and DiscBot for shared access
+        var configuration = ((BotConfigurationService)configReader).Configuration;
+        ThumbnailUtility.Initialize(configuration);
 
-        // Subscribe to startup events
-        globalEventBus.Subscribe<StartupInitiatedEvent>(OnStartupInitiated);
-    }
+        // Initialize the Discord event bus
+        await DiscordEventBus.Instance.InitializeAsync();
 
-    private static Task OnStartupInitiated(StartupInitiatedEvent evt)
-    {
-        _configReader = evt.ConfigurationReader;
-        _ = new DiscordEventHandler(GlobalEventBusProvider.GetGlobalEventBus(), _configReader);
-        return Task.CompletedTask;
+        // Create the Discord event handler (which will auto-subscribe via source generation)
+        var handler = new DiscordEventHandler(configReader);
+        await handler.InitializeAsync();
     }
 }

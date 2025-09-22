@@ -1,47 +1,76 @@
+using WabbitBot.Common.Attributes;
+using WabbitBot.Common.Events.EventInterfaces;
 using WabbitBot.Core.Common.Models;
 
 namespace WabbitBot.Core.Common.Events;
 
-public class MapsSavedEvent
+/// <summary>
+/// Core-internal events for map management - not forwarded to GlobalEventBus
+/// </summary>
+public partial class MapsSavedEvent : IEvent
 {
+    public EventBusType EventBusType { get; init; } = EventBusType.Core;
+    public string EventId { get; init; } = Guid.NewGuid().ToString();
+    public DateTime Timestamp { get; init; } = DateTime.UtcNow;
     public required List<Map> Maps { get; init; }
 }
 
-public class MapsExportedEvent
+public partial class MapsExportedEvent : IEvent
 {
+    public EventBusType EventBusType { get; init; } = EventBusType.Core;
+    public string EventId { get; init; } = Guid.NewGuid().ToString();
+    public DateTime Timestamp { get; init; } = DateTime.UtcNow;
     public required string Path { get; init; }
 }
 
-public class MapsImportedEvent
+public partial class MapsImportedEvent : IEvent
 {
+    public EventBusType EventBusType { get; init; } = EventBusType.Core;
+    public string EventId { get; init; } = Guid.NewGuid().ToString();
+    public DateTime Timestamp { get; init; } = DateTime.UtcNow;
     public required List<Map> Maps { get; init; }
 }
 
-public class MapAddedEvent
+public partial class MapAddedEvent : IEvent
 {
+    public EventBusType EventBusType { get; init; } = EventBusType.Core;
+    public string EventId { get; init; } = Guid.NewGuid().ToString();
+    public DateTime Timestamp { get; init; } = DateTime.UtcNow;
     public required Map Map { get; init; }
 }
 
-public class MapUpdatedEvent
+public partial class MapUpdatedEvent : IEvent
 {
+    public EventBusType EventBusType { get; init; } = EventBusType.Core;
+    public string EventId { get; init; } = Guid.NewGuid().ToString();
+    public DateTime Timestamp { get; init; } = DateTime.UtcNow;
     public required Map Map { get; init; }
     public required Map PreviousMap { get; init; }
 }
 
-public class MapRemovedEvent
+public partial class MapRemovedEvent : IEvent
 {
+    public EventBusType EventBusType { get; init; } = EventBusType.Core;
+    public string EventId { get; init; } = Guid.NewGuid().ToString();
+    public DateTime Timestamp { get; init; } = DateTime.UtcNow;
     public required Map Map { get; init; }
 }
 
-public class MapThumbnailUpdatedEvent
+public partial class MapThumbnailUpdatedEvent : IEvent
 {
+    public EventBusType EventBusType { get; init; } = EventBusType.Core;
+    public string EventId { get; init; } = Guid.NewGuid().ToString();
+    public DateTime Timestamp { get; init; } = DateTime.UtcNow;
     public required Map Map { get; init; }
     public string? OldFilename { get; init; }
     public required string NewFilename { get; init; }
 }
 
-public class MapThumbnailRemovedEvent
+public partial class MapThumbnailRemovedEvent : IEvent
 {
+    public EventBusType EventBusType { get; init; } = EventBusType.Core;
+    public string EventId { get; init; } = Guid.NewGuid().ToString();
+    public DateTime Timestamp { get; init; } = DateTime.UtcNow;
     public required Map Map { get; init; }
     public string? OldFilename { get; init; }
 }

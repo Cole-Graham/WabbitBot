@@ -5,10 +5,12 @@ using System.Threading.Tasks;
 using WabbitBot.Common.Data;
 using WabbitBot.Common.Data.Interfaces;
 using WabbitBot.Common.Data.Utilities;
+using WabbitBot.Core.Tournaments;
+using WabbitBot.Core.Tournaments.Data.Interface;
 
 namespace WabbitBot.Core.Tournaments.Data
 {
-    public class TournamentArchive : BaseArchive<Tournament>
+    public class TournamentArchive : Archive<Tournament>, ITournamentArchive
     {
         private static readonly IEnumerable<string> Columns = new[]
         {
@@ -17,11 +19,11 @@ namespace WabbitBot.Core.Tournaments.Data
             "Description",
             "StartDate",
             "EndDate",
-            "Status",
             "MaxParticipants",
+            "BestOf",
             "CreatedAt",
             "UpdatedAt",
-            "Version",
+            "SchemaVersion",
             "ArchivedAt"  // Additional column for archive
         };
 
@@ -41,11 +43,11 @@ namespace WabbitBot.Core.Tournaments.Data
                 EndDate = reader.IsDBNull(reader.GetOrdinal("EndDate"))
                     ? null
                     : reader.GetDateTime(reader.GetOrdinal("EndDate")),
-                Status = (TournamentStatus)reader.GetInt32(reader.GetOrdinal("Status")),
                 MaxParticipants = reader.GetInt32(reader.GetOrdinal("MaxParticipants")),
+                BestOf = reader.GetInt32(reader.GetOrdinal("BestOf")),
                 CreatedAt = reader.GetDateTime(reader.GetOrdinal("CreatedAt")),
                 UpdatedAt = reader.GetDateTime(reader.GetOrdinal("UpdatedAt")),
-                Version = reader.GetInt32(reader.GetOrdinal("Version"))
+                SchemaVersion = reader.GetInt32(reader.GetOrdinal("SchemaVersion"))
             };
         }
 
@@ -58,11 +60,11 @@ namespace WabbitBot.Core.Tournaments.Data
                 entity.Description,
                 entity.StartDate,
                 entity.EndDate,
-                Status = (int)entity.Status,
                 entity.MaxParticipants,
+                entity.BestOf,
                 entity.CreatedAt,
                 entity.UpdatedAt,
-                entity.Version,
+                entity.SchemaVersion,
                 ArchivedAt = DateTime.UtcNow
             };
         }

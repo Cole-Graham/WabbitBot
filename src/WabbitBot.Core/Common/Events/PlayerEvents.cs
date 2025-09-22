@@ -1,10 +1,53 @@
-using System;
+using WabbitBot.Common.Attributes;
 using WabbitBot.Common.Events.EventInterfaces;
 
 namespace WabbitBot.Core.Common.Events
 {
-    public class PlayerArchiveCheckEvent : ICoreEvent
+    /// <summary>
+    /// Event published when a player is created
+    /// </summary>
+    public partial record PlayerCreatedEvent(
+        string PlayerId
+    ) : IEvent
     {
+        public EventBusType EventBusType { get; init; } = EventBusType.Core;
+        public string EventId { get; init; } = Guid.NewGuid().ToString();
+        public DateTime Timestamp { get; init; } = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Event published when a player is updated
+    /// </summary>
+    public partial record PlayerUpdatedEvent(
+        string PlayerId
+    ) : IEvent
+    {
+        public EventBusType EventBusType { get; init; } = EventBusType.Core;
+        public string EventId { get; init; } = Guid.NewGuid().ToString();
+        public DateTime Timestamp { get; init; } = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Event published when a player is deleted
+    /// </summary>
+    public partial record PlayerDeletedEvent(
+        string PlayerId
+    ) : IEvent
+    {
+        public EventBusType EventBusType { get; init; } = EventBusType.Core;
+        public string EventId { get; init; } = Guid.NewGuid().ToString();
+        public DateTime Timestamp { get; init; } = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Business logic event for player archive checking - unique to Player entity
+    /// This event is used as a mutable data container where handlers set properties
+    /// </summary>
+    public partial class PlayerArchiveCheckEvent : IEvent
+    {
+        public EventBusType EventBusType { get; init; } = EventBusType.Core;
+        public string EventId { get; init; } = Guid.NewGuid().ToString();
+        public DateTime Timestamp { get; init; } = DateTime.UtcNow;
         public Guid PlayerId { get; }
         public bool HasActiveUsers { get; set; }
         public bool HasActiveMatches { get; set; }
@@ -17,27 +60,29 @@ namespace WabbitBot.Core.Common.Events
         }
     }
 
-    public class PlayerArchivedEvent : ICoreEvent
+    /// <summary>
+    /// Event published when a player is archived
+    /// </summary>
+    public partial record PlayerArchivedEvent(
+        string PlayerId
+    ) : IEvent
     {
-        public Guid PlayerId { get; }
-        public DateTime ArchivedAt { get; }
-
-        public PlayerArchivedEvent(Guid playerId)
-        {
-            PlayerId = playerId;
-            ArchivedAt = DateTime.UtcNow;
-        }
+        public EventBusType EventBusType { get; init; } = EventBusType.Core;
+        public string EventId { get; init; } = Guid.NewGuid().ToString();
+        public DateTime Timestamp { get; init; } = DateTime.UtcNow;
     }
 
-    public class PlayerUnarchivedEvent : ICoreEvent
+    /// <summary>
+    /// Event published when a player is unarchived
+    /// </summary>
+    public partial record PlayerUnarchivedEvent(
+        string PlayerId,
+        DateTime UnarchivedAt = default
+    ) : IEvent
     {
-        public Guid PlayerId { get; }
-        public DateTime UnarchivedAt { get; }
-
-        public PlayerUnarchivedEvent(Guid playerId)
-        {
-            PlayerId = playerId;
-            UnarchivedAt = DateTime.UtcNow;
-        }
+        public EventBusType EventBusType { get; init; } = EventBusType.Core;
+        public string EventId { get; init; } = Guid.NewGuid().ToString();
+        public DateTime Timestamp { get; init; } = DateTime.UtcNow;
+        public DateTime UnarchivedAt { get; init; } = UnarchivedAt == default ? DateTime.UtcNow : UnarchivedAt;
     }
 }

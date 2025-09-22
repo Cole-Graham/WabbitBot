@@ -1,33 +1,30 @@
 using System;
 using System.Collections.Generic;
-using System.Text.Json.Serialization;
-using WabbitBot.Common.Models;
-using WabbitBot.Common.Data.Utilities;
 using System.Linq;
+using WabbitBot.Common.Models;
+using WabbitBot.Common.Attributes;
 
 namespace WabbitBot.Core.Common.Models
 {
-    public class Team : BaseEntity
+    public enum TeamFormat
+    {
+        OneVOne,
+        TwoVTwo,
+        ThreeVThree,
+        FourVFour
+    }
+    public class Team : Entity
     {
         public string Name { get; set; } = string.Empty;
-        public string TeamCaptainId { get; set; } = string.Empty;
-        public GameSize TeamSize { get; set; }
+        public Guid TeamCaptainId { get; set; }
+        public EvenTeamFormat TeamSize { get; set; }
         public int MaxRosterSize { get; set; }
         public DateTime LastActive { get; set; }
         public bool IsArchived { get; set; }
         public DateTime? ArchivedAt { get; set; }
         public string? Tag { get; set; }
-
-        [JsonIgnore]
+        public Dictionary<EvenTeamFormat, Stats> Stats { get; set; } = new();
         public List<TeamMember> Roster { get; set; } = new();
-
-        // JSON serialization properties
-        [JsonPropertyName("Roster")]
-        public string RosterJson
-        {
-            get => JsonUtil.Serialize(Roster);
-            set => Roster = JsonUtil.Deserialize<List<TeamMember>>(value) ?? new();
-        }
 
         public Team()
         {
@@ -38,14 +35,47 @@ namespace WabbitBot.Core.Common.Models
             SetMaxRosterSize();
         }
 
+        /// <summary>
+        /// Shared helper methods for Discord commands
+        /// </summary>
+        /// <summary>
+        /// Helper methods for Team model
+        /// </summary>
+        public static class Validation
+        {
+            /// <summary>
+            /// Attempts to parse a string into a TeamRole enum value
+            /// </summary>
+            public static bool TryParseTeamRole(string role, out TeamRole teamRole)
+            {
+                teamRole = role.ToLowerInvariant() switch
+                {
+                    "core" => TeamRole.Core,
+                    "backup" => TeamRole.Substitute,
+                    _ => TeamRole.Core
+                };
+
+                return role.ToLowerInvariant() is "core" or "backup";
+            }
+
+            /// <summary>
+            /// Validates if a team has a valid captain
+            /// </summary>
+            public static bool HasValidCaptain(Team team)
+            {
+                return team.TeamCaptainId != Guid.Empty &&
+                       team.GetActiveMembers().Any(m => m.PlayerId == team.TeamCaptainId);
+            }
+        }
+
         private void SetMaxRosterSize()
         {
             // Allow one extra player for substitutes
             MaxRosterSize = TeamSize switch
             {
-                GameSize.TwoVTwo => 3,
-                GameSize.ThreeVThree => 4,
-                GameSize.FourVFour => 5,
+                EvenTeamFormat.TwoVTwo => 3,
+                EvenTeamFormat.ThreeVThree => 4,
+                EvenTeamFormat.FourVFour => 5,
                 _ => 1
             };
         }
@@ -54,6 +84,7 @@ namespace WabbitBot.Core.Common.Models
         {
             LastActive = DateTime.UtcNow;
         }
+
 
         public void Archive()
         {
@@ -67,7 +98,7 @@ namespace WabbitBot.Core.Common.Models
             ArchivedAt = null;
         }
 
-        public void AddPlayer(string playerId, TeamRole role = TeamRole.Core)
+        public void AddPlayer(Guid playerId, TeamRole role = TeamRole.Core)
         {
             if (Roster.Count >= MaxRosterSize)
             {
@@ -89,7 +120,7 @@ namespace WabbitBot.Core.Common.Models
             });
         }
 
-        public void RemovePlayer(string playerId)
+        public void RemovePlayer(Guid playerId)
         {
             var member = Roster.Find(m => m.PlayerId == playerId);
             if (member != null)
@@ -98,7 +129,7 @@ namespace WabbitBot.Core.Common.Models
             }
         }
 
-        public void UpdatePlayerRole(string playerId, TeamRole newRole)
+        public void UpdatePlayerRole(Guid playerId, TeamRole newRole)
         {
             var member = Roster.Find(m => m.PlayerId == playerId);
             if (member != null)
@@ -112,7 +143,7 @@ namespace WabbitBot.Core.Common.Models
             }
         }
 
-        public void ChangeCaptain(string newCaptainId)
+        public void ChangeCaptain(Guid newCaptainId)
         {
             // Find current captain
             var currentCaptain = Roster.Find(m => m.Role == TeamRole.Captain);
@@ -137,7 +168,7 @@ namespace WabbitBot.Core.Common.Models
             }
         }
 
-        public void SetTeamManagerStatus(string playerId, bool isTeamManager)
+        public void SetTeamManagerStatus(Guid playerId, bool isTeamManager)
         {
             var member = Roster.Find(m => m.PlayerId == playerId);
             if (member != null)
@@ -152,7 +183,7 @@ namespace WabbitBot.Core.Common.Models
             }
         }
 
-        public List<string> GetTeamManagerIds()
+        public List<Guid> GetTeamManagerIds()
         {
             return Roster.Where(m => m.IsActive && m.IsTeamManager).Select(m => m.PlayerId).ToList();
         }
@@ -162,12 +193,12 @@ namespace WabbitBot.Core.Common.Models
             return Roster.Where(m => m.IsActive).ToList();
         }
 
-        public TeamMember? GetMember(string playerId)
+        public TeamMember? GetMember(Guid playerId)
         {
             return Roster.FirstOrDefault(m => m.PlayerId == playerId);
         }
 
-        public void DeactivatePlayer(string playerId)
+        public void DeactivatePlayer(Guid playerId)
         {
             var member = Roster.Find(m => m.PlayerId == playerId);
             if (member != null)
@@ -176,7 +207,7 @@ namespace WabbitBot.Core.Common.Models
             }
         }
 
-        public void ReactivatePlayer(string playerId)
+        public void ReactivatePlayer(Guid playerId)
         {
             var member = Roster.Find(m => m.PlayerId == playerId);
             if (member != null)
@@ -185,12 +216,12 @@ namespace WabbitBot.Core.Common.Models
             }
         }
 
-        public bool HasPlayer(string playerId)
+        public bool HasPlayer(Guid playerId)
         {
             return Roster.Exists(m => m.PlayerId == playerId);
         }
 
-        public bool HasActivePlayer(string playerId)
+        public bool HasActivePlayer(Guid playerId)
         {
             return Roster.Exists(m => m.PlayerId == playerId && m.IsActive);
         }
@@ -200,38 +231,38 @@ namespace WabbitBot.Core.Common.Models
             return Roster.Count(m => m.IsActive);
         }
 
-        public List<string> GetActivePlayerIds()
+        public List<Guid> GetActivePlayerIds()
         {
             return Roster.Where(m => m.IsActive).Select(m => m.PlayerId).ToList();
         }
 
-        public List<string> GetCorePlayerIds()
+        public List<Guid> GetCorePlayerIds()
         {
             return Roster.Where(m => m.IsActive && (m.Role == TeamRole.Core || m.Role == TeamRole.Captain)).Select(m => m.PlayerId).ToList();
         }
 
-        public List<string> GetCaptainIds()
+        public List<Guid> GetCaptainIds()
         {
             return Roster.Where(m => m.IsActive && m.Role == TeamRole.Captain).Select(m => m.PlayerId).ToList();
         }
 
-        public bool IsCaptain(string playerId)
+        public bool IsCaptain(Guid playerId)
         {
             return Roster.Exists(m => m.PlayerId == playerId && m.IsActive && m.Role == TeamRole.Captain);
         }
 
-        public bool IsTeamManager(string playerId)
+        public bool IsTeamManager(Guid playerId)
         {
             return Roster.Exists(m => m.PlayerId == playerId && m.IsActive && m.IsTeamManager);
         }
 
-        public bool IsValidForGameSize(GameSize gameSize)
+        public bool IsValidForEvenTeamFormat(EvenTeamFormat evenTeamFormat)
         {
-            var requiredPlayers = gameSize switch
+            var requiredPlayers = evenTeamFormat switch
             {
-                GameSize.TwoVTwo => 2,
-                GameSize.ThreeVThree => 3,
-                GameSize.FourVFour => 4,
+                EvenTeamFormat.TwoVTwo => 2,
+                EvenTeamFormat.ThreeVThree => 3,
+                EvenTeamFormat.FourVFour => 4,
                 _ => 1
             };
 
@@ -246,12 +277,72 @@ namespace WabbitBot.Core.Common.Models
         Substitute
     }
 
-    public class TeamMember
+    public class TeamMember : Entity
     {
-        public string PlayerId { get; set; } = string.Empty;
+        public Guid PlayerId { get; set; }
         public TeamRole Role { get; set; }
         public DateTime JoinedAt { get; set; }
         public bool IsActive { get; set; }
         public bool IsTeamManager { get; set; }
     }
+
+    #region Stats
+
+    public class Stats : Entity
+    {
+        // Team identification (for team stats)
+        public Guid TeamId { get; set; }
+        public EvenTeamFormat EvenTeamFormat { get; set; }
+
+        // Basic stats
+        public int Wins { get; set; }
+        public int Losses { get; set; }
+        public int MatchesCount => Wins + Losses;
+
+        // Rating system (using double for precision as per user preference)
+        public double InitialRating { get; set; } = 1000.0;
+        public double CurrentRating { get; set; } = 1000.0;
+        public double HighestRating { get; set; } = 1000.0;
+
+        // Streak tracking
+        public int CurrentStreak { get; set; }
+        public int LongestStreak { get; set; }
+
+        // Timing
+        public DateTime LastMatchAt { get; set; }
+        public DateTime LastUpdated { get; set; }
+
+        // Advanced stats
+        public Dictionary<string, double> OpponentDistribution { get; set; } = new();
+        public int RecentMatchesCount { get; set; }  // Number of games played within the variety window
+
+        // Computed properties
+        public double WinRate => MatchesCount == 0 ? 0 : (double)Wins / MatchesCount;
+
+        public virtual void UpdateStats(bool isWin)
+        {
+            if (isWin)
+            {
+                Wins++;
+                CurrentStreak = Math.Max(0, CurrentStreak) + 1;
+            }
+            else
+            {
+                Losses++;
+                CurrentStreak = Math.Min(0, CurrentStreak) - 1;
+            }
+
+            LongestStreak = Math.Max(Math.Abs(CurrentStreak), LongestStreak);
+            LastMatchAt = DateTime.UtcNow;
+            LastUpdated = DateTime.UtcNow;
+        }
+
+        public virtual void UpdateRating(double newRating)
+        {
+            CurrentRating = newRating;
+            HighestRating = Math.Max(HighestRating, newRating);
+            LastUpdated = DateTime.UtcNow;
+        }
+    }
+    #endregion
 }

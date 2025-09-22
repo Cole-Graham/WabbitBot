@@ -1,10 +1,10 @@
 using DSharpPlus.Entities;
 using WabbitBot.Core.Matches;
-using WabbitBot.DiscBot.DiscBot.Interfaces;
+using WabbitBot.DiscBot.DSharpPlus.Generated;
 
 namespace WabbitBot.DiscBot.DSharpPlus.Embeds;
 
-public abstract class MatchEmbed : BaseEmbed, IMatchEmbed
+public abstract class MatchEmbed : BaseEmbed
 {
     protected Match Match { get; private set; } = null!;
     private readonly List<IEmbedField> _fields = new();
@@ -22,37 +22,22 @@ public abstract class MatchEmbed : BaseEmbed, IMatchEmbed
 
     protected string GetMatchProgressBar()
     {
-        string mapBanEmoji = Match.Stage > MatchStage.MapBan ? "✅" : Match.Stage == MatchStage.MapBan ? "▶️" : "⬜";
-        string deckSubmitEmoji = Match.Stage > MatchStage.DeckSubmission ? "✅" : Match.Stage == MatchStage.DeckSubmission ? "▶️" : "⬜";
-        string gameResultsEmoji = Match.Stage == MatchStage.GameResults ? "▶️" : Match.Stage > MatchStage.GameResults ? "✅" : "⬜";
-
-        return $"{mapBanEmoji} Map Bans → {deckSubmitEmoji} Deck Submission → {gameResultsEmoji} Game Results";
+        return EmbedStyling.FormatMatchProgress(Match.CurrentState);
     }
 
     protected DiscordColor GetStageColor()
     {
-        return Match.Stage switch
-        {
-            MatchStage.MapBan => new DiscordColor(66, 134, 244),        // Blue
-            MatchStage.DeckSubmission => new DiscordColor(255, 140, 0), // Orange
-            MatchStage.DeckRevision => new DiscordColor(255, 215, 0),   // Gold
-            MatchStage.GameResults => new DiscordColor(75, 181, 67),    // Green
-            MatchStage.Completed => new DiscordColor(100, 100, 100),    // Gray
-            _ => new DiscordColor(75, 181, 67)                          // Default green
-        };
+        return EmbedStyling.GetMatchStateColor(Match.CurrentState);
     }
 
     protected string GetStageInstructions()
     {
-        return Match.Stage switch
+        var baseInstructions = EmbedStyling.FormatStageInstructions(Match.GetCurrentActionNeeded());
+        if (Match.CurrentState == MatchState.Completed && !string.IsNullOrEmpty(Match.WinnerId))
         {
-            MatchStage.MapBan => "Select maps to ban in order of priority.",
-            MatchStage.DeckSubmission => "Submit your deck using `/match submit_deck`.",
-            MatchStage.DeckRevision => "Please submit your revised deck using `/match submit_deck`.",
-            MatchStage.GameResults => "Select the winner from the dropdown below.",
-            MatchStage.Completed => $"Match completed! Winner: {GetTeamName(Match.WinnerId!)}",
-            _ => string.Empty
-        };
+            return $"{baseInstructions} Winner: {EmbedStyling.FormatTeamName(GetTeamName(Match.WinnerId))}";
+        }
+        return baseInstructions;
     }
 
     protected void SetTitle(string title) => Title = title;

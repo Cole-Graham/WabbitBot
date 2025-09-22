@@ -1,0 +1,36 @@
+📁 Users
+│
+  📁 coleg
+  │
+    📁 Projects
+    │
+      📁 WabbitBot
+      │
+        📁 src
+          📁 WabbitBot.SourceGenerators
+            ├── 📁 Attributes
+            │   ├── 📄 GenerateCrossBoundaryAttribute.cs
+            │   ├── 📄 GenerateEmbedFactoryAttribute.cs
+            │   ├── 📄 GenerateEmbedStylingAttribute.cs
+            │   ├── 📄 GenerateImplementationAttribute.cs
+            │   └── 📄 WabbitCommandAttribute.cs
+            ├── 📁 Generators
+            │   ├── 📁 Command
+            │   │   └── 📄 CommandGenerator.cs
+            │   ├── 📁 Common
+            │   │   ├── 📄 BaseGenerator.cs
+            │   │   ├── 📄 GeneratorHelpers.cs
+            │   │   └── 📄 SourceWriter.cs
+            │   ├── 📁 CrossBoundary
+            │   │   └── 📄 CrossBoundaryGenerator.cs
+            │   ├── 📁 Embed
+            │   │   ├── 📄 EmbedFactoryGenerator.cs
+            │   │   └── 📄 EmbedStylingGenerator.cs
+            │   └── 📁 Event
+            │       └── 📄 EventBusSourceGenerator.cs
+            ├── 📁 Templates
+            │   ├── 📄 CommandTemplate.cs
+            │   ├── 📄 EmbedTemplate.cs
+            │   └── 📄 EventTemplate.cs
+            ├── 📄 README.md
+            └── 📄 WabbitBot.SourceGenerators.csproj

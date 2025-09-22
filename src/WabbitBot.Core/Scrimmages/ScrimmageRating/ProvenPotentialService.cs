@@ -4,6 +4,8 @@ using System.Linq;
 using System.Threading.Tasks;
 using WabbitBot.Common.Events.EventInterfaces;
 using WabbitBot.Common.ErrorHandling;
+using WabbitBot.Common.Attributes;
+using WabbitBot.Core.Common.BotCore;
 using WabbitBot.Core.Common.Models;
 using WabbitBot.Core.Scrimmages;
 using WabbitBot.Core.Scrimmages.Data;
@@ -11,77 +13,25 @@ using WabbitBot.Core.Scrimmages.ScrimmageRating.Interface;
 
 namespace WabbitBot.Core.Scrimmages.ScrimmageRating
 {
-    public class ProvenPotentialService
+    /// <summary>
+    /// Service for proven potential rating adjustments business logic.
+    /// </summary>
+    [GenerateEventPublisher(EventBusType = EventBusType.Core, EnableValidation = true, EnableTimestamps = true)]
+    public partial class ProvenPotentialService : CoreService
     {
-        private readonly ICoreEventBus _eventBus;
-        private readonly ICoreErrorHandler _errorHandler;
         private readonly IProvenPotentialRepository _provenPotentialRepo;
         private readonly RatingCalculatorService _ratingCalculator;
         private const double PROVEN_POTENTIAL_GAP_THRESHOLD = 0.1;
         private const int MAX_MATCHES_FOR_PROVEN_POTENTIAL = 16; // Match Python: max_matches_for_proven_potential
         private const double MAX_CONFIDENCE_FOR_PROVEN_POTENTIAL = 1.0; // Match Python: only consider matches where player had low confidence (< 1.0)
 
-        public ProvenPotentialService(
-            ICoreEventBus eventBus,
-            ICoreErrorHandler errorHandler,
-            IProvenPotentialRepository provenPotentialRepo,
-            RatingCalculatorService ratingCalculator)
+        public ProvenPotentialService()
+            : base(CoreEventBus.Instance, CoreErrorHandler.Instance)
         {
-            _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
-            _errorHandler = errorHandler ?? throw new ArgumentNullException(nameof(errorHandler));
-            _provenPotentialRepo = provenPotentialRepo ?? throw new ArgumentNullException(nameof(provenPotentialRepo));
-            _ratingCalculator = ratingCalculator ?? throw new ArgumentNullException(nameof(ratingCalculator));
+            _provenPotentialRepo = WabbitBot.Core.Common.Data.DataServiceManager.ProvenPotentialRepository;
+            _ratingCalculator = new RatingCalculatorService();
         }
 
-        /// <summary>
-        /// Initializes the service and subscribes to relevant events.
-        /// </summary>
-        public Task InitializeAsync()
-        {
-            // Subscribe to match completion event to check for proven potential
-            _eventBus.Subscribe<ScrimmageCompletedEvent>(async evt =>
-            {
-                try
-                {
-                    // Use event bus to get team ratings
-                    var team1RatingResp = await _eventBus.RequestAsync<GetTeamRatingRequest, GetTeamRatingResponse>(new GetTeamRatingRequest { TeamId = evt.Team1Id });
-                    var team2RatingResp = await _eventBus.RequestAsync<GetTeamRatingRequest, GetTeamRatingResponse>(new GetTeamRatingRequest { TeamId = evt.Team2Id });
-                    var team1Rating = team1RatingResp?.Rating ?? 0;
-                    var team2Rating = team2RatingResp?.Rating ?? 0;
-
-                    // Use confidence values from the event (calculated at match time)
-                    var team1Confidence = evt.Team1Confidence;
-                    var team2Confidence = evt.Team2Confidence;
-
-                    // Calculate rating change using RatingCalculatorService
-                    var (team1Change, team2Change) = await _ratingCalculator.CalculateRatingChangeAsync(
-                        evt.Team1Id, evt.Team2Id, team1Rating, team2Rating, evt.GameSize, evt.Team1Score, evt.Team2Score);
-
-                    // Request creation of proven potential record
-                    var createRequest = new CreateProvenPotentialRecordRequest
-                    {
-                        MatchId = evt.MatchId,
-                        ChallengerId = evt.Team1Id,
-                        OpponentId = evt.Team2Id,
-                        ChallengerRating = team1Rating,
-                        OpponentRating = team2Rating,
-                        ChallengerConfidence = team1Confidence,
-                        OpponentConfidence = team2Confidence,
-                        ChallengerOriginalRatingChange = team1Change,
-                        OpponentOriginalRatingChange = team2Change,
-                        GameSize = evt.GameSize
-                    };
-
-                    await _eventBus.PublishAsync(createRequest);
-                }
-                catch (Exception ex)
-                {
-                    await _errorHandler.HandleError(ex);
-                }
-            });
-
-            return Task.CompletedTask;
-        }
 
         /// <summary>
         /// Handles a request to check proven potential for a team.
@@ -196,22 +146,22 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
                 });
 
                 // Publish event to apply the challenger rating adjustment
-                await _eventBus.PublishAsync(new ApplyProvenPotentialAdjustmentEvent
+                await EventBus.PublishAsync(new ApplyProvenPotentialAdjustmentEvent
                 {
                     ChallengerId = record.ChallengerId,
                     OpponentId = record.OpponentId,
                     Adjustment = challengerRatingAdjustment,
-                    GameSize = record.GameSize,
+                    EvenTeamFormat = record.EvenTeamFormat,
                     Reason = $"Proven potential adjustment: {totalCompensationPercentage:P0} gap closure threshold"
                 });
 
                 // Publish event to apply the opponent rating adjustment
-                await _eventBus.PublishAsync(new ApplyProvenPotentialAdjustmentEvent
+                await EventBus.PublishAsync(new ApplyProvenPotentialAdjustmentEvent
                 {
                     ChallengerId = record.OpponentId,
                     OpponentId = record.ChallengerId,
                     Adjustment = opponentRatingAdjustment,
-                    GameSize = record.GameSize,
+                    EvenTeamFormat = record.EvenTeamFormat,
                     Reason = $"Proven potential adjustment: {totalCompensationPercentage:P0} gap closure threshold"
                 });
 
@@ -253,7 +203,7 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
                     ChallengerOriginalRatingChange = request.ChallengerOriginalRatingChange,
                     OpponentOriginalRatingChange = request.OpponentOriginalRatingChange,
                     RatingAdjustment = 0.0, // Will be calculated during proven potential checks
-                    GameSize = request.GameSize,
+                    EvenTeamFormat = request.EvenTeamFormat,
                     LastCheckedAt = DateTime.UtcNow,
                     IsComplete = false
                 };
@@ -276,7 +226,7 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
                     ChallengerOriginalRatingChange = request.OpponentOriginalRatingChange,
                     OpponentOriginalRatingChange = request.ChallengerOriginalRatingChange,
                     RatingAdjustment = 0.0, // Will be calculated during proven potential checks
-                    GameSize = request.GameSize,
+                    EvenTeamFormat = request.EvenTeamFormat,
                     LastCheckedAt = DateTime.UtcNow,
                     IsComplete = false
                 };
@@ -309,7 +259,7 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
                 foreach (var teamId in teamsWithRecords)
                 {
                     // Get current team rating via event bus
-                    var ratingResp = await _eventBus.RequestAsync<GetTeamRatingRequest, GetTeamRatingResponse>(new GetTeamRatingRequest { TeamId = teamId });
+                    var ratingResp = await EventBus.RequestAsync<GetTeamRatingRequest, GetTeamRatingResponse>(new GetTeamRatingRequest { TeamId = teamId });
                     var currentRating = ratingResp?.Rating ?? 0;
 
                     // Check proven potential for this team
@@ -324,7 +274,7 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
             }
             catch (Exception ex)
             {
-                await _errorHandler.HandleError(ex);
+                await ErrorHandler.HandleErrorAsync(ex);
             }
         }
     }

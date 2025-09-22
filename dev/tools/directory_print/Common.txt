@@ -1,0 +1,68 @@
+📁 Users
+│
+  📁 coleg
+  │
+    📁 Projects
+    │
+      📁 WabbitBot
+      │
+        📁 src
+          📁 WabbitBot.Common
+            ├── 📁 Attributes
+            │   ├── 📄 EventBusAttributes.cs
+            │   ├── 📄 GenerateCrossBoundaryAttribute.cs
+            │   ├── 📄 GenerateEmbedFactoryAttribute.cs
+            │   ├── 📄 GenerateEmbedStylingAttribute.cs
+            │   ├── 📄 GenerateImplementationAttribute.cs
+            │   └── 📄 WabbitCommandAttribute.cs
+            ├── 📁 Data
+            │   ├── 📁 Interfaces
+            │   │   ├── 📄 IDatabaseConnection.cs
+            │   │   └── 📄 IDatabaseService.cs
+            │   ├── 📁 Schema
+            │   │   ├── 📁 Interface
+            │   │   │   └── 📄 IMigration.cs
+            │   │   ├── 📁 Migrations
+            │   │   │   ├── 📄 CreateGamesTable.cs
+            │   │   │   ├── 📄 CreateLeaderboardsTable.cs
+            │   │   │   ├── 📄 CreateMapsTable.cs
+            │   │   │   ├── 📄 CreateMatchStateSnapshotsTable.cs
+            │   │   │   ├── 📄 CreateMatchesTable.cs
+            │   │   │   ├── 📄 CreateProvenPotentialRecordsTable.cs
+            │   │   │   ├── 📄 CreateScrimmagesTable.cs
+            │   │   │   ├── 📄 CreateSeasonsTable.cs
+            │   │   │   ├── 📄 CreateTeamsTable.cs
+            │   │   │   ├── 📄 CreateTournamentStateSnapshotsTable.cs
+            │   │   │   ├── 📄 CreateTournamentsTable.cs
+            │   │   │   └── 📄 CreateUserAndPlayerTables.cs
+            │   │   └── 📄 SchemaManager.cs
+            │   ├── 📁 Service
+            │   │   ├── 📄 ArchiveService.cs
+            │   │   ├── 📄 CacheService.cs
+            │   │   └── 📄 RepositoryService.cs
+            │   ├── 📁 Utilities
+            │   │   ├── 📄 JsonUtil.cs
+            │   │   └── 📄 QueryUtil.cs
+            │   ├── 📄 Archive.cs
+            │   ├── 📄 Cache.cs
+            │   ├── 📄 DatabaseConnection.cs
+            │   ├── 📄 DatabaseConnectionProvider.cs
+            │   └── 📄 Repository.cs
+            ├── 📁 ErrorHandling
+            │   ├── 📁 ErrorInterfaces
+            │   │   └── 📄 ICoreErrorHandler.cs
+            │   └── 📄 GlobalErrorHandler.cs
+            ├── 📁 Events
+            │   ├── 📁 EventInterfaces
+            │   │   ├── 📄 ICoreEventBus.cs
+            │   │   ├── 📄 IDiscordEventBus.cs
+            │   │   └── 📄 IEvent.cs
+            │   ├── 📄 GlobalEventBus.cs
+            │   ├── 📄 GlobalEventBusProvider.cs
+            │   └── 📄 StartupEvents.cs
+            ├── 📁 Models
+            │   ├── 📄 Entity.cs
+            │   └── 📄 Result.cs
+            ├── 📁 Utilities
+            ├── 📄 Configuration.cs
+            └── 📄 WabbitBot.Common.csproj

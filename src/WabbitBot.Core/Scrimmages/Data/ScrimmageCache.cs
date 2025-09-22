@@ -3,16 +3,18 @@ using System.Threading.Tasks;
 using WabbitBot.Common.Data;
 using WabbitBot.Core.Scrimmages;
 using WabbitBot.Core.Common.Models;
+using WabbitBot.Core.Scrimmages.Data.Interface;
 
 namespace WabbitBot.Core.Scrimmages.Data
 {
-    public class ScrimmageCache : BaseCache<Scrimmage, ScrimmageListWrapper>
+    public class ScrimmageCache : Cache<Scrimmage, ScrimmageListWrapper>, IScrimmageCache
     {
         private const string KeyPrefix = "scrimmage:";
         private const string ListKey = "scrimmages:active";
         private const string TeamKeyPrefix = "team:scrimmages:";
+        private const int MaxScrimmageCacheSize = 1500; // Reasonable limit for scrimmages
 
-        public ScrimmageCache() : base()
+        public ScrimmageCache() : base(MaxScrimmageCacheSize)
         {
         }
 
@@ -26,14 +28,14 @@ namespace WabbitBot.Core.Scrimmages.Data
             await SetAsync($"{KeyPrefix}{scrimmage.Id}", scrimmage, expiry);
         }
 
-        public async Task<bool> RemoveScrimmageAsync(Guid id)
+        public async Task<bool> RemoveScrimmageAsync(Guid scrimmageId)
         {
-            return await RemoveAsync($"{KeyPrefix}{id}");
+            return await RemoveAsync($"{KeyPrefix}{scrimmageId}");
         }
 
-        public async Task<bool> ScrimmageExistsAsync(Guid id)
+        public async Task<bool> ScrimmageExistsAsync(Guid scrimmageId)
         {
-            return await ExistsAsync($"{KeyPrefix}{id}");
+            return await ExistsAsync($"{KeyPrefix}{scrimmageId}");
         }
 
         public async Task<ScrimmageListWrapper> GetActiveScrimmagesAsync()

@@ -24,7 +24,7 @@ namespace WabbitBot.Common.Data.Schema.Migrations
                         Id TEXT PRIMARY KEY,
                         MatchId TEXT NOT NULL,
                         MapId TEXT NOT NULL,
-                        GameSize INTEGER NOT NULL,
+                        EvenTeamFormat INTEGER NOT NULL,
                         Team1PlayerIds TEXT NOT NULL,
                         Team2PlayerIds TEXT NOT NULL,
                         WinnerId TEXT NULL,
@@ -34,6 +34,7 @@ namespace WabbitBot.Common.Data.Schema.Migrations
                         GameNumber INTEGER NOT NULL,
                         CreatedAt DATETIME NOT NULL,
                         UpdatedAt DATETIME NOT NULL,
+                        SchemaVersion INTEGER NOT NULL DEFAULT 1,
                         FOREIGN KEY (MatchId) REFERENCES Matches(Id)
                     )", new { }, transaction);
 

@@ -6,7 +6,7 @@ using WabbitBot.Core.Common.Models;
 
 namespace WabbitBot.Core.Common.Data.Interface
 {
-    public interface IGameRepository : IBaseRepository<Game>
+    public interface IGameRepository : IRepository<Game>
     {
         Task<IEnumerable<Game>> GetGamesByMatchAsync(string matchId);
         Task SaveAsync(Game entity);

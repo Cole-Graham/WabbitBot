@@ -6,12 +6,13 @@ using WabbitBot.Core.Matches;
 
 namespace WabbitBot.Core.Matches.Data
 {
-    public class MatchCache : BaseCache<Match, MatchListWrapper>
+    public class MatchCache : Cache<Match, MatchListWrapper>
     {
         private const string KeyPrefix = "match:";
         private const string ListKey = "matches:active";
+        private const int MaxMatchCacheSize = 2000; // Reasonable limit for matches
 
-        public MatchCache() : base()
+        public MatchCache() : base(MaxMatchCacheSize)
         {
         }
 

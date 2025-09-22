@@ -1,7 +1,7 @@
 using DSharpPlus.Entities;
 using WabbitBot.Common.Attributes;
+using WabbitBot.Common.Utilities;
 using WabbitBot.Core.Common.Models;
-using WabbitBot.DiscBot.DiscBot.Interfaces;
 
 namespace WabbitBot.DiscBot.DSharpPlus.Embeds;
 
@@ -15,7 +15,7 @@ public class MapEmbed : BaseEmbed
         _map = map;
         Title = map.Name;
         Description = description;
-        ThumbnailUrl = map.ThumbnailUrl;
+        ThumbnailUrl = ThumbnailUtility.GetThumbnailUrl(map.ThumbnailFilename);
 
         var fields = new List<IEmbedField>
         {

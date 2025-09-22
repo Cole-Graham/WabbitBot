@@ -5,7 +5,9 @@ using DSharpPlus.Entities;
 using DSharpPlus.Commands.Processors.SlashCommands.ArgumentModifiers;
 using DSharpPlus.Commands.Trees;
 using System.ComponentModel;
-using WabbitBot.DiscBot.DiscBot.Commands;
+using WabbitBot.Core.Common.Configuration;
+using WabbitBot.DiscBot.DSharpPlus.Embeds;
+using WabbitBot.DiscBot.DSharpPlus.Generated;
 
 namespace WabbitBot.DiscBot.DSharpPlus.Commands;
 
@@ -37,7 +39,7 @@ public partial class ConfigurationCommandsDiscord
         var result = await ConfigurationCommands.SetServerIdAsync(ctx.Guild.Id);
 
         await ctx.EditResponseAsync(result.Success ?
-            (result.Message ?? $"Server ID set to {ctx.Guild.Id} successfully") :
+            $"Server ID set to {ctx.Guild.Id} successfully" :
             (result.ErrorMessage ?? "Failed to set server ID"));
     }
 
@@ -63,7 +65,7 @@ public partial class ConfigurationCommandsDiscord
         var result = await ConfigurationCommands.SetChannelAsync(channelType, channelId);
 
         await ctx.EditResponseAsync(result.Success ?
-            (result.Message ?? $"{channelType} channel set successfully") :
+            $"{channelType} channel set successfully" :
             (result.ErrorMessage ?? $"Failed to set {channelType} channel"));
     }
 
@@ -89,7 +91,7 @@ public partial class ConfigurationCommandsDiscord
         var result = await ConfigurationCommands.SetRoleAsync(roleType, roleId);
 
         await ctx.EditResponseAsync(result.Success ?
-            (result.Message ?? $"{roleType} role set successfully") :
+            $"{roleType} role set successfully" :
             (result.ErrorMessage ?? $"Failed to set {roleType} role"));
     }
 
@@ -108,22 +110,10 @@ public partial class ConfigurationCommandsDiscord
             return;
         }
 
-        var config = result.Configuration!;
-        var embed = new DiscordEmbedBuilder()
-            .WithTitle("Bot Configuration")
-            .WithColor(DiscordColor.Blue)
-            .AddField("Server ID", config.ServerId?.ToString() ?? "Not set", true)
-            .AddField("Bot Channel", config.Channels.BotChannel?.ToString() ?? "Not set", true)
-            .AddField("Replay Channel", config.Channels.ReplayChannel?.ToString() ?? "Not set", true)
-            .AddField("Deck Channel", config.Channels.DeckChannel?.ToString() ?? "Not set", true)
-            .AddField("Signup Channel", config.Channels.SignupChannel?.ToString() ?? "Not set", true)
-            .AddField("Standings Channel", config.Channels.StandingsChannel?.ToString() ?? "Not set", true)
-            .AddField("Scrimmage Channel", config.Channels.ScrimmageChannel?.ToString() ?? "Not set", true)
-            .AddField("Whitelisted Role", config.Roles.Whitelisted?.ToString() ?? "Not set", true)
-            .AddField("Admin Role", config.Roles.Admin?.ToString() ?? "Not set", true)
-            .AddField("Moderator Role", config.Roles.Moderator?.ToString() ?? "Not set", true);
-
-        await ctx.EditResponseAsync(new DiscordWebhookBuilder().AddEmbed(embed));
+        var config = result.Data!;
+        var embed = new ConfigurationEmbed();
+        embed.SetConfiguration(config);
+        await ctx.EditResponseAsync(new DiscordWebhookBuilder().AddEmbed(embed.ToEmbedBuilder()));
     }
 
     [Command("export")]
@@ -143,7 +133,7 @@ public partial class ConfigurationCommandsDiscord
 
         var stream = new MemoryStream();
         var writer = new StreamWriter(stream);
-        await writer.WriteAsync(result.Message!);
+        await writer.WriteAsync(result.Data!);
         await writer.FlushAsync();
         stream.Position = 0;
 
@@ -172,7 +162,7 @@ public partial class ConfigurationCommandsDiscord
             var result = await ConfigurationCommands.ImportConfigurationAsync(json);
 
             await ctx.EditResponseAsync(result.Success ?
-                (result.Message ?? "Configuration imported successfully") :
+                "Configuration imported successfully" :
                 (result.ErrorMessage ?? "Failed to import configuration"));
         }
         catch (Exception ex)

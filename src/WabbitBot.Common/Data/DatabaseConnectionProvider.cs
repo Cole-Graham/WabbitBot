@@ -1,61 +1,90 @@
-using WabbitBot.Common.Data.Interfaces;
-using WabbitBot.Common.Data.Utilities;
+using Npgsql;
+using System.Data;
 
 namespace WabbitBot.Common.Data
 {
     /// <summary>
-    /// Static provider for database connections following the project's service locator pattern
+    /// PostgreSQL connection provider using Npgsql
     /// </summary>
     public static class DatabaseConnectionProvider
     {
-        private static IDatabaseConnection? _connection;
-        private static ConnectionPoolingUtil? _connectionPool;
+        private static string? _connectionString;
+        private static NpgsqlConnection? _sharedConnection;
 
         /// <summary>
-        /// Initialize the database connection provider
+        /// Initialize the PostgreSQL connection provider
         /// </summary>
-        /// <param name="dbPath">Path to the database file</param>
-        /// <param name="maxPoolSize">Maximum number of connections in the pool</param>
-        public static void Initialize(string dbPath, int maxPoolSize = 10)
+        /// <param name="connectionString">PostgreSQL connection string</param>
+        public static void Initialize(string connectionString)
         {
-            _connectionPool = new ConnectionPoolingUtil(dbPath, maxPoolSize);
+            _connectionString = connectionString ?? throw new ArgumentNullException(nameof(connectionString));
         }
 
         /// <summary>
-        /// Get a database connection from the pool
+        /// Get a PostgreSQL connection
         /// </summary>
-        public static async Task<IDatabaseConnection> GetConnectionAsync()
+        public static async Task<NpgsqlConnection> GetConnectionAsync()
         {
-            if (_connectionPool is null)
+            if (_connectionString is null)
             {
                 throw new InvalidOperationException(
                     "DatabaseConnectionProvider has not been initialized. Call Initialize() first.");
             }
 
-            return await _connectionPool.GetConnectionAsync();
+            // For now, create new connections. In production, consider connection pooling.
+            var connection = new NpgsqlConnection(_connectionString);
+            await connection.OpenAsync();
+            return connection;
         }
 
         /// <summary>
-        /// Release a database connection back to the pool
+        /// Get a shared connection (use carefully, not thread-safe)
         /// </summary>
-        public static Task ReleaseConnectionAsync(IDatabaseConnection connection)
+        public static async Task<NpgsqlConnection> GetSharedConnectionAsync()
         {
-            if (_connectionPool is null)
+            if (_connectionString is null)
             {
-                return Task.CompletedTask;
+                throw new InvalidOperationException(
+                    "DatabaseConnectionProvider has not been initialized. Call Initialize() first.");
             }
 
-            return _connectionPool.ReleaseConnectionAsync(connection);
+            if (_sharedConnection is null || _sharedConnection.State != ConnectionState.Open)
+            {
+                _sharedConnection = new NpgsqlConnection(_connectionString);
+                await _sharedConnection.OpenAsync();
+            }
+
+            return _sharedConnection;
         }
 
         /// <summary>
-        /// Close all connections in the pool
+        /// Close the shared connection
         /// </summary>
-        public static async Task CloseAllConnectionsAsync()
+        public static async Task CloseSharedConnectionAsync()
         {
-            if (_connectionPool is not null)
+            if (_sharedConnection is not null)
             {
-                await _connectionPool.CloseAllConnectionsAsync();
+                await _sharedConnection.CloseAsync();
+                await _sharedConnection.DisposeAsync();
+                _sharedConnection = null;
+            }
+        }
+
+        /// <summary>
+        /// Test the database connection
+        /// </summary>
+        public static async Task<bool> TestConnectionAsync()
+        {
+            try
+            {
+                using var connection = await GetConnectionAsync();
+                using var command = new NpgsqlCommand("SELECT 1", connection);
+                var result = await command.ExecuteScalarAsync();
+                return result != null;
+            }
+            catch
+            {
+                return false;
             }
         }
     }

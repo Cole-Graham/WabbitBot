@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using WabbitBot.Common.Data.Interfaces;
 using WabbitBot.Core.Scrimmages;
+using WabbitBot.Core.Common.Models;
 
 namespace WabbitBot.Core.Scrimmages.Data.Interface
 {
@@ -10,7 +11,7 @@ namespace WabbitBot.Core.Scrimmages.Data.Interface
     /// This interface provides methods for managing scrimmage data in a cache,
     /// supporting both individual scrimmages and collections.
     /// </summary>
-    public interface IScrimmageCache : IBaseCache<Scrimmage>, ICollectionCache<Scrimmage, ScrimmageListWrapper>
+    public interface IScrimmageCache : ICache<Scrimmage>, ICollectionCache<Scrimmage, ScrimmageListWrapper>
     {
         /// <summary>
         /// Gets a scrimmage by its ID from the cache.
@@ -25,12 +26,12 @@ namespace WabbitBot.Core.Scrimmages.Data.Interface
         /// <summary>
         /// Removes a scrimmage from the cache.
         /// </summary>
-        Task<bool> RemoveScrimmageAsync(Guid id);
+        Task<bool> RemoveScrimmageAsync(Guid scrimmageId);
 
         /// <summary>
         /// Checks if a scrimmage exists in the cache.
         /// </summary>
-        Task<bool> ScrimmageExistsAsync(Guid id);
+        Task<bool> ScrimmageExistsAsync(Guid scrimmageId);
 
         /// <summary>
         /// Gets the collection of active scrimmages from the cache.

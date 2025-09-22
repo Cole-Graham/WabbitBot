@@ -1,0 +1,263 @@
+📁 Users
+│
+  📁 coleg
+  │
+    📁 Projects
+    │
+      📁 WabbitBot
+      │
+        📁 src
+          📁 WabbitBot.Core
+            ├── 📁 Common
+            │   ├── 📁 BotCore
+            │   │   ├── 📄 CoreErrorHandler.cs
+            │   │   └── 📄 CoreEventBus.cs
+            │   ├── 📁 Commands
+            │   │   ├── 📄 ConfigurationCommands.cs
+            │   │   ├── 📄 MapCommands.cs
+            │   │   └── 📄 TeamCommands.cs
+            │   ├── 📁 Config
+            │   │   ├── 📄 EntityConfigTests.cs
+            │   │   └── 📄 EntityConfigurations.cs
+            │   ├── 📁 Data
+            │   │   ├── 📁 DataServiceManager
+            │   │   │   ├── 📄 CommonDataServiceManager.cs
+            │   │   │   └── 📄 DataServiceManager.cs
+            │   │   ├── 📁 Game
+            │   │   │   ├── 📄 GameArchive.cs
+            │   │   │   ├── 📄 GameCache.cs
+            │   │   │   └── 📄 GameRepository.cs
+            │   │   ├── 📁 Interface
+            │   │   │   ├── 📄 IGameArchive.cs
+            │   │   │   ├── 📄 IGameCache.cs
+            │   │   │   ├── 📄 IGameRepository.cs
+            │   │   │   ├── 📄 IPlayerArchive.cs
+            │   │   │   ├── 📄 IPlayerCache.cs
+            │   │   │   ├── 📄 IPlayerRepository.cs
+            │   │   │   ├── 📄 ITeamArchive.cs
+            │   │   │   ├── 📄 ITeamCache.cs
+            │   │   │   ├── 📄 ITeamRepository.cs
+            │   │   │   ├── 📄 IUserArchive.cs
+            │   │   │   ├── 📄 IUserCache.cs
+            │   │   │   └── 📄 IUserRepository.cs
+            │   │   ├── 📁 Player
+            │   │   │   ├── 📄 PlayerArchive.cs
+            │   │   │   ├── 📄 PlayerCache.cs
+            │   │   │   ├── 📄 PlayerDataValidation.cs
+            │   │   │   └── 📄 PlayerRepository.cs
+            │   │   ├── 📁 Team
+            │   │   │   ├── 📄 TeamArchive.cs
+            │   │   │   ├── 📄 TeamCache.cs
+            │   │   │   └── 📄 TeamRepository.cs
+            │   │   └── 📁 User
+            │   │       ├── 📄 UserArchive.cs
+            │   │       ├── 📄 UserCache.cs
+            │   │       └── 📄 UserRepository.cs
+            │   ├── 📁 Database
+            │   │   ├── 📁 Tests
+            │   │   │   └── 📄 DbContextIntegrationTest.cs
+            │   │   ├── 📁 WabbitBotDbContext
+            │   │   │   ├── 📄 WabbitBotDbContext.Game.cs
+            │   │   │   ├── 📄 WabbitBotDbContext.Leaderboard.cs
+            │   │   │   ├── 📄 WabbitBotDbContext.Maps.cs
+            │   │   │   ├── 📄 WabbitBotDbContext.Match.cs
+            │   │   │   ├── 📄 WabbitBotDbContext.Player.cs
+            │   │   │   ├── 📄 WabbitBotDbContext.Scrimmage.cs
+            │   │   │   ├── 📄 WabbitBotDbContext.Team.cs
+            │   │   │   ├── 📄 WabbitBotDbContext.Tournament.cs
+            │   │   │   ├── 📄 WabbitBotDbContext.User.cs
+            │   │   │   └── 📄 WabbitBotDbContext.cs
+            │   │   ├── 📄 DatabaseServiceCollectionExtensions.cs
+            │   │   ├── 📄 DatabaseSettings.cs
+            │   │   ├── 📄 WabbitBotDbContextFactory.cs
+            │   │   └── 📄 WabbitBotDbContextProvider.cs
+            │   ├── 📁 Events
+            │   │   ├── 📄 ConfigurationEvents.cs
+            │   │   ├── 📄 CoreEvent.cs
+            │   │   ├── 📄 GameEvents.cs
+            │   │   ├── 📄 MapEvents.cs
+            │   │   ├── 📄 PlayerEvents.cs
+            │   │   ├── 📄 ServerEvents.cs
+            │   │   ├── 📄 TeamEvents.cs
+            │   │   └── 📄 UserEvents.cs
+            │   ├── 📁 Handlers
+            │   │   ├── 📄 ConfigurationHandler.cs
+            │   │   ├── 📄 CoreHandler.cs
+            │   │   ├── 📄 GameHandler.cs
+            │   │   ├── 📄 MapHandler.cs
+            │   │   ├── 📄 PlayerHandler.cs
+            │   │   ├── 📄 TeamHandler.cs
+            │   │   └── 📄 UserHandler.cs
+            │   ├── 📁 Migrations
+            │   │   ├── 📁 20241201120000_methods
+            │   │   │   ├── 📄 initialschema.games.cs
+            │   │   │   ├── 📄 initialschema.leaderboards.cs
+            │   │   │   ├── 📄 initialschema.maps.cs
+            │   │   │   ├── 📄 initialschema.match.cs
+            │   │   │   ├── 📄 initialschema.player.cs
+            │   │   │   ├── 📄 initialschema.scrimmage.cs
+            │   │   │   ├── 📄 initialschema.team.cs
+            │   │   │   ├── 📄 initialschema.tournament.cs
+            │   │   │   └── 📄 initialschema.user.cs
+            │   │   └── 📄 20241201120000_InitialSchema.cs
+            │   ├── 📁 Models
+            │   │   ├── 📄 Game.DbConfig.cs
+            │   │   ├── 📄 Game.cs
+            │   │   ├── 📄 Map.DbConfig.cs
+            │   │   ├── 📄 Map.cs
+            │   │   ├── 📄 Player.DbConfig.cs
+            │   │   ├── 📄 Player.cs
+            │   │   ├── 📄 Team.DbConfig.cs
+            │   │   ├── 📄 Team.cs
+            │   │   ├── 📄 User.DbConfig.cs
+            │   │   └── 📄 User.cs
+            │   ├── 📁 Services
+            │   │   ├── 📁 Core
+            │   │   │   ├── 📁 Player
+            │   │   │   │   ├── 📄 CoreService.Player.Data.cs
+            │   │   │   │   ├── 📄 CoreService.Player.Validation.cs
+            │   │   │   │   └── 📄 CoreService.Player.cs
+            │   │   │   ├── 📄 CoreService.Data.cs
+            │   │   │   └── 📄 CoreService.cs
+            │   │   ├── 📁 Player
+            │   │   │   ├── 📄 PlayerService.Archive.cs
+            │   │   │   ├── 📄 PlayerService.Cache.cs
+            │   │   │   ├── 📄 PlayerService.Repository.cs
+            │   │   │   └── 📄 PlayerService.cs
+            │   │   ├── 📄 ConfigurationService.cs
+            │   │   ├── 📄 GameService.cs
+            │   │   ├── 📄 MapService.cs
+            │   │   ├── 📄 PlayerService.cs
+            │   │   ├── 📄 ServerService.cs
+            │   │   ├── 📄 TeamService.cs
+            │   │   └── 📄 UserService.cs
+            │   └── 📁 Validation
+            │       ├── 📄 ArchiveValidation.cs
+            │       ├── 📄 CoreValidation.cs
+            │       ├── 📄 GameValidation.cs
+            │       ├── 📄 PlayerValidation.cs
+            │       ├── 📄 RepositoryValidation.cs
+            │       ├── 📄 TeamValidation.cs
+            │       └── 📄 UserValidation.cs
+            ├── 📁 Generated
+            │   └── 📁 WabbitBot.SourceGenerators
+            │       ├── 📁 WabbitBot.SourceGenerators.Generators.CrossBoundary.CrossBoundaryGenerator
+            │       └── 📁 WabbitBot.SourceGenerators.Generators.Event.EventBusSourceGenerator
+            │           ├── 📄 ConfigurationHandler.g.cs
+            │           ├── 📄 FileUploadService.g.cs
+            │           ├── 📄 GameHandler.g.cs
+            │           ├── 📄 GameService.g.cs
+            │           ├── 📄 LeaderboardHandler.g.cs
+            │           ├── 📄 LeaderboardService.g.cs
+            │           ├── 📄 MapHandler.g.cs
+            │           ├── 📄 MatchHandler.g.cs
+            │           ├── 📄 MatchService.g.cs
+            │           ├── 📄 PlayerHandler.g.cs
+            │           ├── 📄 PlayerService.g.cs
+            │           ├── 📄 ProvenPotentialHandler.g.cs
+            │           ├── 📄 ProvenPotentialService.g.cs
+            │           ├── 📄 RatingCalculatorHandler.g.cs
+            │           ├── 📄 RatingCalculatorService.g.cs
+            │           ├── 📄 ScrimmageHandler.g.cs
+            │           ├── 📄 ScrimmageService.g.cs
+            │           ├── 📄 SeasonHandler.g.cs
+            │           ├── 📄 SeasonRatingService.g.cs
+            │           ├── 📄 SeasonService.g.cs
+            │           ├── 📄 TeamHandler.g.cs
+            │           ├── 📄 TeamSeasonService.g.cs
+            │           ├── 📄 TeamService.g.cs
+            │           ├── 📄 TournamentHandler.g.cs
+            │           ├── 📄 TournamentService.g.cs
+            │           ├── 📄 UserHandler.g.cs
+            │           └── 📄 UserService.g.cs
+            ├── 📁 Leaderboards
+            │   ├── 📁 Data
+            │   │   ├── 📁 Interface
+            │   │   │   ├── 📄 ILeaderboardArchive.cs
+            │   │   │   ├── 📄 ILeaderboardCache.cs
+            │   │   │   ├── 📄 ILeaderboardRepository.cs
+            │   │   │   ├── 📄 ISeasonArchive.cs
+            │   │   │   ├── 📄 ISeasonCache.cs
+            │   │   │   └── 📄 ISeasonRepository.cs
+            │   │   ├── 📄 LeaderboardArchive.cs
+            │   │   ├── 📄 LeaderboardCache.cs
+            │   │   ├── 📄 LeaderboardRepository.cs
+            │   │   ├── 📄 SeasonArchive.cs
+            │   │   ├── 📄 SeasonCache.cs
+            │   │   └── 📄 SeasonRepository.cs
+            │   ├── 📄 Leaderboard.DbConfig.cs
+            │   ├── 📄 Leaderboard.cs
+            │   ├── 📄 LeaderboardCommands.cs
+            │   ├── 📄 LeaderboardEmbed.cs
+            │   ├── 📄 LeaderboardEvent.cs
+            │   ├── 📄 LeaderboardHandler.cs
+            │   ├── 📄 LeaderboardService.cs
+            │   ├── 📄 Season.DbConfig.cs
+            │   ├── 📄 Season.cs
+            │   ├── 📄 SeasonEvents.cs
+            │   ├── 📄 SeasonHandler.cs
+            │   ├── 📄 SeasonRatingService.cs
+            │   └── 📄 SeasonService.cs
+            ├── 📁 Matches
+            │   ├── 📁 Data
+            │   │   ├── 📁 Interface
+            │   │   │   ├── 📄 IMatchArchive.cs
+            │   │   │   ├── 📄 IMatchCache.cs
+            │   │   │   └── 📄 IMatchRepository.cs
+            │   │   ├── 📄 MatchArchive.cs
+            │   │   ├── 📄 MatchCache.cs
+            │   │   ├── 📄 MatchRepository.cs
+            │   │   └── 📄 MatchStateMachine.cs
+            │   ├── 📄 Match.DbConfig.cs
+            │   ├── 📄 Match.cs
+            │   ├── 📄 MatchEvents.cs
+            │   ├── 📄 MatchHandler.cs
+            │   └── 📄 MatchService.cs
+            ├── 📁 Scrimmages
+            │   ├── 📁 Data
+            │   │   ├── 📁 Interface
+            │   │   │   ├── 📄 IScrimmageArchive.cs
+            │   │   │   ├── 📄 IScrimmageCache.cs
+            │   │   │   └── 📄 IScrimmageRepository.cs
+            │   │   ├── 📄 ScrimmageArchive.cs
+            │   │   ├── 📄 ScrimmageCache.cs
+            │   │   ├── 📄 ScrimmageRepository.cs
+            │   │   └── 📄 ScrimmageStateMachine.cs
+            │   ├── 📁 ScrimmageRating
+            │   │   ├── 📁 Interface
+            │   │   │   └── 📄 IProvenPotentialRepository.cs
+            │   │   ├── 📄 ProvenPotentialHandler.cs
+            │   │   ├── 📄 ProvenPotentialRecord.DbConfig.cs
+            │   │   ├── 📄 ProvenPotentialRecord.cs
+            │   │   ├── 📄 ProvenPotentialRepository.cs
+            │   │   ├── 📄 ProvenPotentialService.cs
+            │   │   ├── 📄 RatingCalculatorEvent.cs
+            │   │   ├── 📄 RatingCalculatorHandler.cs
+            │   │   └── 📄 RatingCalculatorService.cs
+            │   ├── 📁 Validation
+            │   │   └── 📄 ScrimmageCommandsValidation.cs
+            │   ├── 📄 Scrimmage.DbConfig.cs
+            │   ├── 📄 Scrimmage.cs
+            │   ├── 📄 ScrimmageCommands.cs
+            │   ├── 📄 ScrimmageEvents.cs
+            │   ├── 📄 ScrimmageHandler.cs
+            │   └── 📄 ScrimmageService.cs
+            ├── 📁 Tournaments
+            │   ├── 📁 Data
+            │   │   ├── 📁 Interface
+            │   │   │   ├── 📄 ITournamentArchive.cs
+            │   │   │   ├── 📄 ITournamentCache.cs
+            │   │   │   └── 📄 ITournamentRepository.cs
+            │   │   ├── 📄 TournamentArchive.cs
+            │   │   ├── 📄 TournamentCache.cs
+            │   │   ├── 📄 TournamentRepository.cs
+            │   │   └── 📄 TournamentStateMachine.cs
+            │   ├── 📄 Tournament.DbConfig.cs
+            │   ├── 📄 Tournament.cs
+            │   ├── 📄 TournamentCommands.cs
+            │   ├── 📄 TournamentEmbed.cs
+            │   ├── 📄 TournamentEvents.cs
+            │   ├── 📄 TournamentHandler.cs
+            │   └── 📄 TournamentService.cs
+            ├── 📄 Program.cs
+            └── 📄 WabbitBot.Core.csproj

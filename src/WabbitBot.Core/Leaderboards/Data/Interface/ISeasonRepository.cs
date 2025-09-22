@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using WabbitBot.Common.Data.Interfaces;
 using WabbitBot.Core.Leaderboards;
+using WabbitBot.Core.Common.Models;
 
 namespace WabbitBot.Core.Leaderboards.Data.Interface
 {
@@ -11,16 +12,12 @@ namespace WabbitBot.Core.Leaderboards.Data.Interface
     /// This interface is part of the core domain model and should be implemented
     /// by infrastructure-specific repositories (e.g., SQL, NoSQL).
     /// </summary>
-    public interface ISeasonRepository : IBaseRepository<Season>
+    public interface ISeasonRepository : IRepository<Season>
     {
-        /// <summary>
-        /// Retrieves the currently active season.
-        /// </summary>
-        Task<Season?> GetActiveSeasonAsync();
-
-        /// <summary>
-        /// Retrieves seasons within a specific date range.
-        /// </summary>
+        Task<Season?> GetSeasonAsync(string seasonId);
+        Task<Season?> GetActiveSeasonAsync(EvenTeamFormat evenTeamFormat);
+        Task<IEnumerable<Season>> GetSeasonsByEvenTeamFormatAsync(EvenTeamFormat evenTeamFormat);
         Task<IEnumerable<Season>> GetSeasonsByDateRangeAsync(DateTime startDate, DateTime endDate);
+        Task<IEnumerable<Season>> GetCompletedSeasonsAsync(EvenTeamFormat evenTeamFormat);
     }
 }

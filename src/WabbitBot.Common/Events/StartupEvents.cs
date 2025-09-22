@@ -11,13 +11,13 @@ namespace WabbitBot.Common.Events
     #region Startup Sequence Events
     public class StartupInitiatedEvent
     {
-        public BotConfiguration Configuration { get; }
-        public IBotConfigurationReader ConfigurationReader { get; }
+        public BotOptions Configuration { get; }
+        public IBotConfigurationService ConfigurationService { get; }
 
-        public StartupInitiatedEvent(BotConfiguration configuration, IBotConfigurationReader configReader)
+        public StartupInitiatedEvent(BotOptions configuration, IBotConfigurationService configService)
         {
             Configuration = configuration;
-            ConfigurationReader = configReader;
+            ConfigurationService = configService;
         }
     }
 
@@ -29,12 +29,12 @@ namespace WabbitBot.Common.Events
     public class ApplicationReadyEvent
     {
         public TimeSpan StartupDuration { get; }
-        public IBotConfigurationReader ConfigurationReader { get; init; }
+        public IBotConfigurationService ConfigurationService { get; init; }
 
-        public ApplicationReadyEvent(TimeSpan startupDuration, IBotConfigurationReader configReader)
+        public ApplicationReadyEvent(TimeSpan startupDuration, IBotConfigurationService configService)
         {
             StartupDuration = startupDuration;
-            ConfigurationReader = configReader;
+            ConfigurationService = configService;
         }
     }
     #endregion

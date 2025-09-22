@@ -1,7 +1,5 @@
-using DSharpPlus.Entities;
 using WabbitBot.Common.Attributes;
 using WabbitBot.Core.Common.Models;
-using WabbitBot.DiscBot.DiscBot.Interfaces;
 
 namespace WabbitBot.DiscBot.DSharpPlus.Embeds;
 

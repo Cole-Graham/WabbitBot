@@ -1,27 +1,118 @@
-// In WabbitBot.Common
+// Modern .NET Configuration System for WabbitBot
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
+using WabbitBot.Common.Models;
 
-// Configuration service layer
 namespace WabbitBot.Common.Configuration
 {
-    using WabbitBot.Common.Models;
-    public interface IBotConfigurationReader
+    /// <summary>
+    /// Modern configuration service using IConfiguration and Options pattern
+    /// </summary>
+    public interface IBotConfigurationService
     {
         string GetToken();
         string GetDatabasePath();
-        // Any other read-only config properties needed by DiscBot
+        T GetSection<T>(string sectionName) where T : class, new();
+        void ValidateConfiguration();
     }
 
-    public class BotConfigurationReader : IBotConfigurationReader
+    public class BotConfigurationService : IBotConfigurationService
     {
-        private readonly BotConfiguration _config;
+        private readonly IConfiguration _configuration;
+        private readonly BotOptions _botOptions;
 
-        public BotConfigurationReader(BotConfiguration config)
+        public BotConfigurationService(IConfiguration configuration, IOptions<BotOptions> botOptions)
         {
-            _config = config ?? throw new ArgumentNullException(nameof(config));
+            _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+            _botOptions = botOptions?.Value ?? throw new ArgumentNullException(nameof(botOptions));
         }
 
-        public string GetToken() => _config.Token;
-        public string GetDatabasePath() => _config.Database.Path;
+        public string GetToken() => Environment.GetEnvironmentVariable("WABBITBOT_TOKEN") ?? _botOptions.Token;
+        public string GetDatabasePath() => Environment.GetEnvironmentVariable("WABBITBOT_DATABASE_PATH") ?? _botOptions.Database.Path;
+
+        public T GetSection<T>(string sectionName) where T : class, new()
+        {
+            var section = _configuration.GetSection(sectionName);
+            var result = new T();
+            section.Bind(result);
+            return result;
+        }
+
+        public void ValidateConfiguration()
+        {
+            // Validate core bot settings
+            if (string.IsNullOrEmpty(_botOptions.Token))
+                throw new InvalidOperationException("Bot token is required");
+
+            if (string.IsNullOrEmpty(_botOptions.Database.Path))
+                throw new InvalidOperationException("Database path is required");
+
+            // Validate scrimmage configuration
+            if (_botOptions.Scrimmage.InitialRating < 0)
+                throw new InvalidOperationException("Initial rating must be non-negative");
+
+            if (_botOptions.Scrimmage.KFactor <= 0)
+                throw new InvalidOperationException("K-factor must be positive");
+
+            if (_botOptions.Scrimmage.MaxConcurrentScrimmages <= 0)
+                throw new InvalidOperationException("Max concurrent scrimmages must be positive");
+
+            // Validate tournament configuration
+            if (_botOptions.Tournament.BracketSize <= 0)
+                throw new InvalidOperationException("Bracket size must be positive");
+
+            if (_botOptions.Tournament.BestOf <= 0)
+                throw new InvalidOperationException("Best of must be positive");
+
+            // Validate match configuration
+            if (_botOptions.Match.MaxGamesPerMatch <= 0)
+                throw new InvalidOperationException("Max games per match must be positive");
+
+            if (_botOptions.Match.DefaultBestOf <= 0)
+                throw new InvalidOperationException("Default best of must be positive");
+
+            // Validate leaderboard configuration
+            if (_botOptions.Leaderboard.DisplayTopN <= 0)
+                throw new InvalidOperationException("Display top N must be positive");
+
+            if (_botOptions.Leaderboard.SeasonLengthDays <= 0)
+                throw new InvalidOperationException("Season length must be positive");
+
+            // Validate maps configuration
+            if (_botOptions.Maps.Maps == null)
+                throw new InvalidOperationException("Maps list is required");
+        }
+    }
+
+    /// <summary>
+    /// Static configuration provider for services that need configuration access
+    /// </summary>
+    public static class ConfigurationProvider
+    {
+        private static IBotConfigurationService? _configurationService;
+        private static readonly object _lock = new();
+
+        public static void Initialize(IBotConfigurationService configurationService)
+        {
+            lock (_lock)
+            {
+                _configurationService = configurationService ?? throw new ArgumentNullException(nameof(configurationService));
+            }
+        }
+
+        public static IBotConfigurationService GetConfigurationService()
+        {
+            if (_configurationService is null)
+            {
+                throw new InvalidOperationException("Configuration service has not been initialized. Call Initialize() first.");
+            }
+            return _configurationService;
+        }
+
+        public static T GetSection<T>(string sectionName) where T : class, new()
+        {
+            return GetConfigurationService().GetSection<T>(sectionName);
+        }
     }
 
     public class BotConfigurationChangedEvent
@@ -31,46 +122,145 @@ namespace WabbitBot.Common.Configuration
     }
 }
 
-// Configuration data models
+// Modern Configuration Models using Options Pattern
 namespace WabbitBot.Common.Models
 {
-    public record BotConfiguration
+    public class BotOptions
     {
-        public required string Token { get; init; }
-        public string LogLevel { get; init; } = "Information";
-        public ulong? ServerId { get; init; } = null;
-        public DatabaseConfiguration Database { get; init; } = new();
-        public ChannelsConfiguration Channels { get; init; } = new();
-        public RolesConfiguration Roles { get; init; } = new();
-        public ActivityConfiguration Activity { get; init; } = new();
+        public const string SectionName = "Bot";
+
+        public required string Token { get; set; }
+        public string LogLevel { get; set; } = "Information";
+        public ulong? ServerId { get; set; } = null;
+        public DatabaseOptions Database { get; set; } = new();
+        public ChannelsOptions Channels { get; set; } = new();
+        public RolesOptions Roles { get; set; } = new();
+        public ActivityOptions Activity { get; set; } = new();
+        public ScrimmageOptions Scrimmage { get; set; } = new();
+        public TournamentOptions Tournament { get; set; } = new();
+        public MatchOptions Match { get; set; } = new();
+        public LeaderboardOptions Leaderboard { get; set; } = new();
+        public MapsOptions Maps { get; set; } = new();
     }
 
-    public record DatabaseConfiguration
+    public class DatabaseOptions
     {
-        public string Path { get; init; } = "data/wabbitbot.db";
-        public int MaxPoolSize { get; init; } = 10;
+        public string Path { get; set; } = "data/wabbitbot.db";
+        public int MaxPoolSize { get; set; } = 10;
     }
 
-    public record ChannelsConfiguration
+    public class ChannelsOptions
     {
-        public ulong? BotChannel { get; init; } = null;
-        public ulong? ReplayChannel { get; init; } = null;
-        public ulong? DeckChannel { get; init; } = null;
-        public ulong? SignupChannel { get; init; } = null;
-        public ulong? StandingsChannel { get; init; } = null;
-        public ulong? ScrimmageChannel { get; init; } = null;
+        public ulong? BotChannel { get; set; } = null;
+        public ulong? ReplayChannel { get; set; } = null;
+        public ulong? DeckChannel { get; set; } = null;
+        public ulong? SignupChannel { get; set; } = null;
+        public ulong? StandingsChannel { get; set; } = null;
+        public ulong? ScrimmageChannel { get; set; } = null;
     }
 
-    public record RolesConfiguration
+    public class RolesOptions
     {
-        public ulong? Whitelisted { get; init; } = null;
-        public ulong? Admin { get; init; } = null;
-        public ulong? Moderator { get; init; } = null;
+        public ulong? Whitelisted { get; set; } = null;
+        public ulong? Admin { get; set; } = null;
+        public ulong? Moderator { get; set; } = null;
     }
 
-    public record ActivityConfiguration
+    public class ActivityOptions
     {
-        public string Type { get; init; } = "Playing";
-        public string Name { get; init; } = "Wabbit Wars";
+        public string Type { get; set; } = "Playing";
+        public string Name { get; set; } = "Wabbit Wars";
+    }
+
+    public class ScrimmageOptions
+    {
+        public const string SectionName = "Bot:Scrimmage";
+
+        public int MaxConcurrentScrimmages { get; set; } = 10;
+        public string RatingSystem { get; set; } = "elo";
+        public double InitialRating { get; set; } = 1200;
+        public double KFactor { get; set; } = 32;
+        public int MatchTimeoutMinutes { get; set; } = 15;
+        public int MapBanCount { get; set; } = 1;
+        public int BestOf { get; set; } = 1;
+        public bool RankedOnly { get; set; } = false;
+
+        // Rating System Constants
+        public double EloDivisor { get; set; } = 400.0;
+        public int MinimumRating { get; set; } = 600;
+        public double BaseRatingChange { get; set; } = 40.0;
+        public double MaxVarietyBonus { get; set; } = 0.2;
+        public double MinVarietyBonus { get; set; } = -0.1;
+        public int VarietyWindowDays { get; set; } = 30;
+        public double MaxGapPercent { get; set; } = 0.2;
+        public int CatchUpTargetRating { get; set; } = 1500;
+        public int CatchUpThreshold { get; set; } = 200;
+        public double CatchUpMaxBonus { get; set; } = 1.0;
+        public bool CatchUpEnabled { get; set; } = true;
+        public double MaxMultiplier { get; set; } = 2.0;
+        public int VarietyBonusGamesThreshold { get; set; } = 20;
+    }
+
+    public class TournamentOptions
+    {
+        public const string SectionName = "Bot:Tournament";
+
+        public string DefaultFormat { get; set; } = "single-elimination";
+        public int BracketSize { get; set; } = 16;
+        public int BestOf { get; set; } = 3;
+        public int MapBanCount { get; set; } = 1;
+        public bool AllowSpectators { get; set; } = true;
+        public int MatchTimeoutMinutes { get; set; } = 20;
+        public string TieBreakerMethod { get; set; } = "highestScore";
+        public int MaxTournamentsPerDay { get; set; } = 3;
+    }
+
+    public class MatchOptions
+    {
+        public const string SectionName = "Bot:Match";
+
+        public int MaxGamesPerMatch { get; set; } = 5;
+        public int DefaultBestOf { get; set; } = 3;
+        public int MapBanCount { get; set; } = 1;
+        public bool DeckCodeRequired { get; set; } = true;
+        public bool AllowDuplicateDecks { get; set; } = false;
+        public bool DeckSubmissionPerGame { get; set; } = true;
+        public int ResultTimeoutMinutes { get; set; } = 10;
+    }
+
+    public class LeaderboardOptions
+    {
+        public const string SectionName = "Bot:Leaderboard";
+
+        public int DisplayTopN { get; set; } = 10;
+        public string RankingAlgorithm { get; set; } = "elo";
+        public RatingDecayOptions RatingDecay { get; set; } = new();
+        public bool SeasonalResets { get; set; } = true;
+        public int SeasonLengthDays { get; set; } = 90;
+        public double TournamentWeight { get; set; } = 1.5;
+        public double ScrimmageWeight { get; set; } = 1.0;
+    }
+
+    public class RatingDecayOptions
+    {
+        public bool Enabled { get; set; } = true;
+        public double DecayRatePerWeek { get; set; } = 25;
+        public double MinimumRating { get; set; } = 1000;
+    }
+
+    public class MapsOptions
+    {
+        public const string SectionName = "Bot:Maps";
+
+        public List<MapConfiguration> Maps { get; set; } = new();
+    }
+
+    public class MapConfiguration
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Size { get; set; } = string.Empty;
+        public string? ThumbnailFilename { get; set; }
+        public bool IsInRandomPool { get; set; } = true;
+        public bool IsInTournamentPool { get; set; } = true;
     }
 }

@@ -25,19 +25,20 @@ namespace WabbitBot.Common.Data.Schema
                         OriginalMatchId TEXT NOT NULL,
                         ChallengerId TEXT NOT NULL,
                         OpponentId TEXT NOT NULL,
-                        ChallengerRating INTEGER NOT NULL,
-                        OpponentRating INTEGER NOT NULL,
+                        ChallengerRating REAL NOT NULL,
+                        OpponentRating REAL NOT NULL,
                         ChallengerConfidence REAL NOT NULL,
                         OpponentConfidence REAL NOT NULL,
                         AppliedThresholds TEXT NOT NULL,
                         ChallengerOriginalRatingChange REAL NOT NULL,
                         OpponentOriginalRatingChange REAL NOT NULL,
                         RatingAdjustment REAL NOT NULL,
-                        GameSize INTEGER NOT NULL,
+                        EvenTeamFormat INTEGER NOT NULL,
                         LastCheckedAt DATETIME,
                         IsComplete BOOLEAN NOT NULL,
                         CreatedAt DATETIME NOT NULL,
-                        UpdatedAt DATETIME NOT NULL
+                        UpdatedAt DATETIME NOT NULL,
+                        SchemaVersion INTEGER NOT NULL DEFAULT 1
                     )", new { }, transaction);
 
                 // Create indexes for faster lookups

@@ -1,29 +1,25 @@
 using System;
 using System.Data;
-using System.Data.SQLite;
-using System.IO;
 using System.Threading.Tasks;
+using Npgsql;
 using WabbitBot.Common.Data.Interfaces;
 
 namespace WabbitBot.Common.Data
 {
+    /// <summary>
+    /// PostgreSQL database connection using Npgsql
+    /// </summary>
     public class DatabaseConnection : IDatabaseConnection
     {
-        private SQLiteConnection? _connection;
+        private NpgsqlConnection? _connection;
         private readonly string _connectionString;
         private bool _disposed;
 
         public bool IsConnected => _connection?.State == ConnectionState.Open;
 
-        public DatabaseConnection(string dbPath)
+        public DatabaseConnection(string connectionString)
         {
-            var directory = Path.GetDirectoryName(dbPath);
-            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
-
-            _connectionString = $"Data Source={dbPath};Version=3;";
+            _connectionString = connectionString ?? throw new ArgumentNullException(nameof(connectionString));
         }
 
         public async Task<bool> ConnectAsync()
@@ -32,7 +28,7 @@ namespace WabbitBot.Common.Data
             {
                 if (_connection == null)
                 {
-                    _connection = new SQLiteConnection(_connectionString);
+                    _connection = new NpgsqlConnection(_connectionString);
                 }
 
                 if (_connection.State != ConnectionState.Open)

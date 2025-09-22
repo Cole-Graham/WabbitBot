@@ -4,34 +4,34 @@ using DSharpPlus.Commands.Processors.SlashCommands;
 using DSharpPlus.Commands.Trees;
 using WabbitBot.Core.Common.Models;
 using WabbitBot.Core.Common.Handlers;
+using WabbitBot.Core.Common.Services;
 using System.Linq;
-using WabbitBot.DiscBot.DSharpPlus;
 
 namespace WabbitBot.DiscBot.DSharpPlus.Commands;
 
 /// <summary>
-/// Choice provider for game sizes - automatically generated from GameSize enum
+/// Choice provider for game sizes - automatically generated from EvenTeamFormat enum
 /// </summary>
-public class GameSizeChoiceProvider : IChoiceProvider
+public class EvenTeamFormatChoiceProvider : IChoiceProvider
 {
     public async ValueTask<IEnumerable<DiscordApplicationCommandOptionChoice>> ProvideAsync(CommandParameter parameter)
     {
-        return await Task.FromResult(Enum.GetValues<GameSize>()
+        return await Task.FromResult(Enum.GetValues<EvenTeamFormat>()
             .Select(size => new DiscordApplicationCommandOptionChoice(
                 GetDisplayName(size),
                 GetDisplayName(size)
             )));
     }
 
-    private static string GetDisplayName(GameSize gameSize)
+    private static string GetDisplayName(EvenTeamFormat evenTeamFormat)
     {
-        return gameSize switch
+        return evenTeamFormat switch
         {
-            GameSize.OneVOne => "1v1",
-            GameSize.TwoVTwo => "2v2",
-            GameSize.ThreeVThree => "3v3",
-            GameSize.FourVFour => "4v4",
-            _ => gameSize.ToString()
+            EvenTeamFormat.OneVOne => "1v1",
+            EvenTeamFormat.TwoVTwo => "2v2",
+            EvenTeamFormat.ThreeVThree => "3v3",
+            EvenTeamFormat.FourVFour => "4v4",
+            _ => evenTeamFormat.ToString()
         };
     }
 }
@@ -39,26 +39,26 @@ public class GameSizeChoiceProvider : IChoiceProvider
 /// <summary>
 /// Choice provider for team game sizes - excludes 1v1 since teams don't make sense for 1v1
 /// </summary>
-public class TeamGameSizeChoiceProvider : IChoiceProvider
+public class TeamEvenTeamFormatChoiceProvider : IChoiceProvider
 {
     public async ValueTask<IEnumerable<DiscordApplicationCommandOptionChoice>> ProvideAsync(CommandParameter parameter)
     {
-        return await Task.FromResult(Enum.GetValues<GameSize>()
-            .Where(size => size != GameSize.OneVOne) // Exclude 1v1 for team commands
+        return await Task.FromResult(Enum.GetValues<EvenTeamFormat>()
+            .Where(size => size != EvenTeamFormat.OneVOne) // Exclude 1v1 for team commands
             .Select(size => new DiscordApplicationCommandOptionChoice(
                 GetDisplayName(size),
                 GetDisplayName(size)
             )));
     }
 
-    private static string GetDisplayName(GameSize gameSize)
+    private static string GetDisplayName(EvenTeamFormat evenTeamFormat)
     {
-        return gameSize switch
+        return evenTeamFormat switch
         {
-            GameSize.TwoVTwo => "2v2",
-            GameSize.ThreeVThree => "3v3",
-            GameSize.FourVFour => "4v4",
-            _ => gameSize.ToString()
+            EvenTeamFormat.TwoVTwo => "2v2",
+            EvenTeamFormat.ThreeVThree => "3v3",
+            EvenTeamFormat.FourVFour => "4v4",
+            _ => evenTeamFormat.ToString()
         };
     }
 }
@@ -85,11 +85,11 @@ public class TeamRoleChoiceProvider : IChoiceProvider
 /// </summary>
 public class MapSizeChoiceProvider : IChoiceProvider
 {
-    private static readonly MapHandler MapHandler = MapHandler.Instance;
+    private static readonly MapService MapService = new MapService();
 
     public async ValueTask<IEnumerable<DiscordApplicationCommandOptionChoice>> ProvideAsync(CommandParameter parameter)
     {
-        var sizes = MapHandler.GetAvailableSizes().Append("All");
+        var sizes = MapService.GetAvailableSizes().Append("All");
         return await Task.FromResult(sizes
             .Select(s => new DiscordApplicationCommandOptionChoice(s, s)));
     }
@@ -100,12 +100,12 @@ public class MapSizeChoiceProvider : IChoiceProvider
 /// </summary>
 public class MapNameAutoCompleteProvider : IAutoCompleteProvider
 {
-    private static readonly MapHandler MapHandler = MapHandler.Instance;
+    private static readonly MapService MapService = new MapService();
 
     public async ValueTask<IEnumerable<DiscordAutoCompleteChoice>> AutoCompleteAsync(AutoCompleteContext ctx)
     {
         var userInput = ctx.UserInput ?? "";
-        return await Task.FromResult(MapHandler.GetMaps()
+        return await Task.FromResult(MapService.GetMaps()
             .Where(m => m.Name.Contains(userInput, StringComparison.OrdinalIgnoreCase))
             .Take(25)
             .Select(m => new DiscordAutoCompleteChoice(m.Name, m.Name)));
@@ -120,21 +120,22 @@ public class DynamicTeamAutoCompleteProvider : IAutoCompleteProvider
     public async ValueTask<IEnumerable<DiscordAutoCompleteChoice>> AutoCompleteAsync(AutoCompleteContext ctx)
     {
         var userInput = ctx.UserInput ?? "";
+        var teamService = new TeamService();
 
         // Find the game size parameter from the arguments
-        var gameSizeParameter = ctx.Arguments.Keys.FirstOrDefault(p => p.Name == "size");
-        if (gameSizeParameter != null &&
-            ctx.Arguments.TryGetValue(gameSizeParameter, out var gameSizeObj) &&
-            gameSizeObj != null)
+        var evenTeamFormatParameter = ctx.Arguments.Keys.FirstOrDefault(p => p.Name == "size");
+        if (evenTeamFormatParameter != null &&
+            ctx.Arguments.TryGetValue(evenTeamFormatParameter, out var evenTeamFormatObj) &&
+            evenTeamFormatObj != null)
         {
-            var gameSizeString = gameSizeObj?.ToString();
-            if (!string.IsNullOrEmpty(gameSizeString) && Helpers.TryParseGameSize(gameSizeString, out var gameSize))
+            var evenTeamFormatString = evenTeamFormatObj?.ToString();
+            if (!string.IsNullOrEmpty(evenTeamFormatString) && Game.Validation.TryParseEvenTeamFormat(evenTeamFormatString, out var evenTeamFormat))
             {
                 // Filter teams by the selected game size, excluding 1v1 teams
-                var teams = await TeamLookupService.SearchTeamsByGameSizeAsync(
-                    userInput, gameSize, 25);
+                var teams = await teamService.SearchTeamsByEvenTeamFormatAsync(
+                    userInput, evenTeamFormat, 25);
 
-                return teams.Where(team => team.TeamSize != GameSize.OneVOne)
+                return teams.Where(team => team.TeamSize != EvenTeamFormat.OneVOne)
                     .Select(team => new DiscordAutoCompleteChoice(
                         GetDisplayName(team),
                         team.Name
@@ -143,8 +144,8 @@ public class DynamicTeamAutoCompleteProvider : IAutoCompleteProvider
         }
 
         // Fallback to all teams if no game size found, excluding 1v1 teams
-        var allTeams = await TeamLookupService.SearchTeamsAsync(userInput, 25);
-        return allTeams.Where(team => team.TeamSize != GameSize.OneVOne)
+        var allTeams = await teamService.SearchTeamsAsync(userInput, 25);
+        return allTeams.Where(team => team.TeamSize != EvenTeamFormat.OneVOne)
             .Select(team => new DiscordAutoCompleteChoice(
                 GetDisplayName(team),
                 team.Name
@@ -154,8 +155,8 @@ public class DynamicTeamAutoCompleteProvider : IAutoCompleteProvider
     private static string GetDisplayName(Team team)
     {
         var baseName = !string.IsNullOrEmpty(team.Tag) ? $"{team.Name} [{team.Tag}]" : team.Name;
-        var gameSizeDisplay = Helpers.GetGameSizeDisplay(team.TeamSize);
-        return $"{baseName} ({gameSizeDisplay})";
+        var evenTeamFormatDisplay = Game.Helpers.GetEvenTeamFormatDisplay(team.TeamSize);
+        return $"{baseName} ({evenTeamFormatDisplay})";
     }
 }
 
@@ -197,7 +198,8 @@ public class TeamMemberAutoCompleteProvider : IAutoCompleteProvider
                 try
                 {
                     // Get the team
-                    var team = await TeamLookupService.GetByNameAsync(teamName);
+                    var teamService = new TeamService();
+                    var team = await teamService.GetByNameAsync(teamName);
                     if (team != null)
                     {
                         // Get active team members and filter by user input
@@ -236,11 +238,12 @@ public class UserCaptainTeamsAutoCompleteProvider : IAutoCompleteProvider
         try
         {
             // Get all teams the user is a member of
-            var userTeams = await TeamLookupService.GetUserTeamsAsync(userId);
+            var teamService = new TeamService();
+            var userTeams = await teamService.GetUserTeamsAsync(userId);
 
             // Filter to teams where user is captain, and exclude 1v1 teams
             var captainTeams = userTeams.Where(team =>
-                team.TeamSize != GameSize.OneVOne &&
+                team.TeamSize != EvenTeamFormat.OneVOne &&
                 team.IsCaptain(userId));
 
             // Filter by user input
@@ -264,8 +267,8 @@ public class UserCaptainTeamsAutoCompleteProvider : IAutoCompleteProvider
     private static string GetDisplayName(Team team)
     {
         var baseName = !string.IsNullOrEmpty(team.Tag) ? $"{team.Name} [{team.Tag}]" : team.Name;
-        var gameSizeDisplay = Helpers.GetGameSizeDisplay(team.TeamSize);
-        return $"{baseName} ({gameSizeDisplay})";
+        var evenTeamFormatDisplay = Game.Helpers.GetEvenTeamFormatDisplay(team.TeamSize);
+        return $"{baseName} ({evenTeamFormatDisplay})";
     }
 }
 
@@ -282,11 +285,12 @@ public class UserManagedTeamsAutoCompleteProvider : IAutoCompleteProvider
         try
         {
             // Get all teams the user is a member of
-            var userTeams = await TeamLookupService.GetUserTeamsAsync(userId);
+            var teamService = new TeamService();
+            var userTeams = await teamService.GetUserTeamsAsync(userId);
 
             // Filter to teams where user is a team manager, and exclude 1v1 teams
             var managedTeams = userTeams.Where(team =>
-                team.TeamSize != GameSize.OneVOne &&
+                team.TeamSize != EvenTeamFormat.OneVOne &&
                 team.IsTeamManager(userId));
 
             // Filter by user input
@@ -311,7 +315,7 @@ public class UserManagedTeamsAutoCompleteProvider : IAutoCompleteProvider
     private static string GetDisplayName(Team team)
     {
         var baseName = !string.IsNullOrEmpty(team.Tag) ? $"{team.Name} [{team.Tag}]" : team.Name;
-        var gameSizeDisplay = Helpers.GetGameSizeDisplay(team.TeamSize);
-        return $"{baseName} ({gameSizeDisplay})";
+        var evenTeamFormatDisplay = Game.Helpers.GetEvenTeamFormatDisplay(team.TeamSize);
+        return $"{baseName} ({evenTeamFormatDisplay})";
     }
 }

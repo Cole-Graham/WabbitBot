@@ -26,7 +26,8 @@ namespace WabbitBot.Common.Data.Schema.Migrations
                     LastActive DATETIME NOT NULL,
                     CurrentPlayerId TEXT,
                     CreatedAt DATETIME NOT NULL,
-                    UpdatedAt DATETIME NOT NULL
+                    UpdatedAt DATETIME NOT NULL,
+                    SchemaVersion INTEGER NOT NULL DEFAULT 1
                 )";
 
             await QueryUtil.ExecuteNonQueryAsync(conn, createUsersTable);
@@ -36,15 +37,14 @@ namespace WabbitBot.Common.Data.Schema.Migrations
                 CREATE TABLE IF NOT EXISTS Players (
                     Id TEXT PRIMARY KEY,
                     Name TEXT NOT NULL,
-                    CreatedAt DATETIME NOT NULL,
                     LastActive DATETIME NOT NULL,
-                    Stats TEXT NOT NULL,
                     TeamIds TEXT,
                     PreviousUserIds TEXT,
                     CreatedAt DATETIME NOT NULL,
                     UpdatedAt DATETIME NOT NULL,
                     IsArchived BOOLEAN NOT NULL,
-                    ArchivedAt DATETIME
+                    ArchivedAt DATETIME,
+                    SchemaVersion INTEGER NOT NULL DEFAULT 1
                 )";
 
             await QueryUtil.ExecuteNonQueryAsync(conn, createPlayersTable);

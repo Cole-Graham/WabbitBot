@@ -5,8 +5,9 @@ using DSharpPlus.Entities;
 using DSharpPlus.Commands.Processors.SlashCommands.ArgumentModifiers;
 using DSharpPlus.Commands.Trees;
 using System.ComponentModel;
-using WabbitBot.DiscBot.DiscBot.Commands;
 using WabbitBot.Core.Common.Models;
+using WabbitBot.Core.Common.Commands;
+using WabbitBot.Core.Common.Services;
 using WabbitBot.DiscBot.DSharpPlus.Attributes;
 
 namespace WabbitBot.DiscBot.DSharpPlus.Commands;
@@ -27,7 +28,7 @@ public partial class TeamCommandsDiscord
     public async Task CreateTeamAsync(
         CommandContext ctx,
         [Description("Team size")]
-        [SlashChoiceProvider(typeof(TeamGameSizeChoiceProvider))]
+        [SlashChoiceProvider(typeof(TeamEvenTeamFormatChoiceProvider))]
         string size,
         [Description("Team name")]
         string teamName)
@@ -35,14 +36,14 @@ public partial class TeamCommandsDiscord
         await ctx.DeferResponseAsync();
 
         // Parse game size
-        if (!Helpers.TryParseGameSize(size, out var gameSize))
+        if (!Game.Validation.TryParseEvenTeamFormat(size, out var evenTeamFormat))
         {
             await ctx.EditResponseAsync($"Invalid team size: {size}");
             return;
         }
 
         // Call business logic - the creator becomes the captain
-        var result = await TeamCommands.CreateTeamAsync(teamName, gameSize, ctx.User.Id.ToString());
+        var result = await TeamCommands.CreateTeamAsync(teamName, evenTeamFormat, ctx.User.Id.ToString());
 
         if (!result.Success)
         {
@@ -67,7 +68,7 @@ public partial class TeamCommandsDiscord
     public async Task GetTeamInfoAsync(
         CommandContext ctx,
         [Description("Team size")]
-        [SlashChoiceProvider(typeof(TeamGameSizeChoiceProvider))]
+        [SlashChoiceProvider(typeof(TeamEvenTeamFormatChoiceProvider))]
         string size,
         [Description("Team name")]
         [SlashAutoCompleteProvider(typeof(DynamicTeamAutoCompleteProvider))]
@@ -76,14 +77,14 @@ public partial class TeamCommandsDiscord
         await ctx.DeferResponseAsync();
 
         // Parse game size
-        if (!Helpers.TryParseGameSize(size, out var gameSize))
+        if (!Game.Validation.TryParseEvenTeamFormat(size, out var evenTeamFormat))
         {
             await ctx.EditResponseAsync($"Invalid team size: {size}");
             return;
         }
 
         // Call business logic
-        var result = await TeamCommands.GetTeamInfoAsync(teamName, gameSize);
+        var result = await TeamCommands.GetTeamInfoAsync(teamName, evenTeamFormat);
 
         if (!result.Success)
         {
@@ -207,7 +208,7 @@ public partial class TeamCommandsDiscord
     {
         await ctx.DeferResponseAsync();
 
-        if (!Helpers.TryParseTeamRole(position, out var teamRole))
+        if (!Team.Validation.TryParseTeamRole(position, out var teamRole))
         {
             await ctx.EditResponseAsync($"Invalid position: {position}. Valid positions: Core, Backup");
             return;
@@ -263,7 +264,7 @@ public partial class TeamCommandsDiscord
     public async Task LeaveTeamAsync(
         CommandContext ctx,
         [Description("Team size")]
-        [SlashChoiceProvider(typeof(TeamGameSizeChoiceProvider))]
+        [SlashChoiceProvider(typeof(TeamEvenTeamFormatChoiceProvider))]
         string size,
         [Description("Team name")]
         [SlashAutoCompleteProvider(typeof(DynamicTeamAutoCompleteProvider))]
@@ -272,14 +273,14 @@ public partial class TeamCommandsDiscord
         await ctx.DeferResponseAsync();
 
         // Parse game size
-        if (!Helpers.TryParseGameSize(size, out var gameSize))
+        if (!Game.Validation.TryParseEvenTeamFormat(size, out var evenTeamFormat))
         {
             await ctx.EditResponseAsync($"Invalid team size: {size}");
             return;
         }
 
         // Call business logic
-        var result = await TeamCommands.LeaveTeamAsync(teamName, gameSize, ctx.User.Id.ToString());
+        var result = await TeamCommands.LeaveTeamAsync(teamName, evenTeamFormat, ctx.User.Id.ToString());
 
         if (!result.Success)
         {
@@ -295,7 +296,7 @@ public partial class TeamCommandsDiscord
     public async Task RenameTeamAsync(
         CommandContext ctx,
         [Description("Team size")]
-        [SlashChoiceProvider(typeof(TeamGameSizeChoiceProvider))]
+        [SlashChoiceProvider(typeof(TeamEvenTeamFormatChoiceProvider))]
         string size,
         [Description("Current team name")]
         [SlashAutoCompleteProvider(typeof(DynamicTeamAutoCompleteProvider))]
@@ -308,14 +309,14 @@ public partial class TeamCommandsDiscord
         // TODO: Validate user is captain of the team
 
         // Parse game size
-        if (!Helpers.TryParseGameSize(size, out var gameSize))
+        if (!Game.Validation.TryParseEvenTeamFormat(size, out var evenTeamFormat))
         {
             await ctx.EditResponseAsync($"Invalid team size: {size}");
             return;
         }
 
         // Call business logic
-        var result = await TeamCommands.RenameTeamAsync(oldTeamName, gameSize, newTeamName, ctx.User.Id.ToString());
+        var result = await TeamCommands.RenameTeamAsync(oldTeamName, evenTeamFormat, newTeamName, ctx.User.Id.ToString());
 
         if (!result.Success)
         {
@@ -374,7 +375,7 @@ public partial class TeamCommandsDiscord
     public async Task DisbandTeamAsync(
         CommandContext ctx,
         [Description("Team size")]
-        [SlashChoiceProvider(typeof(TeamGameSizeChoiceProvider))]
+        [SlashChoiceProvider(typeof(TeamEvenTeamFormatChoiceProvider))]
         string size,
         [Description("Team name")]
         [SlashAutoCompleteProvider(typeof(DynamicTeamAutoCompleteProvider))]
@@ -385,14 +386,14 @@ public partial class TeamCommandsDiscord
         // TODO: Validate user is captain of the team
 
         // Parse game size
-        if (!Helpers.TryParseGameSize(size, out var gameSize))
+        if (!Game.Validation.TryParseEvenTeamFormat(size, out var evenTeamFormat))
         {
             await ctx.EditResponseAsync($"Invalid team size: {size}");
             return;
         }
 
         // Call business logic
-        var result = await TeamCommands.DisbandTeamAsync(teamName, gameSize, ctx.User.Id.ToString());
+        var result = await TeamCommands.DisbandTeamAsync(teamName, evenTeamFormat, ctx.User.Id.ToString());
 
         if (!result.Success)
         {
@@ -415,7 +416,7 @@ public partial class TeamCommandsDiscord
     public async Task SetTeamTagAsync(
         CommandContext ctx,
         [Description("Team size")]
-        [SlashChoiceProvider(typeof(TeamGameSizeChoiceProvider))]
+        [SlashChoiceProvider(typeof(TeamEvenTeamFormatChoiceProvider))]
         string size,
         [Description("Team name")]
         [SlashAutoCompleteProvider(typeof(DynamicTeamAutoCompleteProvider))]
@@ -428,14 +429,14 @@ public partial class TeamCommandsDiscord
         // TODO: Validate user is captain of the team
 
         // Parse game size
-        if (!Helpers.TryParseGameSize(size, out var gameSize))
+        if (!Game.Validation.TryParseEvenTeamFormat(size, out var evenTeamFormat))
         {
             await ctx.EditResponseAsync($"Invalid team size: {size}");
             return;
         }
 
         // Call business logic
-        var result = await TeamCommands.SetTeamTagAsync(teamName, gameSize, ctx.User.Id.ToString(), tag);
+        var result = await TeamCommands.SetTeamTagAsync(teamName, evenTeamFormat, ctx.User.Id.ToString(), tag);
 
         if (!result.Success)
         {
@@ -470,7 +471,7 @@ public partial class TeamCommandsDiscord
         await ctx.DeferResponseAsync();
 
         // Call business logic
-        var result = await TeamCommands.SetTeamManagerAsync(teamName, GameSize.TwoVTwo, ctx.User.Id.ToString(), memberId, isManager);
+        var result = await TeamCommands.SetTeamManagerAsync(teamName, EvenTeamFormat.TwoVTwo, ctx.User.Id.ToString(), memberId, isManager);
 
         if (!result.Success)
         {
@@ -494,7 +495,7 @@ public partial class TeamCommandsDiscord
     public async Task ListTeamManagersAsync(
         CommandContext ctx,
         [Description("Team size")]
-        [SlashChoiceProvider(typeof(TeamGameSizeChoiceProvider))]
+        [SlashChoiceProvider(typeof(TeamEvenTeamFormatChoiceProvider))]
         string size,
         [Description("Team name")]
         [SlashAutoCompleteProvider(typeof(DynamicTeamAutoCompleteProvider))]
@@ -503,14 +504,14 @@ public partial class TeamCommandsDiscord
         await ctx.DeferResponseAsync();
 
         // Parse game size
-        if (!Helpers.TryParseGameSize(size, out var gameSize))
+        if (!Game.Validation.TryParseEvenTeamFormat(size, out var evenTeamFormat))
         {
             await ctx.EditResponseAsync($"Invalid team size: {size}");
             return;
         }
 
         // Call business logic
-        var result = await TeamCommands.ListTeamManagersAsync(teamName, gameSize);
+        var result = await TeamCommands.ListTeamManagersAsync(teamName, evenTeamFormat);
 
         if (!result.Success)
         {
@@ -549,7 +550,7 @@ public partial class TeamAdminCommandsDiscord
     public async Task ArchiveTeamAsync(
         CommandContext ctx,
         [Description("Team size")]
-        [SlashChoiceProvider(typeof(TeamGameSizeChoiceProvider))]
+        [SlashChoiceProvider(typeof(TeamEvenTeamFormatChoiceProvider))]
         string size,
         [Description("Team name")]
         [SlashAutoCompleteProvider(typeof(DynamicTeamAutoCompleteProvider))]
@@ -558,14 +559,14 @@ public partial class TeamAdminCommandsDiscord
         await ctx.DeferResponseAsync();
 
         // Parse game size
-        if (!Helpers.TryParseGameSize(size, out var gameSize))
+        if (!Game.Validation.TryParseEvenTeamFormat(size, out var evenTeamFormat))
         {
             await ctx.EditResponseAsync($"Invalid team size: {size}");
             return;
         }
 
         // Call business logic
-        var result = await TeamCommands.ArchiveTeamAsync(teamName, gameSize, ctx.User.Id.ToString());
+        var result = await TeamCommands.ArchiveTeamAsync(teamName, evenTeamFormat, ctx.User.Id.ToString());
 
         if (!result.Success)
         {
@@ -588,7 +589,7 @@ public partial class TeamAdminCommandsDiscord
     public async Task UnarchiveTeamAsync(
         CommandContext ctx,
         [Description("Team size")]
-        [SlashChoiceProvider(typeof(TeamGameSizeChoiceProvider))]
+        [SlashChoiceProvider(typeof(TeamEvenTeamFormatChoiceProvider))]
         string size,
         [Description("Team name")]
         [SlashAutoCompleteProvider(typeof(DynamicTeamAutoCompleteProvider))]
@@ -597,14 +598,14 @@ public partial class TeamAdminCommandsDiscord
         await ctx.DeferResponseAsync();
 
         // Parse game size
-        if (!Helpers.TryParseGameSize(size, out var gameSize))
+        if (!Game.Validation.TryParseEvenTeamFormat(size, out var evenTeamFormat))
         {
             await ctx.EditResponseAsync($"Invalid team size: {size}");
             return;
         }
 
         // Call business logic
-        var result = await TeamCommands.UnarchiveTeamAsync(teamName, gameSize, ctx.User.Id.ToString());
+        var result = await TeamCommands.UnarchiveTeamAsync(teamName, evenTeamFormat, ctx.User.Id.ToString());
 
         if (!result.Success)
         {
@@ -629,7 +630,7 @@ public partial class TeamAdminCommandsDiscord
         [Description("Team name")]
         string teamName,
         [Description("Team size")]
-        [SlashChoiceProvider(typeof(TeamGameSizeChoiceProvider))]
+        [SlashChoiceProvider(typeof(TeamEvenTeamFormatChoiceProvider))]
         string size,
         [Description("Captain username")]
         string captainUsername)
@@ -637,14 +638,14 @@ public partial class TeamAdminCommandsDiscord
         await ctx.DeferResponseAsync();
 
         // Parse game size
-        if (!Helpers.TryParseGameSize(size, out var gameSize))
+        if (!Game.Validation.TryParseEvenTeamFormat(size, out var evenTeamFormat))
         {
             await ctx.EditResponseAsync($"Invalid team size: {size}");
             return;
         }
 
         // Call business logic
-        var result = await TeamCommands.AdminCreateTeamAsync(teamName, gameSize, captainUsername, ctx.User.Id.ToString());
+        var result = await TeamCommands.AdminCreateTeamAsync(teamName, evenTeamFormat, captainUsername, ctx.User.Id.ToString());
 
         if (!result.Success)
         {
@@ -669,7 +670,7 @@ public partial class TeamAdminCommandsDiscord
     public async Task AdminDeleteTeamAsync(
         CommandContext ctx,
         [Description("Team size")]
-        [SlashChoiceProvider(typeof(TeamGameSizeChoiceProvider))]
+        [SlashChoiceProvider(typeof(TeamEvenTeamFormatChoiceProvider))]
         string size,
         [Description("Team name")]
         [SlashAutoCompleteProvider(typeof(DynamicTeamAutoCompleteProvider))]
@@ -678,14 +679,14 @@ public partial class TeamAdminCommandsDiscord
         await ctx.DeferResponseAsync();
 
         // Parse game size
-        if (!Helpers.TryParseGameSize(size, out var gameSize))
+        if (!Game.Validation.TryParseEvenTeamFormat(size, out var evenTeamFormat))
         {
             await ctx.EditResponseAsync($"Invalid team size: {size}");
             return;
         }
 
         // Call business logic
-        var result = await TeamCommands.AdminDeleteTeamAsync(teamName, gameSize, ctx.User.Id.ToString());
+        var result = await TeamCommands.AdminDeleteTeamAsync(teamName, evenTeamFormat, ctx.User.Id.ToString());
 
         if (!result.Success)
         {
@@ -709,7 +710,7 @@ public partial class TeamAdminCommandsDiscord
     public async Task AdminAddPlayerAsync(
         CommandContext ctx,
         [Description("Team size")]
-        [SlashChoiceProvider(typeof(TeamGameSizeChoiceProvider))]
+        [SlashChoiceProvider(typeof(TeamEvenTeamFormatChoiceProvider))]
         string size,
         [Description("Team name")]
         [SlashAutoCompleteProvider(typeof(DynamicTeamAutoCompleteProvider))]
@@ -723,21 +724,21 @@ public partial class TeamAdminCommandsDiscord
         await ctx.DeferResponseAsync();
 
         // Parse game size
-        if (!Helpers.TryParseGameSize(size, out var gameSize))
+        if (!Game.Validation.TryParseEvenTeamFormat(size, out var evenTeamFormat))
         {
             await ctx.EditResponseAsync($"Invalid team size: {size}");
             return;
         }
 
         // Parse team role
-        if (!Helpers.TryParseTeamRole(role, out var teamRole))
+        if (!Team.Validation.TryParseTeamRole(role, out var teamRole))
         {
             await ctx.EditResponseAsync($"Invalid role: {role}. Valid roles: Core, Substitute");
             return;
         }
 
         // Call business logic
-        var result = await TeamCommands.AdminAddPlayerAsync(teamName, gameSize, username, teamRole, ctx.User.Id.ToString());
+        var result = await TeamCommands.AdminAddPlayerAsync(teamName, evenTeamFormat, username, teamRole, ctx.User.Id.ToString());
 
         if (!result.Success)
         {
@@ -762,7 +763,7 @@ public partial class TeamAdminCommandsDiscord
     public async Task AdminRemovePlayerAsync(
         CommandContext ctx,
         [Description("Team size")]
-        [SlashChoiceProvider(typeof(TeamGameSizeChoiceProvider))]
+        [SlashChoiceProvider(typeof(TeamEvenTeamFormatChoiceProvider))]
         string size,
         [Description("Team name")]
         [SlashAutoCompleteProvider(typeof(DynamicTeamAutoCompleteProvider))]
@@ -773,14 +774,14 @@ public partial class TeamAdminCommandsDiscord
         await ctx.DeferResponseAsync();
 
         // Parse game size
-        if (!Helpers.TryParseGameSize(size, out var gameSize))
+        if (!Game.Validation.TryParseEvenTeamFormat(size, out var evenTeamFormat))
         {
             await ctx.EditResponseAsync($"Invalid team size: {size}");
             return;
         }
 
         // Call business logic
-        var result = await TeamCommands.AdminRemovePlayerAsync(teamName, gameSize, username, ctx.User.Id.ToString());
+        var result = await TeamCommands.AdminRemovePlayerAsync(teamName, evenTeamFormat, username, ctx.User.Id.ToString());
 
         if (!result.Success)
         {
@@ -804,7 +805,7 @@ public partial class TeamAdminCommandsDiscord
     public async Task AdminResetRatingAsync(
         CommandContext ctx,
         [Description("Team size")]
-        [SlashChoiceProvider(typeof(TeamGameSizeChoiceProvider))]
+        [SlashChoiceProvider(typeof(TeamEvenTeamFormatChoiceProvider))]
         string size,
         [Description("Team name")]
         [SlashAutoCompleteProvider(typeof(DynamicTeamAutoCompleteProvider))]
@@ -813,14 +814,14 @@ public partial class TeamAdminCommandsDiscord
         await ctx.DeferResponseAsync();
 
         // Parse game size
-        if (!Helpers.TryParseGameSize(size, out var gameSize))
+        if (!Game.Validation.TryParseEvenTeamFormat(size, out var evenTeamFormat))
         {
             await ctx.EditResponseAsync($"Invalid team size: {size}");
             return;
         }
 
         // Call business logic
-        var result = await TeamCommands.AdminResetRatingAsync(teamName, gameSize, ctx.User.Id.ToString());
+        var result = await TeamCommands.AdminResetRatingAsync(teamName, evenTeamFormat, ctx.User.Id.ToString());
 
         if (!result.Success)
         {
@@ -844,7 +845,7 @@ public partial class TeamAdminCommandsDiscord
     public async Task AdminChangeRoleAsync(
         CommandContext ctx,
         [Description("Team size")]
-        [SlashChoiceProvider(typeof(TeamGameSizeChoiceProvider))]
+        [SlashChoiceProvider(typeof(TeamEvenTeamFormatChoiceProvider))]
         string size,
         [Description("Team name")]
         [SlashAutoCompleteProvider(typeof(DynamicTeamAutoCompleteProvider))]
@@ -858,21 +859,21 @@ public partial class TeamAdminCommandsDiscord
         await ctx.DeferResponseAsync();
 
         // Parse game size
-        if (!Helpers.TryParseGameSize(size, out var gameSize))
+        if (!Game.Validation.TryParseEvenTeamFormat(size, out var evenTeamFormat))
         {
             await ctx.EditResponseAsync($"Invalid team size: {size}");
             return;
         }
 
         // Parse team role
-        if (!Helpers.TryParseTeamRole(newRole, out var teamRole))
+        if (!Team.Validation.TryParseTeamRole(newRole, out var teamRole))
         {
             await ctx.EditResponseAsync($"Invalid role: {newRole}. Valid roles: Core, Substitute");
             return;
         }
 
         // Call business logic
-        var result = await TeamCommands.AdminChangeRoleAsync(teamName, gameSize, username, teamRole, ctx.User.Id.ToString());
+        var result = await TeamCommands.AdminChangeRoleAsync(teamName, evenTeamFormat, username, teamRole, ctx.User.Id.ToString());
 
         if (!result.Success)
         {

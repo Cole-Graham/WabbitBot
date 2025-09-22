@@ -6,15 +6,16 @@ using WabbitBot.Common.Data;
 using WabbitBot.Common.Data.Interfaces;
 using WabbitBot.Common.Data.Utilities;
 using WabbitBot.Core.Leaderboards;
+using WabbitBot.Core.Leaderboards.Data.Interface;
 using WabbitBot.Core.Common.Models;
 
 namespace WabbitBot.Core.Leaderboards.Data
 {
-    public class LeaderboardArchive : BaseArchive<Leaderboard>
+    public class LeaderboardArchive : Archive<Leaderboard>, ILeaderboardArchive
     {
         private static readonly string[] Columns = new[]
         {
-            "Id", "GameSize", "Rankings", "InitialRating", "KFactor",
+            "Id", "EvenTeamFormat", "Rankings", "InitialRating", "KFactor",
             "CreatedAt", "UpdatedAt", "ArchivedAt"
         };
 
@@ -25,7 +26,7 @@ namespace WabbitBot.Core.Leaderboards.Data
 
         protected override Leaderboard MapEntity(IDataReader reader)
         {
-            var rankings = JsonUtil.Deserialize<Dictionary<GameSize, Dictionary<string, LeaderboardEntry>>>(
+            var rankings = JsonUtil.Deserialize<Dictionary<EvenTeamFormat, Dictionary<string, LeaderboardItem>>>(
                 reader.GetString(reader.GetOrdinal("Rankings"))) ?? new();
 
             return new Leaderboard
@@ -51,14 +52,14 @@ namespace WabbitBot.Core.Leaderboards.Data
             };
         }
 
-        public async Task<IEnumerable<Leaderboard>> GetByGameSizeAsync(GameSize gameSize)
+        public async Task<IEnumerable<Leaderboard>> GetByEvenTeamFormatAsync(EvenTeamFormat evenTeamFormat)
         {
             const string sql = @"
                 SELECT * FROM ArchivedLeaderboards 
-                WHERE GameSize = @GameSize
+                WHERE EvenTeamFormat = @EvenTeamFormat
                 ORDER BY ArchivedAt DESC";
 
-            return await QueryAsync(sql, new { GameSize = (int)gameSize });
+            return await QueryAsync(sql, new { EvenTeamFormat = (int)evenTeamFormat });
         }
     }
 }

@@ -5,6 +5,8 @@ using WabbitBot.Common.ErrorHandling;
 using WabbitBot.Core.Common.Models;
 using WabbitBot.Core.Leaderboards;
 using WabbitBot.Core.Leaderboards.Data.Interface;
+using WabbitBot.Common.Attributes;
+using WabbitBot.Core.Common.BotCore;
 using System.Collections.Generic; // Added for Dictionary
 using System.Linq; // Added for ToDictionary
 
@@ -14,49 +16,50 @@ namespace WabbitBot.Core.Leaderboards
     /// Centralized service for all team rating operations using Season as the source of truth.
     /// This service ensures all rating updates go through the Season system.
     /// </summary>
-    public class SeasonRatingService
+    [GenerateEventPublisher(EventBusType = EventBusType.Core, EnableValidation = true, EnableTimestamps = true)]
+    public partial class SeasonRatingService : CoreService, ILeaderboardService
     {
-        private readonly ICoreEventBus _eventBus;
-        private readonly ICoreErrorHandler _errorHandler;
-        private readonly ISeasonRepository _seasonRepo;
-        private readonly ISeasonCache _seasonCache;
-
-        public SeasonRatingService(
-            ICoreEventBus eventBus,
-            ICoreErrorHandler errorHandler,
-            ISeasonRepository seasonRepo,
-            ISeasonCache seasonCache)
+        public SeasonRatingService()
+            : base(CoreEventBus.Instance, CoreErrorHandler.Instance)
         {
-            _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
-            _errorHandler = errorHandler ?? throw new ArgumentNullException(nameof(errorHandler));
-            _seasonRepo = seasonRepo ?? throw new ArgumentNullException(nameof(seasonRepo));
-            _seasonCache = seasonCache ?? throw new ArgumentNullException(nameof(seasonCache));
         }
+
+        private ISeasonRepository SeasonRepository =>
+            WabbitBot.Core.Common.Data.DataServiceManager.SeasonRepository;
+
+        private ISeasonCache SeasonCache =>
+            WabbitBot.Core.Common.Data.DataServiceManager.SeasonCache;
 
         /// <summary>
         /// Gets the current rating for a team in a specific game size.
         /// </summary>
-        public async Task<int> GetTeamRatingAsync(string teamId, GameSize gameSize)
+        public async Task<double> GetTeamRatingAsync(string teamId, EvenTeamFormat evenTeamFormat)
         {
             try
             {
-                var activeSeason = await GetActiveSeasonAsync();
+                var activeSeason = await GetActiveSeasonAsync(evenTeamFormat);
                 if (activeSeason == null)
                 {
                     return Leaderboard.InitialRating; // Default rating if no active season
                 }
 
-                if (!activeSeason.TeamStats.ContainsKey(gameSize) ||
-                    !activeSeason.TeamStats[gameSize].ContainsKey(teamId))
+                if (!activeSeason.ParticipatingTeams.ContainsKey(teamId))
                 {
                     return Leaderboard.InitialRating; // Default rating for new teams
                 }
 
-                return activeSeason.TeamStats[gameSize][teamId].CurrentRating;
+                // Load the actual team to get current stats
+                var team = await WabbitBot.Core.Common.Data.DataServiceManager.TeamRepository.GetByIdAsync(teamId);
+                if (team == null || !team.Stats.ContainsKey(evenTeamFormat))
+                {
+                    return Leaderboard.InitialRating;
+                }
+
+                return team.Stats[evenTeamFormat].CurrentRating;
             }
             catch (Exception ex)
             {
-                await _errorHandler.HandleError(ex);
+                await ErrorHandler.HandleErrorAsync(ex);
                 return Leaderboard.InitialRating;
             }
         }
@@ -64,55 +67,66 @@ namespace WabbitBot.Core.Leaderboards
         /// <summary>
         /// Updates a team's rating through the Season system.
         /// </summary>
-        public async Task UpdateTeamRatingAsync(string teamId, GameSize gameSize, int newRating, string reason = "")
+        public async Task UpdateTeamRatingAsync(string teamId, EvenTeamFormat evenTeamFormat, double newRating, string reason = "")
         {
             try
             {
-                var activeSeason = await GetActiveSeasonAsync();
+                var activeSeason = await GetActiveSeasonAsync(evenTeamFormat);
                 if (activeSeason == null)
                 {
-                    throw new InvalidOperationException("No active season found for rating update");
+                    throw new InvalidOperationException($"No active season found for game size {evenTeamFormat}. Cannot update rating for team {teamId}.");
                 }
 
                 // Ensure the team exists in the season
-                if (!activeSeason.TeamStats[gameSize].ContainsKey(teamId))
+                if (!activeSeason.ParticipatingTeams.ContainsKey(teamId))
                 {
-                    activeSeason.TeamStats[gameSize][teamId] = new SeasonTeamStats
+                    // Team should be registered with the season before rating updates
+                    // This is likely an error condition - teams should be registered first
+                    throw new InvalidOperationException($"Team {teamId} is not registered for the active season. Teams must be registered with seasons before rating updates.");
+                }
+
+                // Load the actual team from the database
+                var team = await WabbitBot.Core.Common.Data.DataServiceManager.TeamRepository.GetByIdAsync(teamId);
+                if (team == null)
+                {
+                    throw new InvalidOperationException($"Team {teamId} not found in database.");
+                }
+
+                // Ensure the team has stats for this game size
+                if (!team.Stats.ContainsKey(evenTeamFormat))
+                {
+                    team.Stats[evenTeamFormat] = new Stats
                     {
                         TeamId = teamId,
-                        GameSize = gameSize,
+                        EvenTeamFormat = evenTeamFormat,
                         InitialRating = Leaderboard.InitialRating,
                         CurrentRating = Leaderboard.InitialRating,
+                        HighestRating = Leaderboard.InitialRating,
                         LastUpdated = DateTime.UtcNow
                     };
                 }
 
                 // Update the rating
-                var stats = activeSeason.TeamStats[gameSize][teamId];
+                var stats = team.Stats[evenTeamFormat];
                 var oldRating = stats.CurrentRating;
                 stats.CurrentRating = newRating;
                 stats.LastUpdated = DateTime.UtcNow;
 
-                // Save the updated season
-                await _seasonRepo.UpdateAsync(activeSeason);
-                await _seasonCache.SetSeasonAsync(activeSeason);
-                await _seasonCache.SetActiveSeasonAsync(activeSeason);
+                // Save the updated team
+                await WabbitBot.Core.Common.Data.DataServiceManager.TeamRepository.UpdateAsync(team);
+
+                // Update the season cache (ParticipatingTeams references don't change)
+                await SeasonCache.SetActiveSeasonAsync(activeSeason);
 
                 // Publish event for other systems to react (e.g., leaderboard refresh)
-                await _eventBus.PublishAsync(new TeamRatingUpdatedEvent
-                {
-                    TeamId = teamId,
-                    GameSize = gameSize,
-                    OldRating = oldRating,
-                    NewRating = newRating,
-                    Reason = reason
-                });
+                // Event handlers should look up team rating details from cache/repository
+                await EventBus.PublishAsync(new TeamRatingUpdatedEvent(teamId, evenTeamFormat.ToString()));
 
-                Console.WriteLine($"Team rating updated: {teamId} ({gameSize}) {oldRating} -> {newRating} ({reason})");
+                Console.WriteLine($"Team rating updated: {teamId} ({evenTeamFormat}) {oldRating} -> {newRating} ({reason})");
             }
             catch (Exception ex)
             {
-                await _errorHandler.HandleError(ex);
+                await ErrorHandler.HandleErrorAsync(ex);
                 throw;
             }
         }
@@ -120,86 +134,71 @@ namespace WabbitBot.Core.Leaderboards
         /// <summary>
         /// Applies a rating change (delta) to a team's current rating.
         /// </summary>
-        public async Task ApplyRatingChangeAsync(string teamId, GameSize gameSize, int ratingChange, string reason = "")
+        public async Task ApplyRatingChangeAsync(string teamId, EvenTeamFormat evenTeamFormat, double ratingChange, string reason = "")
         {
-            var currentRating = await GetTeamRatingAsync(teamId, gameSize);
+            var currentRating = await GetTeamRatingAsync(teamId, evenTeamFormat);
             var newRating = currentRating + ratingChange;
-            await UpdateTeamRatingAsync(teamId, gameSize, newRating, reason);
+            await UpdateTeamRatingAsync(teamId, evenTeamFormat, newRating, reason);
         }
 
         /// <summary>
-        /// Gets the active season, creating one if none exists.
+        /// Gets the active season for the specified game size.
+        /// Returns null if no active season exists.
         /// </summary>
-        private async Task<Season> GetActiveSeasonAsync()
+        private async Task<Season?> GetActiveSeasonAsync(EvenTeamFormat evenTeamFormat)
         {
             // Try cache first
-            var cachedSeason = await _seasonCache.GetActiveSeasonAsync();
+            var cachedSeason = await SeasonCache.GetActiveSeasonAsync(evenTeamFormat);
             if (cachedSeason != null)
             {
                 return cachedSeason;
             }
 
             // Try database
-            var dbSeason = await _seasonRepo.GetActiveSeasonAsync();
+            var dbSeason = await SeasonRepository.GetActiveSeasonAsync(evenTeamFormat);
             if (dbSeason != null)
             {
-                await _seasonCache.SetActiveSeasonAsync(dbSeason);
+                await SeasonCache.SetActiveSeasonAsync(dbSeason);
                 return dbSeason;
             }
 
-            // Create new active season if none exists
-            var newSeason = Season.Create(
-                "Default Season",
-                DateTime.UtcNow,
-                DateTime.UtcNow.AddYears(1),
-                new SeasonConfig
-                {
-                    RatingDecayEnabled = false,
-                    DecayRatePerWeek = 0,
-                    MinimumRating = 1000
-                }
-            );
-
-            await _seasonRepo.AddAsync(newSeason);
-            await _seasonCache.SetSeasonAsync(newSeason);
-            await _seasonCache.SetActiveSeasonAsync(newSeason);
-
-            return newSeason;
+            // No active season found
+            return null;
         }
 
         /// <summary>
         /// Gets all team ratings for a specific game size.
         /// </summary>
-        public async Task<Dictionary<string, int>> GetAllTeamRatingsAsync(GameSize gameSize)
+        public async Task<Dictionary<string, double>> GetAllTeamRatingsAsync(EvenTeamFormat evenTeamFormat)
         {
             try
             {
-                var activeSeason = await GetActiveSeasonAsync();
-                if (activeSeason == null || !activeSeason.TeamStats.ContainsKey(gameSize))
+                var activeSeason = await GetActiveSeasonAsync(evenTeamFormat);
+                if (activeSeason == null)
                 {
-                    return new Dictionary<string, int>();
+                    throw new InvalidOperationException($"No active season found for game size {evenTeamFormat}. Cannot retrieve team ratings.");
                 }
 
-                return activeSeason.TeamStats[gameSize]
-                    .ToDictionary(kvp => kvp.Key, kvp => kvp.Value.CurrentRating);
+                var ratings = new Dictionary<string, double>();
+
+                // Load each team's current stats
+                foreach (var teamEntry in activeSeason.ParticipatingTeams)
+                {
+                    var team = await WabbitBot.Core.Common.Data.DataServiceManager.TeamRepository.GetByIdAsync(teamEntry.Key);
+                    if (team != null && team.Stats.ContainsKey(evenTeamFormat))
+                    {
+                        ratings[teamEntry.Key] = team.Stats[evenTeamFormat].CurrentRating;
+                    }
+                }
+
+                return ratings;
             }
             catch (Exception ex)
             {
-                await _errorHandler.HandleError(ex);
-                return new Dictionary<string, int>();
+                await ErrorHandler.HandleErrorAsync(ex);
+                throw;
             }
         }
     }
 
-    /// <summary>
-    /// Event published when a team's rating is updated.
-    /// </summary>
-    public class TeamRatingUpdatedEvent : ICoreEvent
-    {
-        public string TeamId { get; init; } = string.Empty;
-        public GameSize GameSize { get; init; }
-        public int OldRating { get; init; }
-        public int NewRating { get; init; }
-        public string Reason { get; init; } = string.Empty;
-    }
 }

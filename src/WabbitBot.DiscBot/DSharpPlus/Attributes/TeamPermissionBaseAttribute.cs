@@ -7,6 +7,7 @@ using DSharpPlus.Commands.Trees;
 using WabbitBot.Core.Common.Models;
 using WabbitBot.Common.Models;
 using WabbitBot.Core.Common.Data.Interface;
+using WabbitBot.Core.Common.Services;
 using WabbitBot.DiscBot.DSharpPlus;
 
 namespace WabbitBot.DiscBot.DSharpPlus.Attributes
@@ -59,9 +60,10 @@ namespace WabbitBot.DiscBot.DSharpPlus.Attributes
                     return $"Parameter '{TeamParameterName}' cannot be empty.";
 
                 // Get the team (could be by ID or name)
+                var teamService = new TeamService();
                 var team = teamParameter.StartsWith("team-")
-                    ? await TeamLookupService.GetByNameAsync(teamParameter)
-                    : await TeamLookupService.GetByTagAsync(teamParameter);
+                    ? await teamService.GetByNameAsync(teamParameter)
+                    : await teamService.GetByTagAsync(teamParameter);
 
                 // If team not found, fail
                 if (team == null)

@@ -1,5 +1,5 @@
 using DSharpPlus.Entities;
-using WabbitBot.DiscBot.DiscBot.Interfaces;
+using WabbitBot.Common.Attributes;
 
 namespace WabbitBot.DiscBot.DSharpPlus.Embeds;
 
@@ -7,6 +7,7 @@ namespace WabbitBot.DiscBot.DSharpPlus.Embeds;
 /// Base class for all embeds in the bot. Provides common properties and functionality
 /// for consistent styling and behavior across different types of embeds.
 /// </summary>
+[GenerateEmbedStyling]
 public abstract class BaseEmbed
 {
     /// <summary>

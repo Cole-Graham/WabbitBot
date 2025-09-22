@@ -5,9 +5,10 @@ using DSharpPlus.Entities;
 using DSharpPlus.Commands.Processors.SlashCommands.ArgumentModifiers;
 using DSharpPlus.Commands.Trees;
 using System.ComponentModel;
-using WabbitBot.DiscBot.DiscBot.Commands;
+using WabbitBot.Core.Scrimmages;
 using WabbitBot.Core.Common.Models;
 using WabbitBot.DiscBot.DSharpPlus.Attributes;
+using WabbitBot.DiscBot.DSharpPlus.Embeds;
 
 namespace WabbitBot.DiscBot.DSharpPlus.Commands;
 
@@ -28,7 +29,7 @@ public partial class ScrimmageCommandsDiscord
     public async Task ChallengeAsync(
         CommandContext ctx,
         [Description("Game size")]
-        [SlashChoiceProvider(typeof(GameSizeChoiceProvider))]
+        [SlashChoiceProvider(typeof(EvenTeamFormatChoiceProvider))]
         string size,
         [Description("Your team name")]
         [SlashAutoCompleteProvider(typeof(DynamicTeamAutoCompleteProvider))]
@@ -40,14 +41,14 @@ public partial class ScrimmageCommandsDiscord
         await ctx.DeferResponseAsync();
 
         // Parse game size
-        if (!Helpers.TryParseGameSize(size, out var gameSize))
+        if (!Game.Validation.TryParseEvenTeamFormat(size, out var evenTeamFormat))
         {
             await ctx.EditResponseAsync($"Invalid game size: {size}");
             return;
         }
 
         // Call business logic - the business logic validates teams exist and have the same game size
-        var result = await ScrimmageCommands.ChallengeAsync(challengerTeam, opponent, gameSize);
+        var result = await ScrimmageCommands.ChallengeAsync(challengerTeam, opponent, evenTeamFormat);
 
         if (!result.Success)
         {
@@ -55,19 +56,31 @@ public partial class ScrimmageCommandsDiscord
             return;
         }
 
-        var embed = new DiscordEmbedBuilder()
-            .WithTitle("🎯 Scrimmage Challenge Created")
-            .WithDescription(result.Message ?? "Scrimmage challenge created")
-            .WithColor(DiscordColor.Green)
-            .AddField("Challenger", challengerTeam, true)
-            .AddField("Opponent", opponent, true)
-            .AddField("Game Size", size, true)
-            .AddField("Challenge ID", result.Scrimmage?.Id.ToString() ?? "Unknown", true)
-            .AddField("Expires", result.Scrimmage?.ChallengeExpiresAt?.ToString("g") ?? "Unknown", true)
-            .WithFooter("The opponent team can accept or decline this challenge");
+        // Create and post the challenge embed first
+        var challengeEmbed = new ScrimmageEmbed();
+        challengeEmbed.SetScrimmage(result.Scrimmage!, 1, result.ChallengerTeamName, result.OpponentTeamName);
 
-        await ctx.EditResponseAsync(new DiscordWebhookBuilder().AddEmbed(embed));
+        var embedBuilder = challengeEmbed.ToEmbedBuilder();
+
+        // Add accept/decline buttons
+        var acceptButton = new DiscordButtonComponent(DiscordButtonStyle.Success, $"accept_challenge_{result.Scrimmage!.Id}", "Accept Challenge");
+        var declineButton = new DiscordButtonComponent(DiscordButtonStyle.Danger, $"decline_challenge_{result.Scrimmage!.Id}", "Decline Challenge");
+
+        // Send message and create thread from it
+        var message = await ctx.Channel.SendMessageAsync(new DiscordMessageBuilder()
+            .AddEmbed(embedBuilder)
+            .AddActionRowComponent(acceptButton, declineButton));
+
+        // Create thread from the message
+        var threadName = $"{result.ChallengerTeamName} vs {result.OpponentTeamName}";
+        var thread = await message.CreateThreadAsync(
+            name: threadName,
+            archiveAfter: DiscordAutoArchiveDuration.Day
+        );
+
+        await ctx.EditResponseAsync($"Challenge created! Thread: {thread.Mention}");
     }
+
 
     #endregion
 

@@ -10,7 +10,7 @@ namespace WabbitBot.Core.Tournaments.Data.Interface
     /// This interface provides methods for managing tournament data in a cache,
     /// supporting both individual tournaments and collections.
     /// </summary>
-    public interface ITournamentCache : IBaseCache<Tournament>, ICollectionCache<Tournament, TournamentListWrapper>
+    public interface ITournamentCache : ICache<Tournament>, ICollectionCache<Tournament, TournamentListWrapper>
     {
         /// <summary>
         /// Gets a tournament by its ID from the cache.
@@ -25,12 +25,12 @@ namespace WabbitBot.Core.Tournaments.Data.Interface
         /// <summary>
         /// Removes a tournament from the cache.
         /// </summary>
-        Task<bool> RemoveTournamentAsync(Guid id);
+        Task<bool> RemoveTournamentAsync(Guid tournamentId);
 
         /// <summary>
         /// Checks if a tournament exists in the cache.
         /// </summary>
-        Task<bool> TournamentExistsAsync(Guid id);
+        Task<bool> TournamentExistsAsync(Guid tournamentId);
 
         /// <summary>
         /// Gets the collection of active tournaments from the cache.

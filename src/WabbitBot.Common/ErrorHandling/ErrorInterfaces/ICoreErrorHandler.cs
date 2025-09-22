@@ -13,10 +13,11 @@ public interface ICoreErrorHandler
     /// Handles an error that occurred in the Core project.
     /// </summary>
     /// <param name="ex">The exception that occurred</param>
-    Task HandleError(Exception ex);
+    /// <param name="context">Optional context information about where the error occurred</param>
+    Task HandleErrorAsync(Exception ex, string? context = null);
 
     /// <summary>
     /// Initializes the Core error handling system.
     /// </summary>
-    Task Initialize();
+    Task InitializeAsync();
 }

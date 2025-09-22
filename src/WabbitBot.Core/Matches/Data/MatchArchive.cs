@@ -7,15 +7,16 @@ using WabbitBot.Common.Data.Interfaces;
 using WabbitBot.Common.Data.Utilities;
 using WabbitBot.Core.Matches;
 using WabbitBot.Core.Common.Models;
+using WabbitBot.Core.Matches.Data.Interface;
 
 namespace WabbitBot.Core.Matches.Data
 {
-    public class MatchArchive : BaseArchive<Match>
+    public class MatchArchive : Archive<Match>, IMatchArchive
     {
         private static readonly string[] Columns = new[]
         {
             "Id", "Team1Id", "Team2Id", "Team1PlayerIds", "Team2PlayerIds",
-            "GameSize", "CreatedAt", "StartedAt", "CompletedAt", "WinnerId",
+            "EvenTeamFormat", "CreatedAt", "StartedAt", "CompletedAt", "WinnerId",
             "Status", "Stage", "ParentId", "ParentType", "BestOf",
             "CreatedAt", "UpdatedAt", "ArchivedAt"
         };
@@ -34,15 +35,18 @@ namespace WabbitBot.Core.Matches.Data
                 Team2Id = reader.GetString(reader.GetOrdinal("Team2Id")),
                 Team1PlayerIds = reader.GetString(reader.GetOrdinal("Team1PlayerIds")).Split(',').ToList(),
                 Team2PlayerIds = reader.GetString(reader.GetOrdinal("Team2PlayerIds")).Split(',').ToList(),
-                GameSize = (GameSize)reader.GetInt32(reader.GetOrdinal("GameSize")),
+                EvenTeamFormat = (EvenTeamFormat)reader.GetInt32(reader.GetOrdinal("EvenTeamFormat")),
                 CreatedAt = reader.GetDateTime(reader.GetOrdinal("CreatedAt")),
-                StartedAt = reader.IsDBNull(reader.GetOrdinal("StartedAt")) ? null : reader.GetDateTime(reader.GetOrdinal("StartedAt")),
-                CompletedAt = reader.IsDBNull(reader.GetOrdinal("CompletedAt")) ? null : reader.GetDateTime(reader.GetOrdinal("CompletedAt")),
-                WinnerId = reader.IsDBNull(reader.GetOrdinal("WinnerId")) ? null : reader.GetString(reader.GetOrdinal("WinnerId")),
-                Status = (MatchStatus)reader.GetInt32(reader.GetOrdinal("Status")),
-                Stage = (MatchStage)reader.GetInt32(reader.GetOrdinal("Stage")),
-                ParentId = reader.IsDBNull(reader.GetOrdinal("ParentId")) ? null : reader.GetString(reader.GetOrdinal("ParentId")),
-                ParentType = reader.IsDBNull(reader.GetOrdinal("ParentType")) ? null : reader.GetString(reader.GetOrdinal("ParentType")),
+                StartedAt = reader.IsDBNull(reader.GetOrdinal("StartedAt")) ? null : reader.GetDateTime(
+                    reader.GetOrdinal("StartedAt")),
+                CompletedAt = reader.IsDBNull(reader.GetOrdinal("CompletedAt")) ? null : reader.GetDateTime(
+                    reader.GetOrdinal("CompletedAt")),
+                WinnerId = reader.IsDBNull(reader.GetOrdinal("WinnerId")) ? null : reader.GetString(
+                    reader.GetOrdinal("WinnerId")),
+                ParentId = reader.IsDBNull(reader.GetOrdinal("ParentId")) ? null : reader.GetString(
+                    reader.GetOrdinal("ParentId")),
+                ParentType = reader.IsDBNull(reader.GetOrdinal("ParentType")) ? null : reader.GetString(
+                    reader.GetOrdinal("ParentType")),
                 BestOf = reader.GetInt32(reader.GetOrdinal("BestOf"))
             };
         }
@@ -56,13 +60,11 @@ namespace WabbitBot.Core.Matches.Data
                 entity.Team2Id,
                 Team1PlayerIds = string.Join(",", entity.Team1PlayerIds),
                 Team2PlayerIds = string.Join(",", entity.Team2PlayerIds),
-                GameSize = (int)entity.GameSize,
+                EvenTeamFormat = (int)entity.EvenTeamFormat,
                 entity.CreatedAt,
                 entity.StartedAt,
                 entity.CompletedAt,
                 entity.WinnerId,
-                Status = (int)entity.Status,
-                Stage = (int)entity.Stage,
                 entity.ParentId,
                 entity.ParentType,
                 entity.BestOf,
@@ -80,6 +82,36 @@ namespace WabbitBot.Core.Matches.Data
                 LIMIT @Limit";
 
             return await QueryAsync(sql, new { TeamId = teamId, Limit = limit });
+        }
+
+        public async Task<IEnumerable<Match>> GetMatchesByDateRangeAsync(DateTime startDate, DateTime endDate)
+        {
+            const string sql = @"
+                SELECT * FROM ArchivedMatches 
+                WHERE ArchivedAt >= @StartDate AND ArchivedAt <= @EndDate
+                ORDER BY ArchivedAt DESC";
+
+            return await QueryAsync(sql, new { StartDate = startDate, EndDate = endDate });
+        }
+
+        public async Task<IEnumerable<Match>> GetMatchesByEvenTeamFormatAsync(EvenTeamFormat evenTeamFormat)
+        {
+            const string sql = @"
+                SELECT * FROM ArchivedMatches 
+                WHERE EvenTeamFormat = @EvenTeamFormat
+                ORDER BY ArchivedAt DESC";
+
+            return await QueryAsync(sql, new { EvenTeamFormat = (int)evenTeamFormat });
+        }
+
+        public async Task<IEnumerable<Match>> GetMatchesByTournamentIdAsync(string tournamentId)
+        {
+            const string sql = @"
+                SELECT * FROM ArchivedMatches 
+                WHERE ParentId = @TournamentId AND ParentType = 'Tournament'
+                ORDER BY ArchivedAt DESC";
+
+            return await QueryAsync(sql, new { TournamentId = tournamentId });
         }
     }
 }

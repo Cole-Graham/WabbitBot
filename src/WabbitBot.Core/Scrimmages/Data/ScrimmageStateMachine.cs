@@ -1,0 +1,166 @@
+using System;
+using System.Collections.Generic;
+using WabbitBot.Core.Scrimmages;
+
+namespace WabbitBot.Core.Scrimmages.Data
+{
+    /// <summary>
+    /// State machine for managing scrimmage lifecycle and transitions
+    /// </summary>
+    public class ScrimmageStateMachine
+    {
+        private readonly Dictionary<Guid, Scrimmage> _activeScrimmages = new();
+        private readonly Dictionary<Guid, ScrimmageStatus> _scrimmageStates = new();
+
+        /// <summary>
+        /// Gets the current state of a scrimmage
+        /// </summary>
+        public ScrimmageStatus? GetCurrentState(Guid scrimmageId)
+        {
+            return _scrimmageStates.TryGetValue(scrimmageId, out var state) ? state : null;
+        }
+
+        /// <summary>
+        /// Gets the current scrimmage instance
+        /// </summary>
+        public Scrimmage? GetCurrentScrimmage(Guid scrimmageId)
+        {
+            return _activeScrimmages.TryGetValue(scrimmageId, out var scrimmage) ? scrimmage : null;
+        }
+
+        /// <summary>
+        /// Adds a new scrimmage to the state machine
+        /// </summary>
+        public void AddScrimmage(Scrimmage scrimmage)
+        {
+            var scrimmageId = scrimmage.Id;
+            _activeScrimmages[scrimmageId] = scrimmage;
+            _scrimmageStates[scrimmageId] = scrimmage.Status;
+        }
+
+        /// <summary>
+        /// Updates the state of a scrimmage
+        /// </summary>
+        public void UpdateState(Guid scrimmageId, ScrimmageStatus newStatus)
+        {
+            if (_scrimmageStates.ContainsKey(scrimmageId))
+            {
+                _scrimmageStates[scrimmageId] = newStatus;
+                if (_activeScrimmages.TryGetValue(scrimmageId, out var scrimmage))
+                {
+                    scrimmage.Status = newStatus;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Removes a scrimmage from the state machine (when completed/archived)
+        /// </summary>
+        public void RemoveScrimmage(Guid scrimmageId)
+        {
+            _activeScrimmages.Remove(scrimmageId);
+            _scrimmageStates.Remove(scrimmageId);
+        }
+
+        /// <summary>
+        /// Validates if a state transition is allowed
+        /// </summary>
+        public bool IsValidTransition(ScrimmageStatus from, ScrimmageStatus to)
+        {
+            return (from, to) switch
+            {
+                // Created -> Accepted, Declined, Cancelled
+                (ScrimmageStatus.Created, ScrimmageStatus.Accepted) => true,
+                (ScrimmageStatus.Created, ScrimmageStatus.Declined) => true,
+                (ScrimmageStatus.Created, ScrimmageStatus.Cancelled) => true,
+
+                // Accepted -> InProgress, Cancelled
+                (ScrimmageStatus.Accepted, ScrimmageStatus.InProgress) => true,
+                (ScrimmageStatus.Accepted, ScrimmageStatus.Cancelled) => true,
+
+                // InProgress -> Completed, Forfeited, Cancelled
+                (ScrimmageStatus.InProgress, ScrimmageStatus.Completed) => true,
+                (ScrimmageStatus.InProgress, ScrimmageStatus.Forfeited) => true,
+                (ScrimmageStatus.InProgress, ScrimmageStatus.Cancelled) => true,
+
+                // Terminal states - no transitions allowed
+                (ScrimmageStatus.Completed, _) => false,
+                (ScrimmageStatus.Declined, _) => false,
+                (ScrimmageStatus.Forfeited, _) => false,
+                (ScrimmageStatus.Cancelled, _) => false,
+
+                _ => false
+            };
+        }
+
+        /// <summary>
+        /// Gets all active scrimmages for a team
+        /// </summary>
+        public IEnumerable<Scrimmage> GetActiveScrimmagesForTeam(string teamId)
+        {
+            foreach (var scrimmage in _activeScrimmages.Values)
+            {
+                if ((scrimmage.Team1Id == teamId || scrimmage.Team2Id == teamId) &&
+                    scrimmage.Status != ScrimmageStatus.Completed &&
+                    scrimmage.Status != ScrimmageStatus.Declined &&
+                    scrimmage.Status != ScrimmageStatus.Cancelled &&
+                    scrimmage.Status != ScrimmageStatus.Forfeited)
+                {
+                    yield return scrimmage;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Gets all expired challenges that need cleanup
+        /// </summary>
+        public IEnumerable<Scrimmage> GetExpiredChallenges()
+        {
+            var now = DateTime.UtcNow;
+            foreach (var scrimmage in _activeScrimmages.Values)
+            {
+                if (scrimmage.Status == ScrimmageStatus.Created &&
+                    scrimmage.ChallengeExpiresAt.HasValue &&
+                    scrimmage.ChallengeExpiresAt.Value < now)
+                {
+                    yield return scrimmage;
+                }
+            }
+        }
+
+        #region Persistence Integration Methods
+
+        /// <summary>
+        /// Gets the state machine instance for repository integration
+        /// </summary>
+        public static ScrimmageStateMachine GetInstance()
+        {
+            return new ScrimmageStateMachine();
+        }
+
+        /// <summary>
+        /// Checks if a scrimmage is currently in the state machine
+        /// </summary>
+        public bool ContainsScrimmage(Guid scrimmageId)
+        {
+            return _activeScrimmages.ContainsKey(scrimmageId);
+        }
+
+        /// <summary>
+        /// Gets all scrimmages currently in the state machine
+        /// </summary>
+        public IEnumerable<Scrimmage> GetAllActiveScrimmages()
+        {
+            return _activeScrimmages.Values;
+        }
+
+        /// <summary>
+        /// Gets the count of active scrimmages
+        /// </summary>
+        public int ActiveScrimmageCount => _activeScrimmages.Count;
+
+        #endregion
+
+    }
+
+}

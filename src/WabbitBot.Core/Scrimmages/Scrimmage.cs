@@ -4,10 +4,11 @@ using WabbitBot.Common.Models;
 using WabbitBot.Core.Matches;
 using WabbitBot.Core.Common.BotCore;
 using WabbitBot.Core.Scrimmages.ScrimmageRating;
+using WabbitBot.Common.Attributes;
 
-namespace WabbitBot.Core.Scrimmages
+namespace WabbitBot.Core.Scrimmages.Deprecated
 {
-    public class Scrimmage : BaseEntity
+    public partial class Scrimmage : Entity
     {
         private static readonly ICoreEventBus _eventBus;
 
@@ -16,25 +17,28 @@ namespace WabbitBot.Core.Scrimmages
             _eventBus = CoreEventBus.Instance;
         }
 
-        public string Team1Id { get; set; } = string.Empty;
-        public string Team2Id { get; set; } = string.Empty;
-        public List<string> Team1RosterIds { get; set; } = new();
-        public List<string> Team2RosterIds { get; set; } = new();
-        public GameSize GameSize { get; set; }
+        public Guid Team1Id { get; set; }
+        public Guid Team2Id { get; set; }
+        public List<Guid> Team1RosterIds { get; set; } = new();
+        public List<Guid> Team2RosterIds { get; set; } = new();
+        public EvenTeamFormat EvenTeamFormat { get; set; }
         public DateTime? StartedAt { get; set; }
         public DateTime? CompletedAt { get; set; }
-        public string? WinnerId { get; set; }
+        public Guid? WinnerId { get; set; }
         public ScrimmageStatus Status { get; set; }
-        public int Team1Rating { get; set; }
-        public int Team2Rating { get; set; }
+        public double Team1Rating { get; set; }
+        public double Team2Rating { get; set; }
         public double Team1RatingChange { get; set; }
         public double Team2RatingChange { get; set; }
         public double Team1Confidence { get; set; } = 0.0; // Confidence at time of match
         public double Team2Confidence { get; set; } = 0.0; // Confidence at time of match
+        public int Team1Score { get; set; } = 0; // Score at completion
+        public int Team2Score { get; set; } = 0; // Score at completion
         public DateTime? ChallengeExpiresAt { get; set; }
         public bool IsAccepted { get; set; }
         public Match? Match { get; private set; }
         public int BestOf { get; set; } = 1;
+
 
         public Scrimmage()
         {
@@ -43,20 +47,20 @@ namespace WabbitBot.Core.Scrimmages
             ChallengeExpiresAt = DateTime.UtcNow.AddHours(24); // 24 hour challenge window
         }
 
-        public bool IsTeamMatch => GameSize != GameSize.OneVOne;
+        public bool IsTeamMatch => EvenTeamFormat != EvenTeamFormat.OneVOne;
 
-        private async Task PublishEventAsync(ICoreEvent @event)
+        private async Task PublishEventAsync(IEvent @event)
         {
             await _eventBus.PublishAsync(@event);
         }
 
-        public static Scrimmage Create(string team1Id, string team2Id, GameSize gameSize, int bestOf = 1)
+        public static Scrimmage Create(string team1Id, string team2Id, EvenTeamFormat evenTeamFormat, int bestOf = 1)
         {
             var scrimmage = new Scrimmage
             {
                 Team1Id = team1Id,
                 Team2Id = team2Id,
-                GameSize = gameSize,
+                EvenTeamFormat = evenTeamFormat,
                 Status = ScrimmageStatus.Created,
                 CreatedAt = DateTime.UtcNow,
                 BestOf = bestOf
@@ -78,7 +82,7 @@ namespace WabbitBot.Core.Scrimmages
             Status = ScrimmageStatus.Accepted;
 
             // Create the match
-            Match = Match.Create(Team1Id, Team2Id, GameSize, Id.ToString(), "Scrimmage", BestOf);
+            Match = Match.Create(Team1Id, Team2Id, EvenTeamFormat, Id, "Scrimmage", BestOf);
 
             // Event will be published by source generator
         }
@@ -106,7 +110,7 @@ namespace WabbitBot.Core.Scrimmages
 
             StartedAt = DateTime.UtcNow;
             Status = ScrimmageStatus.InProgress;
-            Match.Start();
+            // Match.Start() moved to MatchService - will be handled by ScrimmageService
 
             // Event will be published by source generator
         }
@@ -133,9 +137,9 @@ namespace WabbitBot.Core.Scrimmages
 
             // Calculate confidence levels at match time using the rating calculator service
             var team1ConfidenceResp = await _eventBus.RequestAsync<CalculateConfidenceRequest, CalculateConfidenceResponse>(
-                new CalculateConfidenceRequest { TeamId = Team1Id, GameSize = GameSize });
+                new CalculateConfidenceRequest { TeamId = Team1Id, EvenTeamFormat = EvenTeamFormat });
             var team2ConfidenceResp = await _eventBus.RequestAsync<CalculateConfidenceRequest, CalculateConfidenceResponse>(
-                new CalculateConfidenceRequest { TeamId = Team2Id, GameSize = GameSize });
+                new CalculateConfidenceRequest { TeamId = Team2Id, EvenTeamFormat = EvenTeamFormat });
 
             var team1Confidence = team1ConfidenceResp?.Confidence ?? 0.0;
             var team2Confidence = team2ConfidenceResp?.Confidence ?? 0.0;
@@ -148,7 +152,7 @@ namespace WabbitBot.Core.Scrimmages
                     Team2Id = Team2Id,
                     Team1Rating = team1Rating,
                     Team2Rating = team2Rating,
-                    GameSize = GameSize,
+                    EvenTeamFormat = EvenTeamFormat,
                     Team1Score = team1Score,
                     Team2Score = team2Score
                 });
@@ -166,21 +170,16 @@ namespace WabbitBot.Core.Scrimmages
             Team2RatingChange = team2RatingChange;
             Team1Confidence = team1Confidence;
             Team2Confidence = team2Confidence;
+            Team1Score = team1Score;
+            Team2Score = team2Score;
 
-            Match.Complete(winnerId);
+            // Match.Complete() moved to MatchService - will be handled by ScrimmageService
 
-            // Publish ScrimmageCompletedEvent with confidence values
+            // Publish ScrimmageCompletedEvent with minimal data for cross-project communication
             await PublishEventAsync(new ScrimmageCompletedEvent
             {
-                ScrimmageId = Id.ToString(),
-                MatchId = Match.Id,
-                Team1Id = Team1Id,
-                Team2Id = Team2Id,
-                Team1Score = team1Score,
-                Team2Score = team2Score,
-                GameSize = GameSize,
-                Team1Confidence = team1Confidence,
-                Team2Confidence = team2Confidence
+                ScrimmageId = Id,
+                MatchId = Match.Id
             });
         }
 
@@ -193,7 +192,7 @@ namespace WabbitBot.Core.Scrimmages
 
             if (Match != null)
             {
-                Match.Cancel(reason, cancelledBy);
+                // Match.Cancel() moved to MatchService - will be handled by ScrimmageService
             }
 
             // Event will be published by source generator
@@ -213,7 +212,7 @@ namespace WabbitBot.Core.Scrimmages
             Status = ScrimmageStatus.Forfeited;
             WinnerId = forfeitedTeamId == Team1Id ? Team2Id : Team1Id;
 
-            Match.Forfeit(forfeitedTeamId, reason);
+            // Match.Forfeit() moved to MatchService - will be handled by ScrimmageService
 
             // Event will be published by source generator
         }
@@ -249,6 +248,7 @@ namespace WabbitBot.Core.Scrimmages
                 // Event will be published by source generator
             }
         }
+
     }
 
     public enum ScrimmageStatus

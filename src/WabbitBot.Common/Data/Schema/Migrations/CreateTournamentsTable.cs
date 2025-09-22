@@ -24,7 +24,7 @@ namespace WabbitBot.Common.Data.Schema.Migrations
                         Id TEXT PRIMARY KEY,
                         Name TEXT NOT NULL,
                         Description TEXT NOT NULL,
-                        GameSize INTEGER NOT NULL,
+                        EvenTeamFormat INTEGER NOT NULL,
                         StartDate DATETIME NOT NULL,
                         EndDate DATETIME NULL,
                         Status INTEGER NOT NULL,
@@ -32,7 +32,7 @@ namespace WabbitBot.Common.Data.Schema.Migrations
                         BestOf INTEGER NOT NULL DEFAULT 1,
                         CreatedAt DATETIME NOT NULL,
                         UpdatedAt DATETIME NOT NULL,
-                        Version INTEGER NOT NULL
+                        SchemaVersion INTEGER NOT NULL DEFAULT 1
                     )", new { }, transaction);
 
                 // Create indexes for faster lookups

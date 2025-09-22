@@ -1,6 +1,5 @@
 using DSharpPlus.Entities;
 using WabbitBot.Core.Matches;
-using WabbitBot.DiscBot.DiscBot.Interfaces;
 
 namespace WabbitBot.DiscBot.DSharpPlus.Embeds;
 

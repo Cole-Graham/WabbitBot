@@ -32,7 +32,8 @@ namespace WabbitBot.Common.Data.Schema
                         IsArchived BOOLEAN NOT NULL,
                         ArchivedAt DATETIME,
                         CreatedAt DATETIME NOT NULL,
-                        UpdatedAt DATETIME NOT NULL
+                        UpdatedAt DATETIME NOT NULL,
+                        SchemaVersion INTEGER NOT NULL DEFAULT 1
                     )", new { }, transaction);
 
                 // Create indexes for faster lookups

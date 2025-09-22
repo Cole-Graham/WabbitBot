@@ -2,15 +2,17 @@ using System;
 using System.Threading.Tasks;
 using WabbitBot.Common.Data;
 using WabbitBot.Common.Data.Interfaces;
+using WabbitBot.Core.Tournaments.Data.Interface;
 
 namespace WabbitBot.Core.Tournaments.Data
 {
-    public class TournamentCache : BaseCache<Tournament, TournamentListWrapper>
+    public class TournamentCache : Cache<Tournament, TournamentListWrapper>, ITournamentCache
     {
         private const string KeyPrefix = "tournament:";
         private const string ListKey = "tournaments:active";
+        private const int MaxTournamentCacheSize = 1000; // Reasonable limit for tournaments
 
-        public TournamentCache() : base()
+        public TournamentCache() : base(MaxTournamentCacheSize)
         {
         }
 

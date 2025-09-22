@@ -8,15 +8,16 @@ using WabbitBot.Common.Data.Interfaces;
 using WabbitBot.Common.Data.Utilities;
 using WabbitBot.Core.Leaderboards;
 using WabbitBot.Core.Leaderboards.Data.Interface;
+using WabbitBot.Core.Common.Models;
 
 namespace WabbitBot.Core.Leaderboards.Data
 {
-    public class SeasonRepository : BaseJsonRepository<Season>, ISeasonRepository
+    public class SeasonRepository : JsonRepository<Season>, ISeasonRepository
     {
         private static readonly string[] Columns = new[]
         {
-            "Id", "Name", "StartDate", "EndDate", "IsActive",
-            "TeamStats", "Config", "CreatedAt", "UpdatedAt"
+            "Id", "SeasonGroupId", "EvenTeamFormat", "StartDate", "EndDate", "IsActive",
+            "ParticipatingTeams", "Config", "CreatedAt", "UpdatedAt"
         };
 
         public SeasonRepository(IDatabaseConnection connection)
@@ -29,11 +30,24 @@ namespace WabbitBot.Core.Leaderboards.Data
             return new Season();
         }
 
-        public async Task<Season?> GetActiveSeasonAsync()
+        public async Task<Season?> GetSeasonAsync(string seasonId)
         {
-            const string sql = "SELECT * FROM Seasons WHERE IsActive = 1";
-            var results = await QueryAsync(sql);
+            const string sql = "SELECT * FROM Seasons WHERE Id = @SeasonId";
+            var results = await QueryAsync(sql, new { SeasonId = seasonId });
             return results.FirstOrDefault();
+        }
+
+        public async Task<Season?> GetActiveSeasonAsync(EvenTeamFormat evenTeamFormat)
+        {
+            const string sql = "SELECT * FROM Seasons WHERE IsActive = 1 AND EvenTeamFormat = @EvenTeamFormat";
+            var results = await QueryAsync(sql, new { EvenTeamFormat = evenTeamFormat });
+            return results.FirstOrDefault();
+        }
+
+        public async Task<IEnumerable<Season>> GetSeasonsByEvenTeamFormatAsync(EvenTeamFormat evenTeamFormat)
+        {
+            const string sql = "SELECT * FROM Seasons WHERE EvenTeamFormat = @EvenTeamFormat ORDER BY StartDate DESC";
+            return await QueryAsync(sql, new { EvenTeamFormat = evenTeamFormat });
         }
 
         public async Task<IEnumerable<Season>> GetSeasonsByDateRangeAsync(DateTime startDate, DateTime endDate)
@@ -44,6 +58,12 @@ namespace WabbitBot.Core.Leaderboards.Data
                 AND EndDate <= @EndDate";
 
             return await QueryAsync(sql, new { StartDate = startDate, EndDate = endDate });
+        }
+
+        public async Task<IEnumerable<Season>> GetCompletedSeasonsAsync(EvenTeamFormat evenTeamFormat)
+        {
+            const string sql = "SELECT * FROM Seasons WHERE IsActive = 0 AND EvenTeamFormat = @EvenTeamFormat ORDER BY EndDate DESC";
+            return await QueryAsync(sql, new { EvenTeamFormat = evenTeamFormat });
         }
 
         protected override Season MapEntity(IDataReader reader)

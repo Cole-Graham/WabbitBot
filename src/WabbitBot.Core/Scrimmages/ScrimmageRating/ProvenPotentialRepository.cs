@@ -8,7 +8,7 @@ using WabbitBot.Core.Scrimmages.ScrimmageRating.Interface;
 
 namespace WabbitBot.Core.Scrimmages.ScrimmageRating
 {
-    public class ProvenPotentialRepository : BaseJsonRepository<ProvenPotentialRecord>, IProvenPotentialRepository
+    public class ProvenPotentialRepository : JsonRepository<ProvenPotentialRecord>, IProvenPotentialRepository
     {
         public ProvenPotentialRepository(IDatabaseConnection connection)
             : base(connection, "ProvenPotentialRecords", new[]

@@ -30,7 +30,8 @@ namespace WabbitBot.Common.Data.Schema
                         IsInTournamentPool BOOLEAN NOT NULL,
                         ThumbnailFilename TEXT,
                         CreatedAt DATETIME NOT NULL,
-                        UpdatedAt DATETIME NOT NULL
+                        UpdatedAt DATETIME NOT NULL,
+                        SchemaVersion INTEGER NOT NULL DEFAULT 1
                     )", new { }, transaction);
 
                 // Create indexes for faster lookups

@@ -26,22 +26,23 @@ namespace WabbitBot.Common.Data.Schema.Migrations
                         Team2Id TEXT NOT NULL,
                         Team1RosterIds TEXT NOT NULL,
                         Team2RosterIds TEXT NOT NULL,
-                        GameSize INTEGER NOT NULL,
-                        StartedAt TEXT,
-                        CompletedAt TEXT,
+                        EvenTeamFormat INTEGER NOT NULL,
+                        StartedAt DATETIME,
+                        CompletedAt DATETIME,
                         WinnerId TEXT,
                         Status INTEGER NOT NULL,
-                        Team1Rating INTEGER NOT NULL,
-                        Team2Rating INTEGER NOT NULL,
+                        Team1Rating REAL NOT NULL,
+                        Team2Rating REAL NOT NULL,
                         Team1RatingChange REAL NOT NULL,
                         Team2RatingChange REAL NOT NULL,
                         Team1Confidence REAL NOT NULL,
                         Team2Confidence REAL NOT NULL,
-                        ChallengeExpiresAt TEXT,
+                        ChallengeExpiresAt DATETIME,
                         IsAccepted INTEGER NOT NULL,
                         BestOf INTEGER NOT NULL,
-                        CreatedAt TEXT NOT NULL,
-                        UpdatedAt TEXT NOT NULL
+                        CreatedAt DATETIME NOT NULL,
+                        UpdatedAt DATETIME NOT NULL,
+                        SchemaVersion INTEGER NOT NULL DEFAULT 1
                     )", new { }, transaction);
 
                 // Create indexes for faster lookups

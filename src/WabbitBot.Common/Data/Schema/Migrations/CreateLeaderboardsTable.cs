@@ -22,17 +22,18 @@ namespace WabbitBot.Common.Data.Schema.Migrations
                 await QueryUtil.ExecuteNonQueryAsync(conn, @"
                     CREATE TABLE IF NOT EXISTS Leaderboards (
                         Id TEXT PRIMARY KEY,
-                        GameSize INTEGER NOT NULL,
-                        Rankings TEXT NOT NULL,
-                        InitialRating INTEGER NOT NULL,
+                        SeasonId TEXT NOT NULL,
+                        EvenTeamFormat INTEGER NOT NULL,
+                        InitialRating REAL NOT NULL,
                         KFactor INTEGER NOT NULL,
                         CreatedAt DATETIME NOT NULL,
-                        UpdatedAt DATETIME NOT NULL
+                        UpdatedAt DATETIME NOT NULL,
+                        SchemaVersion INTEGER NOT NULL DEFAULT 1
                     )", new { }, transaction);
 
                 // Create indexes for faster lookups
                 await QueryUtil.ExecuteNonQueryAsync(conn, @"
-                    CREATE INDEX IF NOT EXISTS idx_leaderboards_gamesize ON Leaderboards(GameSize)", new { }, transaction);
+                    CREATE INDEX IF NOT EXISTS idx_leaderboards_gamesize ON Leaderboards(EvenTeamFormat)", new { }, transaction);
 
                 transaction.Commit();
             }

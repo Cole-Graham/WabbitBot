@@ -2,11 +2,9 @@ using System;
 using System.Threading.Tasks;
 using WabbitBot.Core.Common.BotCore;
 using WabbitBot.Common.Events.EventInterfaces;
-using WabbitBot.Core.Leaderboards.Data.Interface;
-using WabbitBot.Core.Scrimmages.ScrimmageRating;
 using WabbitBot.Core.Common.Models;
-using System.Linq;
-using System.Collections.Generic;
+using WabbitBot.Common.Attributes;
+using WabbitBot.Core.Common.Data;
 
 namespace WabbitBot.Core.Leaderboards
 {
@@ -14,103 +12,37 @@ namespace WabbitBot.Core.Leaderboards
     /// Handler for leaderboard-related events and requests.
     /// Leaderboards are now read-only views generated from Season data.
     /// </summary>
-    public class LeaderboardHandler : CoreBaseHandler
+    [GenerateEventSubscriptions(EnableMetrics = true, EnableErrorHandling = true, EnableLogging = true)]
+    public partial class LeaderboardHandler : CoreHandler
     {
-        private readonly ILeaderboardRepository _leaderboardRepo;
-        private readonly SeasonRatingService _seasonRatingService;
+        private readonly LeaderboardService _leaderboardService;
 
-        public LeaderboardHandler(
-            ILeaderboardRepository leaderboardRepo,
-            SeasonRatingService seasonRatingService)
+        public static LeaderboardHandler Instance { get; } = new LeaderboardHandler();
+
+        private LeaderboardHandler()
             : base(CoreEventBus.Instance)
         {
-            _leaderboardRepo = leaderboardRepo ?? throw new ArgumentNullException(nameof(leaderboardRepo));
-            _seasonRatingService = seasonRatingService ?? throw new ArgumentNullException(nameof(seasonRatingService));
+            _leaderboardService = new LeaderboardService();
         }
 
         public override Task InitializeAsync()
         {
-            // Subscribe to team rating update events to refresh leaderboards
-            EventBus.Subscribe<TeamRatingUpdatedEvent>(async evt =>
-            {
-                try
-                {
-                    await RefreshLeaderboardAsync(evt.GameSize);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error refreshing leaderboard: {ex.Message}");
-                }
-            });
-
+            // Register auto-generated event subscriptions
+            RegisterEventSubscriptions();
             return Task.CompletedTask;
         }
 
-        /// <summary>
-        /// Refreshes the leaderboard for a specific game size from Season data.
-        /// </summary>
-        private async Task RefreshLeaderboardAsync(GameSize gameSize)
+        [EventHandler(Priority = 1, EnableRetry = true, MaxRetryAttempts = 3)]
+        private async Task HandleTeamRatingUpdatedEvent(TeamRatingUpdatedEvent evt)
         {
-            try
+            // Convert string back to EvenTeamFormat enum
+            if (!Enum.TryParse<EvenTeamFormat>(evt.EvenTeamFormat, out var evenTeamFormat))
             {
-                // Get all team ratings from Season
-                var teamRatings = await _seasonRatingService.GetAllTeamRatingsAsync(gameSize);
-
-                // Create leaderboard entries
-                var rankings = new Dictionary<string, LeaderboardEntry>();
-                foreach (var (teamId, rating) in teamRatings)
-                {
-                    rankings[teamId] = new LeaderboardEntry
-                    {
-                        Name = teamId,
-                        Rating = rating,
-                        IsTeam = true,
-                        LastUpdated = DateTime.UtcNow
-                    };
-                }
-
-                // Get or create leaderboard
-                var leaderboards = await _leaderboardRepo.GetLeaderboardsByGameSizeAsync(gameSize);
-                var leaderboard = leaderboards.FirstOrDefault();
-
-                if (leaderboard == null)
-                {
-                    leaderboard = new Leaderboard();
-                }
-
-                // Update rankings
-                leaderboard.Rankings[gameSize] = rankings;
-
-                // Save to database
-                if (leaderboard.Id == Guid.Empty)
-                {
-                    await _leaderboardRepo.AddAsync(leaderboard);
-                }
-                else
-                {
-                    await _leaderboardRepo.UpdateAsync(leaderboard);
-                }
-
-                Console.WriteLine($"Leaderboard refreshed for {gameSize}: {rankings.Count} teams");
+                Console.WriteLine($"Invalid EvenTeamFormat string in TeamRatingUpdatedEvent: {evt.EvenTeamFormat}");
+                return;
             }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error refreshing leaderboard for {gameSize}: {ex.Message}");
-            }
-        }
 
-        /// <summary>
-        /// Manually triggers a leaderboard refresh for all game sizes.
-        /// </summary>
-        public async Task RefreshAllLeaderboardsAsync()
-        {
-            foreach (GameSize gameSize in Enum.GetValues(typeof(GameSize)))
-            {
-                if (gameSize != GameSize.OneVOne) // Teams don't participate in 1v1
-                {
-                    await RefreshLeaderboardAsync(gameSize);
-                }
-            }
+            await _leaderboardService.RefreshLeaderboardAsync(evenTeamFormat);
         }
     }
 }

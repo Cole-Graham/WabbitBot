@@ -22,23 +22,31 @@ namespace WabbitBot.Common.Data.Schema.Migrations
                 await QueryUtil.ExecuteNonQueryAsync(conn, @"
                     CREATE TABLE IF NOT EXISTS Seasons (
                         Id TEXT PRIMARY KEY,
-                        Name TEXT NOT NULL,
+                        SeasonGroupId TEXT NOT NULL,
+                        EvenTeamFormat INTEGER NOT NULL,
                         StartDate DATETIME NOT NULL,
                         EndDate DATETIME NOT NULL,
                         IsActive BOOLEAN NOT NULL,
                         TeamStats TEXT NOT NULL,
                         Config TEXT NOT NULL,
                         CreatedAt DATETIME NOT NULL,
-                        UpdatedAt DATETIME NOT NULL
+                        UpdatedAt DATETIME NOT NULL,
+                        SchemaVersion INTEGER NOT NULL DEFAULT 1
                     )", new { }, transaction);
 
                 // Create indexes for faster lookups
+                await QueryUtil.ExecuteNonQueryAsync(conn, @"
+                    CREATE INDEX IF NOT EXISTS idx_seasons_seasongroupid ON Seasons(SeasonGroupId)", new { }, transaction);
+                await QueryUtil.ExecuteNonQueryAsync(conn, @"
+                    CREATE INDEX IF NOT EXISTS idx_seasons_gamesize ON Seasons(EvenTeamFormat)", new { }, transaction);
                 await QueryUtil.ExecuteNonQueryAsync(conn, @"
                     CREATE INDEX IF NOT EXISTS idx_seasons_startdate ON Seasons(StartDate)", new { }, transaction);
                 await QueryUtil.ExecuteNonQueryAsync(conn, @"
                     CREATE INDEX IF NOT EXISTS idx_seasons_enddate ON Seasons(EndDate)", new { }, transaction);
                 await QueryUtil.ExecuteNonQueryAsync(conn, @"
                     CREATE INDEX IF NOT EXISTS idx_seasons_isactive ON Seasons(IsActive)", new { }, transaction);
+                await QueryUtil.ExecuteNonQueryAsync(conn, @"
+                    CREATE INDEX IF NOT EXISTS idx_seasons_isactive_gamesize ON Seasons(IsActive, EvenTeamFormat)", new { }, transaction);
 
                 transaction.Commit();
             }

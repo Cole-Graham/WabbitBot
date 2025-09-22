@@ -8,14 +8,15 @@ using WabbitBot.Common.Data.Interfaces;
 using WabbitBot.Common.Data.Utilities;
 using WabbitBot.Core.Common.Models;
 using WabbitBot.Core.Scrimmages;
+using WabbitBot.Core.Scrimmages.Data.Interface;
 
 namespace WabbitBot.Core.Scrimmages.Data
 {
-    public class ScrimmageArchive : BaseArchive<Scrimmage>
+    public class ScrimmageArchive : Archive<Scrimmage>, IScrimmageArchive
     {
         private static readonly string[] Columns = new[]
         {
-            "Id", "Team1Id", "Team2Id", "Team1RosterIds", "Team2RosterIds", "GameSize",
+            "Id", "Team1Id", "Team2Id", "Team1RosterIds", "Team2RosterIds", "EvenTeamFormat",
             "StartedAt", "CompletedAt", "WinnerId", "Status", "Team1Rating", "Team2Rating",
             "Team1RatingChange", "Team2RatingChange", "Team1Confidence", "Team2Confidence",
             "ChallengeExpiresAt", "IsAccepted", "BestOf", "CreatedAt", "UpdatedAt", "ArchivedAt"
@@ -47,22 +48,22 @@ namespace WabbitBot.Core.Scrimmages.Data
                 Team2Id = reader.GetString(reader.GetOrdinal("Team2Id")),
                 Team1RosterIds = JsonUtil.Deserialize<List<string>>(reader.GetString(reader.GetOrdinal("Team1RosterIds"))) ?? new List<string>(),
                 Team2RosterIds = JsonUtil.Deserialize<List<string>>(reader.GetString(reader.GetOrdinal("Team2RosterIds"))) ?? new List<string>(),
-                GameSize = (GameSize)reader.GetInt32(reader.GetOrdinal("GameSize")),
-                StartedAt = reader.IsDBNull(reader.GetOrdinal("StartedAt")) ? null : DateTime.Parse(reader.GetString(reader.GetOrdinal("StartedAt"))),
-                CompletedAt = reader.IsDBNull(reader.GetOrdinal("CompletedAt")) ? null : DateTime.Parse(reader.GetString(reader.GetOrdinal("CompletedAt"))),
+                EvenTeamFormat = (EvenTeamFormat)reader.GetInt32(reader.GetOrdinal("EvenTeamFormat")),
+                StartedAt = reader.IsDBNull(reader.GetOrdinal("StartedAt")) ? null : reader.GetDateTime(reader.GetOrdinal("StartedAt")),
+                CompletedAt = reader.IsDBNull(reader.GetOrdinal("CompletedAt")) ? null : reader.GetDateTime(reader.GetOrdinal("CompletedAt")),
                 WinnerId = reader.IsDBNull(reader.GetOrdinal("WinnerId")) ? null : reader.GetString(reader.GetOrdinal("WinnerId")),
                 Status = (ScrimmageStatus)reader.GetInt32(reader.GetOrdinal("Status")),
-                Team1Rating = reader.GetInt32(reader.GetOrdinal("Team1Rating")),
-                Team2Rating = reader.GetInt32(reader.GetOrdinal("Team2Rating")),
+                Team1Rating = reader.GetDouble(reader.GetOrdinal("Team1Rating")),
+                Team2Rating = reader.GetDouble(reader.GetOrdinal("Team2Rating")),
                 Team1RatingChange = reader.GetDouble(reader.GetOrdinal("Team1RatingChange")),
                 Team2RatingChange = reader.GetDouble(reader.GetOrdinal("Team2RatingChange")),
                 Team1Confidence = reader.GetDouble(reader.GetOrdinal("Team1Confidence")),
                 Team2Confidence = reader.GetDouble(reader.GetOrdinal("Team2Confidence")),
-                ChallengeExpiresAt = reader.IsDBNull(reader.GetOrdinal("ChallengeExpiresAt")) ? null : DateTime.Parse(reader.GetString(reader.GetOrdinal("ChallengeExpiresAt"))),
+                ChallengeExpiresAt = reader.IsDBNull(reader.GetOrdinal("ChallengeExpiresAt")) ? null : reader.GetDateTime(reader.GetOrdinal("ChallengeExpiresAt")),
                 IsAccepted = reader.GetInt32(reader.GetOrdinal("IsAccepted")) != 0,
                 BestOf = reader.GetInt32(reader.GetOrdinal("BestOf")),
-                CreatedAt = DateTime.Parse(reader.GetString(reader.GetOrdinal("CreatedAt"))),
-                UpdatedAt = DateTime.Parse(reader.GetString(reader.GetOrdinal("UpdatedAt")))
+                CreatedAt = reader.GetDateTime(reader.GetOrdinal("CreatedAt")),
+                UpdatedAt = reader.GetDateTime(reader.GetOrdinal("UpdatedAt"))
             };
         }
 
@@ -75,7 +76,7 @@ namespace WabbitBot.Core.Scrimmages.Data
                 entity.Team2Id,
                 Team1RosterIds = JsonUtil.Serialize(entity.Team1RosterIds),
                 Team2RosterIds = JsonUtil.Serialize(entity.Team2RosterIds),
-                GameSize = (int)entity.GameSize,
+                EvenTeamFormat = (int)entity.EvenTeamFormat,
                 StartedAt = entity.StartedAt?.ToString("O"),
                 CompletedAt = entity.CompletedAt?.ToString("O"),
                 entity.WinnerId,

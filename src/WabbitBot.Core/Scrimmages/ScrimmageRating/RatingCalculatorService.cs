@@ -6,40 +6,22 @@ using WabbitBot.Common.Events.EventInterfaces;
 using WabbitBot.Common.ErrorHandling;
 using WabbitBot.Core.Common.Models;
 using WabbitBot.Core.Scrimmages;
-
-using WabbitBot.Core.Leaderboards;
+using WabbitBot.Common.Configuration;
+using WabbitBot.Common.Models;
+using WabbitBot.Core.Common.Data;
+using WabbitBot.Core.Common.BotCore;
+using WabbitBot.Core.Common;
+using WabbitBot.Common.Attributes;
 
 namespace WabbitBot.Core.Scrimmages.ScrimmageRating
 {
     /// <summary>
     /// Service for handling scrimmage rating-related business logic.
     /// </summary>
-    public class RatingCalculatorService
+    [GenerateEventPublisher(EventBusType = EventBusType.Core, EnableValidation = true, EnableTimestamps = true)]
+    public partial class RatingCalculatorService : CoreService
     {
-        private readonly ICoreEventBus _eventBus;
-        private readonly ICoreErrorHandler _errorHandler;
-        private readonly SeasonRatingService _seasonRatingService;
-
-        // Rating System Constants (matching Python implementation)
-        private const double ELO_DIVISOR = 400.0; // Standard ELO sensitivity
-        private const int MINIMUM_RATING = 600;
-        private const double BASE_RATING_CHANGE = 40.0; // Match Python: base K-factor for ELO calculations
-        private const double MAX_VARIETY_BONUS = 0.2;  // +20% max bonus for high variety
-        private const double MIN_VARIETY_BONUS = -0.1; // -10% penalty for low variety
-        private const int VARIETY_WINDOW_DAYS = 30;
-        private const double MAX_GAP_PERCENT = 0.2; // 20% of rating range
-
-        // Catch-up bonus configuration (matching Python ladder reset scenario)
-        private const int CATCH_UP_TARGET_RATING = 1500; // Intended average rating
-        private const int CATCH_UP_THRESHOLD = 200; // Rating difference threshold
-        private const double CATCH_UP_MAX_BONUS = 1.0; // Maximum bonus multiplier
-        private const bool CATCH_UP_ENABLED = true; // Enable/disable catch-up bonus
-
-        // Multiplier configuration
-        private const double MAX_MULTIPLIER = 2.0;
-        private const int VARIETY_BONUS_GAMES_THRESHOLD = 20; // Match Python: max_confidence_games
-
-        // Configuration option to enable/disable time-based match filtering for variety calculations (VARIETY_WINDOW_DAYS)
+        // Configuration option to enable/disable time-based match filtering for variety calculations
         // Can be changed at runtime through configuration
         private bool UseTimeBasedVarietyFiltering { get; set; } = false;
 
@@ -50,14 +32,46 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
         private const double MIN_SCALING_FACTOR = 0.1;
         private const double MAX_SCALING_FACTOR = 1.0;
 
-        public RatingCalculatorService(
-            ICoreEventBus eventBus,
-            ICoreErrorHandler errorHandler,
-            SeasonRatingService seasonRatingService)
+        public RatingCalculatorService()
+            : base(CoreEventBus.Instance, CoreErrorHandler.Instance)
         {
-            _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
-            _errorHandler = errorHandler ?? throw new ArgumentNullException(nameof(errorHandler));
-            _seasonRatingService = seasonRatingService ?? throw new ArgumentNullException(nameof(seasonRatingService));
+        }
+
+
+        /// <summary>
+        /// Gets all team ratings for a specific game size.
+        /// Note: Since we can't access season data directly due to architectural constraints,
+        /// this method queries all teams and returns their ratings for the specified game size.
+        /// </summary>
+        private async Task<Dictionary<string, double>> GetAllTeamRatingsAsync(EvenTeamFormat evenTeamFormat)
+        {
+            try
+            {
+                // Get all teams from the repository
+                var allTeams = await WabbitBot.Core.Common.Data.DataServiceManager.TeamRepository.GetAllAsync();
+                var ratings = new Dictionary<string, double>();
+
+                foreach (var team in allTeams ?? Enumerable.Empty<WabbitBot.Core.Common.Models.Team>())
+                {
+                    if (team.Stats.ContainsKey(evenTeamFormat))
+                    {
+                        ratings[team.Id.ToString()] = team.Stats[evenTeamFormat].CurrentRating;
+                    }
+                }
+
+                return ratings;
+            }
+            catch (Exception ex)
+            {
+                await ErrorHandler.HandleErrorAsync(ex);
+                return new Dictionary<string, double>();
+            }
+        }
+
+
+        private static ScrimmageOptions GetScrimmageDbConfig()
+        {
+            return ConfigurationProvider.GetSection<ScrimmageOptions>(ScrimmageOptions.SectionName);
         }
 
         /// <summary>
@@ -66,15 +80,17 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
         /// <param name="playerRating">The player's current rating.</param>
         /// <param name="allRatings">A sorted list of all player ratings.</param>
         /// <returns>The percentile (0.0 to 100.0) of the player's rating.</returns>
-        private static double CalculatePlayerPercentile(int playerRating, List<int> allRatings)
+        private static double CalculatePlayerPercentile(double playerRating, List<double> allRatings)
         {
-            if (allRatings == null || allRatings.Count == 0)
+            // Use Common validation for collection validation
+            var validation = CoreValidation.ValidateNotEmpty(allRatings, "all ratings");
+            if (!validation.Success)
                 return 50.0; // Default to middle if no ratings
 
             // Find the position of this rating in the sorted list
             // Count how many ratings are less than this rating
-            int countBelow = 0;
-            int countEqual = 0;
+            double countBelow = 0;
+            double countEqual = 0;
 
             foreach (int rating in allRatings)
             {
@@ -106,8 +122,8 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
             }
 
             // Validate input is in the correct range for top 10%
-            if (percentile < 90 || percentile > 100)
-                throw new ArgumentException("Percentile must be between 1-10 or 90-100 for tail scaling");
+            if (percentile < 90.0 || percentile > 100.0)
+                throw new ArgumentException("Percentile must be between 90-100 for tail scaling");
 
             // Map percentile to x in range [1, 10]
             double x = percentile - 89;
@@ -133,9 +149,19 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
             {
                 // Get all teams' ratings
                 var ratingsRequest = new AllTeamRatingsRequest();
-                var ratingsResponse = await _eventBus.RequestAsync<AllTeamRatingsRequest, AllTeamRatingsResponse>(ratingsRequest);
+                var ratingsResponse = await EventBus.RequestAsync<AllTeamRatingsRequest, AllTeamRatingsResponse>(ratingsRequest);
 
-                if (ratingsResponse?.Ratings == null || !ratingsResponse.Ratings.Any())
+                // Use Common validation for collection validation
+                if (ratingsResponse?.Ratings == null)
+                {
+                    return new AllTeamOpponentDistributionsResponse
+                    {
+                        Distributions = new List<(string, Dictionary<string, double>)>()
+                    };
+                }
+
+                var ratingsValidation = CoreValidation.ValidateNotEmpty(ratingsResponse.Ratings, "team ratings");
+                if (!ratingsValidation.Success)
                 {
                     return new AllTeamOpponentDistributionsResponse
                     {
@@ -155,7 +181,7 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
                         Since = request.Since
                     };
 
-                    var statsResponse = await _eventBus.RequestAsync<TeamOpponentStatsRequest, TeamOpponentStatsResponse>(statsRequest);
+                    var statsResponse = await EventBus.RequestAsync<TeamOpponentStatsRequest, TeamOpponentStatsResponse>(statsRequest);
                     if (statsResponse?.OpponentMatches == null) continue;
 
                     // Calculate normalized weights for each opponent
@@ -171,7 +197,7 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
             }
             catch (Exception ex)
             {
-                await _errorHandler.HandleError(ex);
+                await ErrorHandler.HandleErrorAsync(ex);
                 throw;
             }
         }
@@ -180,9 +206,9 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
         /// Calculates normalized weights for a team's opponents based on rating gaps and match counts.
         /// </summary>
         private Dictionary<string, double> CalculateOpponentWeights(
-            int teamRating,
-            Dictionary<string, (int Count, int Rating)> opponentMatches,
-            (int Max, int Min) ratingRange)
+            double teamRating,
+            Dictionary<string, (int Count, double Rating)> opponentMatches,
+            (double Max, double Min) ratingRange)
         {
             var weighted = new Dictionary<string, double>();
             double total = 0;
@@ -236,8 +262,8 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
         /// </summary>
         public async Task<double> CalculateVarietyBonusAsync(
             string teamId,
-            int teamRating,
-            GameSize gameSize)
+            double teamRating,
+            EvenTeamFormat evenTeamFormat)
         {
             try
             {
@@ -251,7 +277,7 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
                 double playerPercentile = CalculatePlayerPercentile(teamRating, allTeamRatings);
 
                 // Get team's opponent distribution
-                var distribution = await GetTeamOpponentDistributionAsync(teamId, ratingRange, gameSize);
+                var distribution = await GetTeamOpponentDistributionAsync(teamId, ratingRange, evenTeamFormat);
 
                 // Calculate team's variety entropy
                 double teamVarietyEntropy = CalculateWeightedEntropy(distribution);
@@ -263,14 +289,14 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
                 double averageMatchesPlayed = await GetAverageGamesPlayedAsync(teamRating, ratingRange);
 
                 // Get team's matches played
-                int teamMatchesPlayed = await GetTeamMatchesPlayedAsync(teamId, gameSize);
+                int teamMatchesPlayed = await GetTeamMatchesPlayedAsync(teamId, evenTeamFormat);
 
                 // Calculate and return the variety bonus with tail scaling
                 return CalculateVarietyBonus(teamVarietyEntropy, averageVarietyEntropy, teamMatchesPlayed, averageMatchesPlayed, playerPercentile);
             }
             catch (Exception ex)
             {
-                await _errorHandler.HandleError(ex);
+                await ErrorHandler.HandleErrorAsync(ex);
                 throw;
             }
         }
@@ -311,7 +337,7 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
             double scaledDiff = relativeDiff * scalingFactor;
 
             // Calculate base bonus
-            double baseBonus = scaledDiff * MAX_VARIETY_BONUS;
+            double baseBonus = scaledDiff * GetScrimmageDbConfig().MaxVarietyBonus;
 
             // Apply distribution scaling for players at the extremes
             // This helps players at the top and bottom 10% who have fewer opponents at their skill level
@@ -363,24 +389,26 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
                 }
             }
 
-            return Math.Clamp(baseBonus, MIN_VARIETY_BONUS, MAX_VARIETY_BONUS);
+            return Math.Clamp(baseBonus, GetScrimmageDbConfig().MinVarietyBonus, GetScrimmageDbConfig().MaxVarietyBonus);
         }
 
-        private async Task<(int Max, int Min)> GetCurrentRatingRangeAsync()
+        private async Task<(double Max, double Min)> GetCurrentRatingRangeAsync()
         {
             // Get all team ratings from Season system
-            var allRatings = new List<int>();
+            var allRatings = new List<double>();
 
-            foreach (GameSize gameSize in Enum.GetValues(typeof(GameSize)))
+            foreach (EvenTeamFormat evenTeamFormat in Enum.GetValues(typeof(EvenTeamFormat)))
             {
-                if (gameSize != GameSize.OneVOne) // Teams don't participate in 1v1
+                if (evenTeamFormat != EvenTeamFormat.OneVOne) // Teams don't participate in 1v1
                 {
-                    var ratings = await _seasonRatingService.GetAllTeamRatingsAsync(gameSize);
+                    var ratings = await GetAllTeamRatingsAsync(evenTeamFormat);
                     allRatings.AddRange(ratings.Values);
                 }
             }
 
-            if (!allRatings.Any())
+            // Use Common validation for collection validation
+            var allRatingsValidation = CoreValidation.ValidateNotEmpty(allRatings, "all ratings");
+            if (!allRatingsValidation.Success)
                 return (2100, 1000); // Fallback
 
             return (allRatings.Max(), allRatings.Min());
@@ -390,15 +418,15 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
         /// Gets all team ratings for percentile calculation.
         /// </summary>
         /// <returns>List of all team ratings.</returns>
-        private async Task<List<int>> GetAllTeamRatingsAsync()
+        private async Task<List<double>> GetAllTeamRatingsAsync()
         {
-            var allRatings = new List<int>();
+            var allRatings = new List<double>();
 
-            foreach (GameSize gameSize in Enum.GetValues(typeof(GameSize)))
+            foreach (EvenTeamFormat evenTeamFormat in Enum.GetValues(typeof(EvenTeamFormat)))
             {
-                if (gameSize != GameSize.OneVOne) // Teams don't participate in 1v1
+                if (evenTeamFormat != EvenTeamFormat.OneVOne) // Teams don't participate in 1v1
                 {
-                    var ratings = await _seasonRatingService.GetAllTeamRatingsAsync(gameSize);
+                    var ratings = await GetAllTeamRatingsAsync(evenTeamFormat);
                     allRatings.AddRange(ratings.Values);
                 }
             }
@@ -410,18 +438,18 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
 
         private async Task<Dictionary<string, double>> GetTeamOpponentDistributionAsync(
             string teamId,
-            (int Max, int Min) ratingRange,
-            GameSize gameSize)
+            (double Max, double Min) ratingRange,
+            EvenTeamFormat evenTeamFormat)
         {
             DateTime startDate;
             if (UseTimeBasedVarietyFiltering)
             {
-                startDate = DateTime.UtcNow.AddDays(-VARIETY_WINDOW_DAYS);
+                startDate = DateTime.UtcNow.AddDays(-GetScrimmageDbConfig().VarietyWindowDays);
             }
             else
             {
                 var seasonRequest = new GetActiveSeasonRequest();
-                var seasonResponse = await _eventBus.RequestAsync<GetActiveSeasonRequest, GetActiveSeasonResponse>(seasonRequest);
+                var seasonResponse = await EventBus.RequestAsync<GetActiveSeasonRequest, GetActiveSeasonResponse>(seasonRequest);
                 startDate = seasonResponse?.Season?.StartDate ?? DateTime.UtcNow.AddDays(-365); // 1 year ago as fallback
             }
 
@@ -429,27 +457,27 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
             {
                 TeamId = teamId,
                 Since = startDate,
-                GameSize = gameSize
+                EvenTeamFormat = evenTeamFormat
             };
 
-            var response = await _eventBus.RequestAsync<TeamOpponentStatsRequest, TeamOpponentStatsResponse>(request);
+            var response = await EventBus.RequestAsync<TeamOpponentStatsRequest, TeamOpponentStatsResponse>(request);
             if (response == null)
                 throw new InvalidOperationException("Failed to retrieve team opponent statistics");
 
             return CalculateOpponentWeights(response.TeamRating, response.OpponentMatches, ratingRange);
         }
 
-        private async Task<double> GetAverageEntropyAsync((int Max, int Min) ratingRange)
+        private async Task<double> GetAverageEntropyAsync((double Max, double Min) ratingRange)
         {
             DateTime startDate;
             if (UseTimeBasedVarietyFiltering)
             {
-                startDate = DateTime.UtcNow.AddDays(-VARIETY_WINDOW_DAYS);
+                startDate = DateTime.UtcNow.AddDays(-GetScrimmageDbConfig().VarietyWindowDays);
             }
             else
             {
                 var seasonRequest = new GetActiveSeasonRequest();
-                var seasonResponse = await _eventBus.RequestAsync<GetActiveSeasonRequest, GetActiveSeasonResponse>(seasonRequest);
+                var seasonResponse = await EventBus.RequestAsync<GetActiveSeasonRequest, GetActiveSeasonResponse>(seasonRequest);
                 startDate = seasonResponse?.Season?.StartDate ?? DateTime.UtcNow.AddDays(-365); // 1 year ago as fallback
             }
 
@@ -458,8 +486,14 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
                 Since = startDate
             };
 
-            var response = await _eventBus.RequestAsync<AllTeamOpponentDistributionsRequest, AllTeamOpponentDistributionsResponse>(request);
-            if (response?.Distributions == null || response.Distributions.Count == 0)
+            var response = await EventBus.RequestAsync<AllTeamOpponentDistributionsRequest, AllTeamOpponentDistributionsResponse>(request);
+
+            // Use Common validation for collection validation
+            if (response?.Distributions == null)
+                return 0;
+
+            var distributionsValidation = CoreValidation.ValidateNotEmpty(response.Distributions, "team distributions");
+            if (!distributionsValidation.Success)
                 return 0;
 
             // Variety entropy mean across all teams
@@ -476,17 +510,17 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
             return count > 0 ? totalVarietyEntropy / count : 0;
         }
 
-        private async Task<double> GetAverageGamesPlayedAsync(int teamRating, (int Max, int Min) ratingRange)
+        private async Task<double> GetAverageGamesPlayedAsync(double teamRating, (double Max, double Min) ratingRange)
         {
             DateTime startDate;
             if (UseTimeBasedVarietyFiltering)
             {
-                startDate = DateTime.UtcNow.AddDays(-VARIETY_WINDOW_DAYS);
+                startDate = DateTime.UtcNow.AddDays(-GetScrimmageDbConfig().VarietyWindowDays);
             }
             else
             {
                 var seasonRequest = new GetActiveSeasonRequest();
-                var seasonResponse = await _eventBus.RequestAsync<GetActiveSeasonRequest, GetActiveSeasonResponse>(seasonRequest);
+                var seasonResponse = await EventBus.RequestAsync<GetActiveSeasonRequest, GetActiveSeasonResponse>(seasonRequest);
                 startDate = seasonResponse?.Season?.StartDate ?? DateTime.UtcNow.AddDays(-365); // 1 year ago as fallback
             }
 
@@ -495,16 +529,16 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
                 Since = startDate
             };
 
-            var response = await _eventBus.RequestAsync<TeamGamesPlayedRequest, TeamGamesPlayedResponse>(request);
-            if (response?.SeasonTeamStats == null || response.SeasonTeamStats.Count == 0)
+            var response = await EventBus.RequestAsync<TeamGamesPlayedRequest, TeamGamesPlayedResponse>(request);
+            if (response?.TeamStats == null || response.TeamStats.Count == 0)
                 return 0;
 
-            // Calculate dynamic range based on MAX_GAP_PERCENT
+            // Calculate dynamic range based on MaxGapPercent
             double range = ratingRange.Max - ratingRange.Min;
-            double maxGap = range * MAX_GAP_PERCENT;
+            double maxGap = range * GetScrimmageDbConfig().MaxGapPercent;
 
             // Calculate average games played for teams within the dynamic range
-            var relevantTeams = response.SeasonTeamStats
+            var relevantTeams = response.TeamStats
                 .Where(t => Math.Abs(t.Value.CurrentRating - teamRating) <= maxGap)
                 .ToList();
 
@@ -514,17 +548,17 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
             return relevantTeams.Average(t => t.Value.RecentMatchesCount);
         }
 
-        private async Task<int> GetTeamMatchesPlayedAsync(string teamId, GameSize gameSize)
+        private async Task<int> GetTeamMatchesPlayedAsync(string teamId, EvenTeamFormat evenTeamFormat)
         {
             DateTime startDate;
             if (UseTimeBasedVarietyFiltering)
             {
-                startDate = DateTime.UtcNow.AddDays(-VARIETY_WINDOW_DAYS);
+                startDate = DateTime.UtcNow.AddDays(-GetScrimmageDbConfig().VarietyWindowDays);
             }
             else
             {
                 var seasonRequest = new GetActiveSeasonRequest();
-                var seasonResponse = await _eventBus.RequestAsync<GetActiveSeasonRequest, GetActiveSeasonResponse>(seasonRequest);
+                var seasonResponse = await EventBus.RequestAsync<GetActiveSeasonRequest, GetActiveSeasonResponse>(seasonRequest);
                 startDate = seasonResponse?.Season?.StartDate ?? DateTime.UtcNow.AddDays(-365); // 1 year ago as fallback
             }
 
@@ -534,7 +568,7 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
                 Since = startDate
             };
 
-            var response = await _eventBus.RequestAsync<ScrimmageHistoryRequest, ScrimmageHistoryResponse>(request);
+            var response = await EventBus.RequestAsync<ScrimmageHistoryRequest, ScrimmageHistoryResponse>(request);
             return response?.Matches?.Count() ?? 0;
         }
 
@@ -544,20 +578,20 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
         public async Task<(double Team1Multiplier, double Team2Multiplier)> CalculateRatingMultipliersAsync(
             string team1Id,
             string team2Id,
-            int team1Rating,
-            int team2Rating,
-            GameSize gameSize,
+            double team1Rating,
+            double team2Rating,
+            EvenTeamFormat evenTeamFormat,
             bool team1Won = true)
         {
             try
             {
                 // Get team confidence levels
-                var team1Confidence = await CalculateConfidenceAsync(team1Id, gameSize);
-                var team2Confidence = await CalculateConfidenceAsync(team2Id, gameSize);
+                var team1Confidence = await CalculateConfidenceAsync(team1Id, evenTeamFormat);
+                var team2Confidence = await CalculateConfidenceAsync(team2Id, evenTeamFormat);
 
                 // Get variety bonuses
-                var team1VarietyBonus = await CalculateVarietyBonusAsync(team1Id, team1Rating, gameSize);
-                var team2VarietyBonus = await CalculateVarietyBonusAsync(team2Id, team2Rating, gameSize);
+                var team1VarietyBonus = await CalculateVarietyBonusAsync(team1Id, team1Rating, evenTeamFormat);
+                var team2VarietyBonus = await CalculateVarietyBonusAsync(team2Id, team2Rating, evenTeamFormat);
 
                 // Apply variety bonus threshold based on confidence (not games played)
                 // Variety bonus is only applied when players have reached 1.0 confidence
@@ -582,14 +616,14 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
                     : team2ConfidenceMultiplier - team2VarietyBonus; // Loser: subtract variety bonus
 
                 // Clamp multipliers to maximum value only (matching Python implementation)
-                team1Multiplier = Math.Min(team1Multiplier, MAX_MULTIPLIER);
-                team2Multiplier = Math.Min(team2Multiplier, MAX_MULTIPLIER);
+                team1Multiplier = Math.Min(team1Multiplier, GetScrimmageDbConfig().MaxMultiplier);
+                team2Multiplier = Math.Min(team2Multiplier, GetScrimmageDbConfig().MaxMultiplier);
 
                 return (team1Multiplier, team2Multiplier);
             }
             catch (Exception ex)
             {
-                await _errorHandler.HandleError(ex);
+                await ErrorHandler.HandleErrorAsync(ex);
                 throw;
             }
         }
@@ -602,9 +636,9 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
         public async Task<(double Team1Change, double Team2Change)> CalculateRatingChangeAsync(
             string team1Id,
             string team2Id,
-            int team1Rating,
-            int team2Rating,
-            GameSize gameSize,
+            double team1Rating,
+            double team2Rating,
+            EvenTeamFormat evenTeamFormat,
             int team1Score = 0,
             int team2Score = 0)
         {
@@ -614,7 +648,7 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
                 bool team1Won = team1Score > team2Score;
                 bool team2Won = team2Score > team1Score;
 
-                // If no scores provided, assume team1 won (for backward compatibility)
+                // If no scores provided, assume team1 won (default behavior)
                 if (team1Score == 0 && team2Score == 0)
                 {
                     team1Won = true;
@@ -622,15 +656,15 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
                 }
 
                 // Calculate expected outcome using ELO formula
-                double expectedOutcome = 1.0 / (1.0 + Math.Pow(10.0, (team2Rating - team1Rating) / ELO_DIVISOR));
+                double expectedOutcome = 1.0 / (1.0 + Math.Pow(10.0, (team2Rating - team1Rating) / GetScrimmageDbConfig().EloDivisor));
 
                 // Calculate base rating change (K * (actual - expected))
                 // For team1, actual outcome is 1 if they win, 0 if they lose
                 double actualOutcome = team1Won ? 1.0 : 0.0;
-                double baseChange = BASE_RATING_CHANGE * (actualOutcome - expectedOutcome);
+                double baseChange = GetScrimmageDbConfig().BaseRatingChange * (actualOutcome - expectedOutcome);
 
                 // Get individual multipliers for each team
-                var (team1Multiplier, team2Multiplier) = await CalculateRatingMultipliersAsync(team1Id, team2Id, team1Rating, team2Rating, gameSize, team1Won);
+                var (team1Multiplier, team2Multiplier) = await CalculateRatingMultipliersAsync(team1Id, team2Id, team1Rating, team2Rating, evenTeamFormat, team1Won);
 
                 // Calculate rating gap scaling to prevent shadow-boxing
                 // Get current rating range to calculate max gap (40% / 2 = 20% of total range)
@@ -649,8 +683,8 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
                     double cosineScaling = (1.0 + Math.Cos(Math.PI * normalizedGap * 0.7)) / 2.0;
 
                     // Get confidence levels to determine if gap scaling should be applied
-                    var team1Confidence = await CalculateConfidenceAsync(team1Id, gameSize);
-                    var team2Confidence = await CalculateConfidenceAsync(team2Id, gameSize);
+                    var team1Confidence = await CalculateConfidenceAsync(team1Id, evenTeamFormat);
+                    var team2Confidence = await CalculateConfidenceAsync(team2Id, evenTeamFormat);
 
                     // Only apply gap scaling to higher-rated player if lower-rated player has 1.0 confidence
                     if (team1Rating > team2Rating && team2Confidence >= 1.0)
@@ -669,16 +703,16 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
                 double team1CatchUpBonus = 0.0;
                 double team2CatchUpBonus = 0.0;
 
-                if (CATCH_UP_ENABLED)
+                if (GetScrimmageDbConfig().CatchUpEnabled)
                 {
                     // Apply catch-up bonus to winner if below target
-                    if (team1Won && team1Rating < CATCH_UP_TARGET_RATING)
+                    if (team1Won && team1Rating < GetScrimmageDbConfig().CatchUpTargetRating)
                     {
-                        team1CatchUpBonus = CalculateCatchUpBonus(team1Rating, CATCH_UP_TARGET_RATING, CATCH_UP_THRESHOLD, CATCH_UP_MAX_BONUS);
+                        team1CatchUpBonus = CalculateCatchUpBonus(team1Rating, GetScrimmageDbConfig().CatchUpTargetRating, GetScrimmageDbConfig().CatchUpThreshold, GetScrimmageDbConfig().CatchUpMaxBonus);
                     }
-                    else if (team2Won && team2Rating < CATCH_UP_TARGET_RATING)
+                    else if (team2Won && team2Rating < GetScrimmageDbConfig().CatchUpTargetRating)
                     {
-                        team2CatchUpBonus = CalculateCatchUpBonus(team2Rating, CATCH_UP_TARGET_RATING, CATCH_UP_THRESHOLD, CATCH_UP_MAX_BONUS);
+                        team2CatchUpBonus = CalculateCatchUpBonus(team2Rating, GetScrimmageDbConfig().CatchUpTargetRating, GetScrimmageDbConfig().CatchUpThreshold, GetScrimmageDbConfig().CatchUpMaxBonus);
                     }
                 }
 
@@ -704,7 +738,7 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
             }
             catch (Exception ex)
             {
-                await _errorHandler.HandleError(ex);
+                await ErrorHandler.HandleErrorAsync(ex);
                 throw;
             }
         }
@@ -720,7 +754,7 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
         /// <param name="threshold">Rating difference threshold before bonus applies</param>
         /// <param name="maxBonus">Maximum bonus multiplier</param>
         /// <returns>Catch-up bonus multiplier (0.0 to maxBonus)</returns>
-        private static double CalculateCatchUpBonus(int playerRating, int targetRating, int threshold, double maxBonus)
+        private static double CalculateCatchUpBonus(double playerRating, double targetRating, double threshold, double maxBonus)
         {
             if (playerRating >= targetRating)
                 return 0.0;
@@ -738,7 +772,7 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
         /// <summary>
         /// Calculates the confidence level for a team based on games played.
         /// </summary>
-        public async Task<double> CalculateConfidenceAsync(string teamId, GameSize gameSize)
+        public async Task<double> CalculateConfidenceAsync(string teamId, EvenTeamFormat evenTeamFormat)
         {
             try
             {
@@ -746,10 +780,10 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
                 var request = new ScrimmageHistoryRequest
                 {
                     TeamId = teamId,
-                    Since = DateTime.UtcNow.AddDays(-VARIETY_WINDOW_DAYS)
+                    Since = DateTime.UtcNow.AddDays(-GetScrimmageDbConfig().VarietyWindowDays)
                 };
 
-                var response = await _eventBus.RequestAsync<ScrimmageHistoryRequest, ScrimmageHistoryResponse>(request);
+                var response = await EventBus.RequestAsync<ScrimmageHistoryRequest, ScrimmageHistoryResponse>(request);
                 if (response?.Matches == null)
                     return 0.0;
 
@@ -758,11 +792,11 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
                 // where k = 3.0 gives a good balance of quick early growth and smooth leveling
                 int totalGames = response.Matches.Count();
 
-                if (totalGames >= VARIETY_BONUS_GAMES_THRESHOLD)
-                    return 1.0; // Max confidence at 20 games and stays there
+                if (totalGames >= GetScrimmageDbConfig().VarietyBonusGamesThreshold)
+                    return 1.0; // Max confidence at threshold games and stays there
 
                 // Calculate how far along we are in the confidence growth (0 to 1)
-                double progress = totalGames / (double)VARIETY_BONUS_GAMES_THRESHOLD;
+                double progress = totalGames / (double)GetScrimmageDbConfig().VarietyBonusGamesThreshold;
 
                 // Use exponential decay formula: 1 - e^(-k * x)
                 // k = 3.0 gives a good balance of quick early growth and smooth leveling
@@ -773,7 +807,7 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
             }
             catch (Exception ex)
             {
-                await _errorHandler.HandleError(ex);
+                await ErrorHandler.HandleErrorAsync(ex);
                 throw;
             }
         }

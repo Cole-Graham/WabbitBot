@@ -1,31 +1,52 @@
 using System;
 using System.Collections.Generic;
 using WabbitBot.Core.Common.Models;
+using WabbitBot.Common.Attributes;
 using WabbitBot.Common.Events.EventInterfaces;
 
 namespace WabbitBot.Core.Scrimmages.ScrimmageRating
 {
-    public class RatingAdjustmentEvent : ICoreEvent
+    public class RatingAdjustmentEvent : IEvent
     {
+        public EventBusType EventBusType { get; init; } = EventBusType.Core;
+        public string EventId { get; init; } = Guid.NewGuid().ToString();
+        public DateTime Timestamp { get; init; } = DateTime.UtcNow;
         public string Team1Id { get; init; } = string.Empty;
         public string Team2Id { get; init; } = string.Empty;
-        public int Adjustment { get; init; }
+        public double Adjustment { get; init; }
     }
 
-    public class ApplyProvenPotentialAdjustmentEvent : ICoreEvent
+    public class ApplyProvenPotentialAdjustmentEvent : IEvent
     {
+        public EventBusType EventBusType { get; init; } = EventBusType.Core;
+        public string EventId { get; init; } = Guid.NewGuid().ToString();
+        public DateTime Timestamp { get; init; } = DateTime.UtcNow;
         public string ChallengerId { get; init; } = string.Empty;
         public string OpponentId { get; init; } = string.Empty;
-        public int Adjustment { get; init; }
-        public GameSize GameSize { get; init; }
+        public double Adjustment { get; init; }
+        public EvenTeamFormat EvenTeamFormat { get; init; }
         public string Reason { get; init; } = string.Empty;
     }
 
-    public class UpdateTeamRatingEvent : ICoreEvent
+    public class UpdateTeamRatingEvent : IEvent
     {
+        public EventBusType EventBusType { get; init; } = EventBusType.Core;
+        public string EventId { get; init; } = Guid.NewGuid().ToString();
+        public DateTime Timestamp { get; init; } = DateTime.UtcNow;
         public string TeamId { get; init; } = string.Empty;
-        public int NewRating { get; init; }
-        public GameSize GameSize { get; init; }
+        public double NewRating { get; init; }
+        public EvenTeamFormat EvenTeamFormat { get; init; }
+        public string Reason { get; init; } = string.Empty;
+    }
+
+    public class ApplyTeamRatingChangeEvent : IEvent
+    {
+        public EventBusType EventBusType { get; init; } = EventBusType.Core;
+        public string EventId { get; init; } = Guid.NewGuid().ToString();
+        public DateTime Timestamp { get; init; } = DateTime.UtcNow;
+        public string TeamId { get; init; } = string.Empty;
+        public double RatingChange { get; init; }
+        public EvenTeamFormat EvenTeamFormat { get; init; }
         public string Reason { get; init; } = string.Empty;
     }
 
@@ -36,7 +57,7 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
 
     public class AllTeamRatingsResponse
     {
-        public IEnumerable<int> Ratings { get; set; } = Array.Empty<int>();
+        public IEnumerable<double> Ratings { get; set; } = Array.Empty<double>();
         public IEnumerable<string> TeamIds { get; set; } = Array.Empty<string>();
     }
 
@@ -44,14 +65,14 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
     {
         public string TeamId { get; set; } = string.Empty;
         public DateTime Since { get; set; }
-        public GameSize GameSize { get; set; }
+        public EvenTeamFormat EvenTeamFormat { get; set; }
     }
 
     public class TeamOpponentStatsResponse
     {
-        public int TeamRating { get; set; }
-        public GameSize? GameSize { get; set; }
-        public Dictionary<string, (int Count, int Rating)> OpponentMatches { get; set; } = new();
+        public double TeamRating { get; set; }
+        public EvenTeamFormat? EvenTeamFormat { get; set; }
+        public Dictionary<string, (int Count, double Rating)> OpponentMatches { get; set; } = new();
     }
 
     public class AllTeamOpponentDistributionsRequest
@@ -71,13 +92,13 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
 
     public class GetTeamRatingResponse
     {
-        public int Rating { get; set; }
+        public double Rating { get; set; }
     }
 
     public class CalculateConfidenceRequest
     {
         public string TeamId { get; set; } = string.Empty;
-        public GameSize GameSize { get; set; }
+        public EvenTeamFormat EvenTeamFormat { get; set; }
     }
 
     public class CalculateConfidenceResponse
@@ -89,9 +110,9 @@ namespace WabbitBot.Core.Scrimmages.ScrimmageRating
     {
         public string Team1Id { get; set; } = string.Empty;
         public string Team2Id { get; set; } = string.Empty;
-        public int Team1Rating { get; set; }
-        public int Team2Rating { get; set; }
-        public GameSize GameSize { get; set; }
+        public double Team1Rating { get; set; }
+        public double Team2Rating { get; set; }
+        public EvenTeamFormat EvenTeamFormat { get; set; }
         public int Team1Score { get; set; }
         public int Team2Score { get; set; }
     }

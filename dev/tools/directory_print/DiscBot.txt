@@ -1,0 +1,77 @@
+📁 Users
+│
+  📁 coleg
+  │
+    📁 Projects
+    │
+      📁 WabbitBot
+      │
+        📁 src
+          📁 WabbitBot.DiscBot
+            ├── 📁 DSharpPlus
+            │   ├── 📁 Attributes
+            │   │   ├── 📄 RequireTeamCaptainAttribute.cs
+            │   │   ├── 📄 RequireTeamCorePlayerAttribute.cs
+            │   │   ├── 📄 RequireTeamManagerAttribute.cs
+            │   │   ├── 📄 RequireTeamMemberAttribute.cs
+            │   │   ├── 📄 RequireWhitelistedRoleAttribute.cs
+            │   │   └── 📄 TeamPermissionBaseAttribute.cs
+            │   ├── 📁 Commands
+            │   │   ├── 📄 CommandRegistrationHandler.cs
+            │   │   ├── 📄 ConfigurationCommandsDiscord.cs
+            │   │   ├── 📄 MapCommandsDiscord.cs
+            │   │   ├── 📄 Providers.cs
+            │   │   ├── 📄 ScrimmageCommandsDiscord.cs
+            │   │   └── 📄 TeamCommandsDiscord.cs
+            │   ├── 📁 Embeds
+            │   │   ├── 📄 BaseEmbed.cs
+            │   │   ├── 📄 ConfigurationEmbed.cs
+            │   │   ├── 📄 EmbedInterfaces.cs
+            │   │   ├── 📄 MapEmbed.cs
+            │   │   ├── 📄 MapListEmbed.cs
+            │   │   ├── 📄 MatchEmbed.cs
+            │   │   ├── 📄 ScrimmageEmbed.cs
+            │   │   └── 📄 TournamentEmbed.cs
+            │   ├── 📁 Generated
+            │   │   ├── 📁 NetEscapades.EnumGenerators
+            │   │   │   └── 📁 NetEscapades.EnumGenerators.EnumGenerator
+            │   │   │       └── 📄 EnumExtensionsAttribute.g.cs
+            │   │   └── 📁 WabbitBot.SourceGenerators
+            │   │       ├── 📁 WabbitBot.SourceGenerators.Generators.Embed.EmbedFactoryGenerator
+            │   │       │   └── 📄 EmbedFactories.g.cs
+            │   │       ├── 📁 WabbitBot.SourceGenerators.Generators.Embed.EmbedStylingGenerator
+            │   │       │   └── 📄 EmbedStyling.g.cs
+            │   │       └── 📁 WabbitBot.SourceGenerators.Generators.Event.EventBusSourceGenerator
+            │   │           ├── 📄 CommandRegistrationHandler.g.cs
+            │   │           ├── 📄 DiscordEventBus.g.cs
+            │   │           ├── 📄 DiscordEventHandler.g.cs
+            │   │           └── 📄 ScrimmageDiscordEventHandler.g.cs
+            │   ├── 📁 Interactions
+            │   │   ├── 📄 ScrimmageButtonInteractions.cs
+            │   │   ├── 📄 ScrimmageModalBuilders.cs
+            │   │   └── 📄 ScrimmageModalInteractions.cs
+            │   ├── 📁 Services
+            │   │   ├── 📄 DSharpPlusMatchEventHandler.cs
+            │   │   └── 📄 DSharpPlusScrimmageEventHandler.cs
+            │   ├── 📄 DiscBotStartup.cs
+            │   ├── 📄 ErrorHandler.cs
+            │   └── 📄 PermissionService.cs
+            ├── 📁 DiscBot
+            │   ├── 📁 Base
+            │   │   ├── 📄 DiscordBaseEvent.cs
+            │   │   └── 📄 DiscordBaseHandler.cs
+            │   ├── 📁 ErrorHandling
+            │   │   └── 📄 DiscordErrorHandler.cs
+            │   ├── 📁 Events
+            │   │   ├── 📄 DiscordApplicationReadyEvent.cs
+            │   │   ├── 📄 DiscordClientReadyEvent.cs
+            │   │   ├── 📄 DiscordEventBus.cs
+            │   │   ├── 📄 DiscordEventHandler.cs
+            │   │   ├── 📄 IDiscordScrimmageOperations.cs
+            │   │   ├── 📄 IMatchDiscordOperations.cs
+            │   │   ├── 📄 ScrimmageDiscordEventHandler.cs
+            │   │   └── 📄 ScrimmageDiscordEvents.cs
+            │   └── 📁 Services
+            │       └── 📄 DiscordClientProvider.cs
+            ├── 📄 DiscBot.cs
+            └── 📄 WabbitBot.DiscBot.csproj

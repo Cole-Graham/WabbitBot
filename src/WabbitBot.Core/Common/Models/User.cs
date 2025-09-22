@@ -5,7 +5,7 @@ namespace WabbitBot.Core.Common.Models
     /// <summary>
     /// Represents a Discord user in the system.
     /// </summary>
-    public class User : BaseEntity
+    public class User : Entity
     {
         public string DiscordId { get; set; } = string.Empty;
         public string Username { get; set; } = string.Empty;
@@ -14,7 +14,7 @@ namespace WabbitBot.Core.Common.Models
         public DateTime JoinedAt { get; set; }
         public DateTime LastActive { get; set; }
         public bool IsActive { get; set; }
-        public string? PlayerId { get; set; } // Reference to associated Player entity
+        public Guid? PlayerId { get; set; } // Reference to associated Player entity
 
         public User()
         {
@@ -40,9 +40,9 @@ namespace WabbitBot.Core.Common.Models
             LastActive = DateTime.UtcNow;
         }
 
-        public void LinkPlayer(string playerId)
+        public void LinkPlayer(Guid playerId)
         {
-            if (string.IsNullOrEmpty(playerId))
+            if (playerId == Guid.Empty)
                 throw new ArgumentException("Player ID cannot be null or empty", nameof(playerId));
 
             PlayerId = playerId;
