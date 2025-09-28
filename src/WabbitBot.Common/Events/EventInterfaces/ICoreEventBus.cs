@@ -11,21 +11,21 @@ public interface ICoreEventBus
     /// </summary>
     /// <typeparam name="TEvent">The type of event to publish</typeparam>
     /// <param name="event">The event instance to publish</param>
-    Task PublishAsync<TEvent>(TEvent @event) where TEvent : class;
+    ValueTask PublishAsync<TEvent>(TEvent @event) where TEvent : class, IEvent;
 
     /// <summary>
     /// Subscribes a handler to a specific type of event within Core.
     /// </summary>
     /// <typeparam name="TEvent">The type of event to subscribe to</typeparam>
     /// <param name="handler">The handler function to be called when the event occurs</param>
-    void Subscribe<TEvent>(Func<TEvent, Task> handler) where TEvent : class;
+    void Subscribe<TEvent>(Func<TEvent, Task> handler) where TEvent : class, IEvent;
 
     /// <summary>
     /// Unsubscribes a handler from a specific type of event within Core.
     /// </summary>
     /// <typeparam name="TEvent">The type of event to unsubscribe from</typeparam>
     /// <param name="handler">The handler function to remove</param>
-    void Unsubscribe<TEvent>(Func<TEvent, Task> handler) where TEvent : class;
+    void Unsubscribe<TEvent>(Func<TEvent, Task> handler) where TEvent : class, IEvent;
 
     /// <summary>
     /// Makes a request and waits for a response through the event bus.
@@ -36,8 +36,8 @@ public interface ICoreEventBus
     /// <param name="request">The request instance to send</param>
     /// <returns>A task that completes with the response when received</returns>
     Task<TResponse?> RequestAsync<TRequest, TResponse>(TRequest request)
-        where TRequest : class
-        where TResponse : class;
+        where TRequest : class, IEvent
+        where TResponse : class, IEvent;
 
     /// <summary>
     /// Initializes the Core event bus and sets up its connection to the GlobalEventBus.

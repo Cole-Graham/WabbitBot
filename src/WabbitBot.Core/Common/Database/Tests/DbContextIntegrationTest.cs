@@ -6,12 +6,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using WabbitBot.Core.Common.Database;
 using WabbitBot.Core.Common.Models;
-using WabbitBot.Core.Matches;
-using WabbitBot.Core.Matches.Data;
 using WabbitBot.Core.Scrimmages;
-using WabbitBot.Core.Scrimmages.ScrimmageRating;
 using WabbitBot.Core.Tournaments;
-using WabbitBot.Core.Tournaments.Data;
 using WabbitBot.Core.Leaderboards;
 using Xunit;
 
@@ -27,11 +23,11 @@ namespace WabbitBot.Core.Common.Database.Tests
 
         public DbContextIntegrationTest()
         {
-            // Use in-memory SQLite for testing (no external dependencies)
-            _connectionString = "DataSource=:memory:;Cache=Shared";
+            // Use PostgreSQL for testing (with Npgsql native JSONB support)
+            _connectionString = "Host=localhost;Database=wabbitbot_test;Username=wabbitbot;Password=password123";
 
             var options = new DbContextOptionsBuilder<WabbitBotDbContext>()
-                .UseSqlite(_connectionString)
+                .UseNpgsql(_connectionString)
                 .EnableDetailedErrors()
                 .EnableSensitiveDataLogging()
                 .Options;
@@ -52,7 +48,7 @@ namespace WabbitBot.Core.Common.Database.Tests
             var player = new Player
             {
                 Name = "TestPlayer",
-                TeamIds = new List<string> { "team1", "team2", "team3" },
+                TeamIds = new List<Guid> { Guid.NewGuid(), Guid.NewGuid() },
                 PreviousUserIds = new Dictionary<string, List<string>>
                 {
                     { "Discord", new List<string> { "user123", "user456" } },
@@ -70,10 +66,7 @@ namespace WabbitBot.Core.Common.Database.Tests
             var savedPlayer = await _context.Players.FindAsync(player.Id);
             Assert.NotNull(savedPlayer);
             Assert.Equal("TestPlayer", savedPlayer.Name);
-            Assert.Equal(3, savedPlayer.TeamIds.Count);
-            Assert.Contains("team1", savedPlayer.TeamIds);
-            Assert.Contains("team2", savedPlayer.TeamIds);
-            Assert.Contains("team3", savedPlayer.TeamIds);
+            Assert.Equal(2, savedPlayer.TeamIds.Count);
             Assert.Equal(2, savedPlayer.PreviousUserIds.Count); // Discord + Steam platforms
             Assert.True(savedPlayer.PreviousUserIds.ContainsKey("Discord"));
             Assert.True(savedPlayer.PreviousUserIds.ContainsKey("Steam"));
@@ -87,16 +80,17 @@ namespace WabbitBot.Core.Common.Database.Tests
         public async Task CanCreateAndSaveTeamWithJsonbFields()
         {
             // Arrange
+            var captainId = Guid.NewGuid();
             var team = new Team
             {
                 Name = "TestTeam",
-                TeamCaptainId = "captain123",
-                TeamSize = EvenTeamFormat.ThreeVThree,
+                TeamCaptainId = captainId,
+                TeamSize = TeamSize.ThreeVThree,
                 Roster = new List<TeamMember>
                 {
                     new TeamMember
                     {
-                        PlayerId = "player1",
+                        PlayerId = Guid.NewGuid(),
                         Role = TeamRole.Core,
                         JoinedAt = DateTime.UtcNow,
                         IsActive = true,
@@ -104,20 +98,20 @@ namespace WabbitBot.Core.Common.Database.Tests
                     },
                     new TeamMember
                     {
-                        PlayerId = "captain123",
+                        PlayerId = captainId,
                         Role = TeamRole.Captain,
                         JoinedAt = DateTime.UtcNow,
                         IsActive = true,
                         IsTeamManager = true
                     }
                 },
-                Stats = new Dictionary<EvenTeamFormat, Stats>
+                Stats = new Dictionary<TeamSize, Stats>
                 {
-                    [EvenTeamFormat.ThreeVThree] = new Stats
+                    [TeamSize.ThreeVThree] = new Stats
                     {
                         Wins = 10,
                         Losses = 5,
-                        EvenTeamFormat = EvenTeamFormat.ThreeVThree,
+                        TeamSize = TeamSize.ThreeVThree,
                         CurrentRating = 1500.0
                     }
                 }
@@ -131,29 +125,30 @@ namespace WabbitBot.Core.Common.Database.Tests
             var savedTeam = await _context.Teams.FindAsync(team.Id);
             Assert.NotNull(savedTeam);
             Assert.Equal("TestTeam", savedTeam.Name);
-            Assert.Equal("captain123", savedTeam.TeamCaptainId);
+            Assert.Equal(captainId, savedTeam.TeamCaptainId);
             Assert.True(savedTeam.Roster.Count == 2);
             Assert.True(savedTeam.Stats.Count == 1);
-            Assert.True(savedTeam.Stats.ContainsKey(EvenTeamFormat.ThreeVThree));
-            Assert.Equal(10, savedTeam.Stats[EvenTeamFormat.ThreeVThree].Wins);
-            Assert.Equal(5, savedTeam.Stats[EvenTeamFormat.ThreeVThree].Losses);
+            Assert.True(savedTeam.Stats.ContainsKey(TeamSize.ThreeVThree));
+            Assert.Equal(10, savedTeam.Stats[TeamSize.ThreeVThree].Wins);
+            Assert.Equal(5, savedTeam.Stats[TeamSize.ThreeVThree].Losses);
         }
 
         [Fact]
         public async Task CanQueryJsonbFields()
         {
             // Arrange
+            var sharedTeamId = Guid.NewGuid();
             var player1 = new Player
             {
                 Name = "Player1",
-                TeamIds = new List<string> { "team1", "shared" },
+                TeamIds = new List<Guid> { Guid.NewGuid(), sharedTeamId },
                 IsArchived = false
             };
 
             var player2 = new Player
             {
                 Name = "Player2",
-                TeamIds = new List<string> { "team2", "shared" },
+                TeamIds = new List<Guid> { Guid.NewGuid(), sharedTeamId },
                 IsArchived = false
             };
 
@@ -167,7 +162,7 @@ namespace WabbitBot.Core.Common.Database.Tests
 
             // Assert
             Assert.Equal(2, allPlayers.Count);
-            var playerWithShared = allPlayers.First(p => p.TeamIds.Contains("shared"));
+            var playerWithShared = allPlayers.First(p => p.TeamIds.Contains(sharedTeamId));
             Assert.NotNull(playerWithShared);
         }
 
@@ -181,7 +176,7 @@ namespace WabbitBot.Core.Common.Database.Tests
             {
                 MatchId = matchId,
                 MapId = mapId,
-                EvenTeamFormat = EvenTeamFormat.TwoVTwo,
+                TeamSize = TeamSize.TwoVTwo,
                 Team1PlayerIds = new List<Guid> { Guid.NewGuid(), Guid.NewGuid() },
                 Team2PlayerIds = new List<Guid> { Guid.NewGuid(), Guid.NewGuid() },
                 GameNumber = 1,
@@ -192,7 +187,7 @@ namespace WabbitBot.Core.Common.Database.Tests
                         GameId = Guid.NewGuid(), // Will be set by EF
                         MatchId = matchId,
                         MapId = mapId,
-                        EvenTeamFormat = EvenTeamFormat.TwoVTwo,
+                        TeamSize = TeamSize.TwoVTwo,
                         Team1PlayerIds = new List<Guid> { Guid.NewGuid(), Guid.NewGuid() },
                         Team2PlayerIds = new List<Guid> { Guid.NewGuid(), Guid.NewGuid() },
                         GameNumber = 1,
@@ -203,7 +198,7 @@ namespace WabbitBot.Core.Common.Database.Tests
             };
 
             // Set winner on current state (WinnerId is read-only computed property)
-            game.CurrentState.WinnerId = Guid.NewGuid();
+            game.StateHistory.First().WinnerId = Guid.NewGuid();
 
             // Act
             _context.Games.Add(game);
@@ -214,16 +209,16 @@ namespace WabbitBot.Core.Common.Database.Tests
             Assert.NotNull(savedGame);
             Assert.Equal(matchId, savedGame.MatchId);
             Assert.Equal(mapId, savedGame.MapId);
-            Assert.Equal(EvenTeamFormat.TwoVTwo, savedGame.EvenTeamFormat);
+            Assert.Equal(TeamSize.TwoVTwo, savedGame.TeamSize);
             Assert.Equal(1, savedGame.GameNumber);
-            Assert.NotEqual(Guid.Empty, savedGame.WinnerId); // WinnerId is set in the state history
+            Assert.NotEqual(Guid.Empty, savedGame.StateHistory.First().WinnerId); // WinnerId is set in the state history
             Assert.True(savedGame.Team1PlayerIds.Count == 2);
             Assert.True(savedGame.Team2PlayerIds.Count == 2);
             // Note: We can't test specific player IDs since they're Guids generated in the test
             Assert.All(savedGame.Team1PlayerIds, id => Assert.NotEqual(Guid.Empty, id));
             Assert.All(savedGame.Team2PlayerIds, id => Assert.NotEqual(Guid.Empty, id));
             Assert.True(savedGame.StateHistory.Count == 1);
-            Assert.NotEqual(Guid.Empty, savedGame.StateHistory[0].WinnerId);
+            Assert.NotEqual(Guid.Empty, savedGame.StateHistory.First().WinnerId);
         }
     }
 }

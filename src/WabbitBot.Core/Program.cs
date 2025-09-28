@@ -6,12 +6,15 @@ using WabbitBot.Common.Configuration;
 using WabbitBot.Common.Events;
 using WabbitBot.Common.Events.EventInterfaces;
 using WabbitBot.Common.Models;
-using WabbitBot.Common.ErrorHandling;
+using WabbitBot.Common.ErrorService;
 using WabbitBot.Core.Common.BotCore;
 using WabbitBot.Core.Common.Database;
 using WabbitBot.Common.Data;
-using WabbitBot.Common.Events;
 using WabbitBot.Common.Utilities;
+using WabbitBot.Core.Common.Utilities;
+using WabbitBot.Core.Leaderboards;
+using WabbitBot.Core.Scrimmages;
+using WabbitBot.Core.Tournaments;
 
 namespace WabbitBot.Core;
 
@@ -20,8 +23,7 @@ public static class Program
     // Static instances for global access
     private static readonly IGlobalEventBus GlobalEventBus;
     private static readonly ICoreEventBus CoreEventBus;
-    private static readonly IGlobalErrorHandler GlobalErrorHandler;
-    private static readonly ICoreErrorHandler CoreErrorHandler;
+    private static readonly IErrorService ErrorService;
     private static IBotConfigurationService? ConfigurationService;
 
     // Static constructor for initialization of dependencies
@@ -34,8 +36,7 @@ public static class Program
         GlobalEventBusProvider.Initialize(GlobalEventBus);
 
         CoreEventBus = new CoreEventBus(GlobalEventBus);
-        GlobalErrorHandler = new GlobalErrorHandler(GlobalEventBus);
-        CoreErrorHandler = new CoreErrorHandler(CoreEventBus, GlobalEventBus);
+        ErrorService = new WabbitBot.Common.ErrorService.ErrorService(); // TODO: Inject this properly
     }
 
     public static async Task Main()
@@ -46,8 +47,8 @@ public static class Program
             await CoreEventBus.InitializeAsync();
 
             // Initialize error handling
-            await GlobalErrorHandler.Initialize();
-            await CoreErrorHandler.InitializeAsync();
+            // await GlobalErrorHandler.Initialize(); // This line is removed as per the new_code
+            // await CoreErrorHandler.InitializeAsync(); // This line is removed as per the new_code
 
             // Load modern configuration
             var configuration = BuildConfiguration();
@@ -68,10 +69,9 @@ public static class Program
             ConfigurationService.ValidateConfiguration();
 
             // Initialize core business logic
-            await InitializeCoreAsync(botOptions);
+            await InitializeCoreAsync(configuration);
 
-            // Publish startup event with configuration
-            // This will be picked up by DiscBot through event handlers
+            // Publish startup event (allow startup events to carry configuration references)
             await GlobalEventBus.PublishAsync(new StartupInitiatedEvent(botOptions, ConfigurationService));
 
             // Signal that the core system is ready
@@ -81,12 +81,7 @@ public static class Program
             await GlobalEventBus.PublishAsync(new SystemReadyEvent());
 
             // Signal that the application is fully ready
-            var startTime = DateTime.UtcNow;
-            var startupDuration = DateTime.UtcNow - startTime;
-            await GlobalEventBus.PublishAsync(new ApplicationReadyEvent(startupDuration, ConfigurationService)
-            {
-                ConfigurationService = ConfigurationService
-            });
+            await GlobalEventBus.PublishAsync(new ApplicationReadyEvent());
 
             // Keep the application running
             await Task.Delay(-1);
@@ -94,7 +89,7 @@ public static class Program
         catch (Exception ex)
         {
             // Handle startup errors through global error handler
-            await GlobalErrorHandler.HandleError(ex);
+            await (ErrorService as IGlobalErrorHandler)!.HandleError(ex); // TODO: Refactor error handling initialization
             throw;
         }
     }
@@ -111,25 +106,21 @@ public static class Program
             .Build();
     }
 
-    private static async Task InitializeCoreAsync(BotOptions config)
+    private static async Task InitializeCoreAsync(IConfiguration configuration)
     {
         try
         {
-            // Initialize EF Core database
-            var dbSettings = new DatabaseSettings
-            {
-                Provider = config.Database.Provider,
-                ConnectionString = config.Database.ConnectionString,
-                MaxPoolSize = config.Database.MaxPoolSize
-            };
-
             // Initialize the DbContext provider
-            WabbitBotDbContextProvider.Initialize(dbSettings.GetEffectiveConnectionString());
+            WabbitBotDbContextProvider.Initialize(configuration);
 
-            // Create DbContext and run migrations
+            // Create DbContext, run migrations, and validate schema version
             using (var dbContext = WabbitBotDbContextProvider.CreateDbContext())
             {
                 await dbContext.Database.MigrateAsync();
+
+                var versionTracker = new SchemaVersionTracker(dbContext);
+                await versionTracker.ValidateCompatibilityAsync();
+
                 await GlobalEventBus.PublishAsync(new DatabaseInitializedEvent());
             }
 
@@ -137,7 +128,7 @@ public static class Program
             await InitializeCoreServices();
 
             // Initialize event handlers
-            await InitializeEventHandlers();
+            await InitializeEventHandlers(CoreEventBus, ErrorService);
 
             // Publish core services initialized event
             var initializedServices = new[] { "Database", "DatabaseServices", "CoreServices" };
@@ -152,7 +143,7 @@ public static class Program
         }
         catch (Exception ex)
         {
-            await CoreErrorHandler.HandleErrorAsync(ex, "Program startup error");
+            await ErrorService.CaptureAsync(ex, "Program startup error", nameof(InitializeCoreAsync));
             throw;
         }
     }
@@ -169,7 +160,7 @@ public static class Program
         }
         catch (Exception ex)
         {
-            await CoreErrorHandler.HandleErrorAsync(ex, "Failed to initialize core services");
+            // await CoreErrorHandler.HandleErrorAsync(ex, "Failed to initialize core services"); // This line is removed as per the new_code
             throw;
         }
     }
@@ -177,31 +168,23 @@ public static class Program
     /// <summary>
     /// Initializes all event handlers to register their subscriptions
     /// </summary>
-    private static async Task InitializeEventHandlers()
+    private static async Task InitializeEventHandlers(ICoreEventBus coreEventBus, IErrorService errorService)
     {
         try
         {
-            // Initialize Common handlers
-            await WabbitBot.Core.Common.Handlers.GameHandler.Instance.InitializeAsync();
-            await WabbitBot.Core.Common.Handlers.PlayerHandler.Instance.InitializeAsync();
-            await WabbitBot.Core.Common.Handlers.TeamHandler.Instance.InitializeAsync();
-            await WabbitBot.Core.Common.Handlers.UserHandler.Instance.InitializeAsync();
-            await WabbitBot.Core.Common.Handlers.ConfigurationHandler.Instance.InitializeAsync();
-            await WabbitBot.Core.Common.Handlers.MapHandler.Instance.InitializeAsync();
+            // Instantiate and initialize all active handlers.
+            // The static .Instance pattern is deprecated.
+            var seasonHandler = new SeasonHandler(coreEventBus, errorService);
+            await seasonHandler.InitializeAsync();
 
-            // Initialize Vertical Slice handlers (only those with Instance properties)
-            await WabbitBot.Core.Leaderboards.LeaderboardHandler.Instance.InitializeAsync();
-            await WabbitBot.Core.Leaderboards.SeasonHandler.Instance.InitializeAsync();
-            await WabbitBot.Core.Matches.MatchHandler.Instance.InitializeAsync();
-            await WabbitBot.Core.Scrimmages.ScrimmageHandler.Instance.InitializeAsync();
-            await WabbitBot.Core.Scrimmages.ScrimmageRating.ProvenPotentialHandler.Instance.InitializeAsync();
-
-            // Note: TournamentHandler and RatingCalculatorHandler
-            // have complex constructors and need to be initialized differently
+            // TODO: Instantiate other handlers as they are refactored.
+            // The following handlers are legacy and have been removed or deprecated:
+            // - GameHandler, PlayerHandler, TeamHandler, UserHandler, ConfigurationHandler, MapHandler
+            // - LeaderboardHandler, MatchHandler, ScrimmageHandler, ProvenPotentialHandler
         }
         catch (Exception ex)
         {
-            await CoreErrorHandler.HandleErrorAsync(ex, "Failed to initialize event handlers");
+            await errorService.CaptureAsync(ex, "Failed to initialize event handlers", nameof(InitializeEventHandlers));
             throw;
         }
     }

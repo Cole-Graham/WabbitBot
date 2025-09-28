@@ -26,7 +26,7 @@ namespace WabbitBot.Common.Data.Schema.Migrations
                         Team2Id TEXT NOT NULL,
                         Team1RosterIds TEXT NOT NULL,
                         Team2RosterIds TEXT NOT NULL,
-                        EvenTeamFormat INTEGER NOT NULL,
+                        TeamSize INTEGER NOT NULL,
                         StartedAt DATETIME,
                         CompletedAt DATETIME,
                         WinnerId TEXT,

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Npgsql;
 using WabbitBot.Common.Data;
+using WabbitBot.Common.Data.Interfaces;
 using WabbitBot.Common.Data.Utilities;
 using WabbitBot.Common.Models;
 
@@ -14,43 +15,31 @@ namespace WabbitBot.Common.Data.Service;
 /// </summary>
 public partial class DatabaseService<TEntity> where TEntity : Entity
 {
-    // Archive-specific properties and configuration
-    private string? _archiveTableName;
-    private IEnumerable<string>? _archiveColumns;
+    private DatabaseService<TEntity>? _archiveService; // Nullable as it's initialized later
 
     /// <summary>
     /// Initialize archive configuration for the entity type
     /// </summary>
     private void InitializeArchive(string archiveTableName, IEnumerable<string> archiveColumns)
     {
-        _archiveTableName = archiveTableName ?? throw new ArgumentNullException(nameof(archiveTableName));
-        _archiveColumns = archiveColumns ?? throw new ArgumentNullException(nameof(archiveColumns));
+        _archiveService = new DatabaseService<TEntity>(archiveTableName, archiveColumns, archiveTableName, archiveColumns);
     }
 
     #region Archive Operations Implementation
 
-    protected virtual async Task<Result<TEntity>> CreateInArchiveAsync(TEntity entity)
+    private async Task<Result<TEntity>> CreateInArchiveAsync(TEntity entity)
     {
-        try
-        {
-            // Mark entity as archived with timestamp
-            entity.UpdatedAt = DateTime.UtcNow;
+        return await (_archiveService?.CreateAsync(entity, DatabaseComponent.Archive) ?? Task.FromResult(Result<TEntity>.Failure("Archive service not initialized.")));
+    }
 
-            using var connection = await DatabaseConnectionProvider.GetConnectionAsync();
-            var sql = QueryUtil.BuildInsertQuery(_archiveTableName!, _archiveColumns!);
+    private async Task<Result<TEntity>> UpdateInArchiveAsync(TEntity entity)
+    {
+        return await (_archiveService?.UpdateAsync(entity, DatabaseComponent.Archive) ?? Task.FromResult(Result<TEntity>.Failure("Archive service not initialized.")));
+    }
 
-            // TODO: Implement actual database insertion for archiving
-            // This would typically insert into an archive table with additional metadata
-            // like deletion timestamp, reason for archiving, etc.
-
-            return Result<TEntity>.CreateSuccess(entity);
-        }
-        catch (Exception ex)
-        {
-            // Archive failures shouldn't break the main operation
-            // Return failure result - archiving is important but not critical
-            return Result<TEntity>.Failure($"Failed to archive entity {entity.Id}: {ex.Message}");
-        }
+    private async Task<Result<TEntity>> DeleteFromArchiveAsync(object id)
+    {
+        return await (_archiveService?.DeleteAsync(id, DatabaseComponent.Archive) ?? Task.FromResult(Result<TEntity>.Failure("Archive service not initialized.")));
     }
 
     #endregion

@@ -1,7 +1,11 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Text;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text;
+using WabbitBot.SourceGenerators.Utils;
 
 namespace WabbitBot.SourceGenerators.Generators.CrossBoundary;
 
@@ -12,43 +16,79 @@ public enum CrossBoundaryDirection
 }
 
 [Generator]
-public class CrossBoundaryGenerator : ISourceGenerator
+public class CrossBoundaryGenerator : IIncrementalGenerator
 {
-    public void Initialize(GeneratorInitializationContext context)
+    public void Initialize(IncrementalGeneratorInitializationContext context)
     {
-        context.RegisterForSyntaxNotifications(() => new CrossBoundarySyntaxReceiver());
+        // Pipeline for Core to DiscBot types
+        var coreToDiscBotTypes = context.SyntaxProvider.CreateSyntaxProvider(
+            predicate: (node, _) => node.HasAttribute("GenerateCoreToDiscBot"),
+            transform: (ctx, ct) =>
+            {
+                ct.ThrowIfCancellationRequested();
+                return ctx.Node as TypeDeclarationSyntax;
+            })
+            .Where(type => type != null)
+            .Collect();
+
+        // Pipeline for DiscBot to Core types
+        var discBotToCoreTypes = context.SyntaxProvider.CreateSyntaxProvider(
+            predicate: (node, _) => node.HasAttribute("GenerateDiscBotToCore"),
+            transform: (ctx, ct) =>
+            {
+                ct.ThrowIfCancellationRequested();
+                return ctx.Node as TypeDeclarationSyntax;
+            })
+            .Where(type => type != null)
+            .Collect();
+
+        // Combine with compilation info
+        var compilationInfo = context.CompilationProvider.Select((comp, ct) => comp.AssemblyName);
+
+        // Generate Core to DiscBot classes
+        var coreToDiscBotSource = coreToDiscBotTypes
+            .Combine(compilationInfo)
+            .Select((combined, ct) =>
+            {
+                ct.ThrowIfCancellationRequested();
+                var (types, assemblyName) = combined;
+                if (assemblyName?.Contains("DiscBot") == true && types.Any())
+                {
+                    var sourceText = GenerateCrossBoundaryClasses(types.Where(t => t != null).Cast<TypeDeclarationSyntax>().ToList(), CrossBoundaryDirection.CoreToDiscBot);
+                    return sourceText;
+                }
+                return SourceText.From("", Encoding.UTF8);
+            });
+
+        // Generate DiscBot to Core classes
+        var discBotToCoreSource = discBotToCoreTypes
+            .Combine(compilationInfo)
+            .Select((combined, ct) =>
+            {
+                ct.ThrowIfCancellationRequested();
+                var (types, assemblyName) = combined;
+                if (assemblyName?.Contains("Core") == true && types.Any())
+                {
+                    var sourceText = GenerateCrossBoundaryClasses(types.Where(t => t != null).Cast<TypeDeclarationSyntax>().ToList(), CrossBoundaryDirection.DiscBotToCore);
+                    return sourceText;
+                }
+                return SourceText.From("", Encoding.UTF8);
+            });
+
+        context.RegisterSourceOutput(coreToDiscBotSource, (spc, source) =>
+        {
+            if (!string.IsNullOrEmpty(source.ToString()))
+                spc.AddSource("CoreToDiscBotClasses.g.cs", source);
+        });
+
+        context.RegisterSourceOutput(discBotToCoreSource, (spc, source) =>
+        {
+            if (!string.IsNullOrEmpty(source.ToString()))
+                spc.AddSource("DiscBotToCoreClasses.g.cs", source);
+        });
     }
 
-    public void Execute(GeneratorExecutionContext context)
-    {
-        if (context.SyntaxReceiver is not CrossBoundarySyntaxReceiver receiver)
-            return;
-
-        if (!receiver.CoreToDiscBotTypes.Any() && !receiver.DiscBotToCoreTypes.Any())
-            return;
-
-        var assemblyName = context.Compilation.AssemblyName;
-
-        // Handle Core to DiscBot generation
-        if (assemblyName?.Contains("DiscBot") == true && receiver.CoreToDiscBotTypes.Any())
-        {
-            var sourceBuilder = GenerateCrossBoundaryClasses(receiver.CoreToDiscBotTypes, context, CrossBoundaryDirection.CoreToDiscBot);
-            var fileName = "CoreToDiscBotClasses.g.cs";
-            var sourceText = sourceBuilder.ToString();
-            context.AddSource(fileName, sourceText);
-        }
-
-        // Handle DiscBot to Core generation
-        if (assemblyName?.Contains("Core") == true && receiver.DiscBotToCoreTypes.Any())
-        {
-            var sourceBuilder = GenerateCrossBoundaryClasses(receiver.DiscBotToCoreTypes, context, CrossBoundaryDirection.DiscBotToCore);
-            var fileName = "DiscBotToCoreClasses.g.cs";
-            var sourceText = sourceBuilder.ToString();
-            context.AddSource(fileName, sourceText);
-        }
-    }
-
-    private StringBuilder GenerateCrossBoundaryClasses(List<TypeDeclarationSyntax> types, GeneratorExecutionContext context, CrossBoundaryDirection direction)
+    private SourceText GenerateCrossBoundaryClasses(List<TypeDeclarationSyntax> types, CrossBoundaryDirection direction)
     {
         var sourceBuilder = new StringBuilder();
 
@@ -66,51 +106,34 @@ public class CrossBoundaryGenerator : ISourceGenerator
         sourceBuilder.AppendLine("using WabbitBot.Common.Models;");
         sourceBuilder.AppendLine();
 
-        // Determine target namespace based on compilation and direction
-        var targetNamespace = GetTargetNamespace(context, direction);
+        // Determine target namespace based on direction
+        var targetNamespace = GetTargetNamespace(direction);
         sourceBuilder.AppendLine($"namespace {targetNamespace}");
         sourceBuilder.AppendLine("{");
 
         foreach (var typeDeclaration in types)
         {
-            var typeSource = GenerateEventTypeDefinition(typeDeclaration, context);
+            var typeSource = GenerateEventTypeDefinition(typeDeclaration);
             sourceBuilder.AppendLine(typeSource);
             sourceBuilder.AppendLine();
         }
 
         sourceBuilder.AppendLine("}");
 
-        return sourceBuilder;
+        return SourceText.From(sourceBuilder.ToString(), Encoding.UTF8);
     }
 
-    private string GetTargetNamespace(GeneratorExecutionContext context, CrossBoundaryDirection direction)
+    private string GetTargetNamespace(CrossBoundaryDirection direction)
     {
-        // Check if we're generating for DiscBot
-        var assemblyName = context.Compilation.AssemblyName;
-        if (assemblyName?.Contains("DiscBot") == true)
+        return direction switch
         {
-            return direction switch
-            {
-                CrossBoundaryDirection.CoreToDiscBot => "WabbitBot.DiscBot.Generated.Events",
-                _ => "WabbitBot.DiscBot.Generated.Events"
-            };
-        }
-
-        // When generating in Core, use a namespace that won't conflict
-        if (assemblyName?.Contains("Core") == true)
-        {
-            return direction switch
-            {
-                CrossBoundaryDirection.DiscBotToCore => "WabbitBot.Core.Generated.CrossBoundary",
-                _ => "WabbitBot.Core.Generated.CrossBoundary"
-            };
-        }
-
-        // Default fallback
-        return "WabbitBot.Common.Generated.Events";
+            CrossBoundaryDirection.CoreToDiscBot => "WabbitBot.DiscBot.Generated.Events",
+            CrossBoundaryDirection.DiscBotToCore => "WabbitBot.Core.Generated.CrossBoundary",
+            _ => "WabbitBot.Common.Generated.Events"
+        };
     }
 
-    private string GenerateEventTypeDefinition(TypeDeclarationSyntax typeDeclaration, GeneratorExecutionContext context)
+    private string GenerateEventTypeDefinition(TypeDeclarationSyntax typeDeclaration)
     {
         var typeName = typeDeclaration.Identifier.Text;
         var modifiers = typeDeclaration.Modifiers.ToString();
@@ -125,7 +148,7 @@ public class CrossBoundaryGenerator : ISourceGenerator
 
         // Add IEvent implementation properties
         sourceBuilder.AppendLine("        public EventBusType EventBusType { get; init; } = EventBusType.Global;");
-        sourceBuilder.AppendLine("        public string EventId { get; init; } = Guid.NewGuid().ToString();");
+        sourceBuilder.AppendLine("        public Guid EventId { get; init; } = Guid.NewGuid();");
         sourceBuilder.AppendLine("        public DateTime Timestamp { get; init; } = DateTime.UtcNow;");
 
         // Generate original members (properties only)
@@ -152,61 +175,3 @@ public class CrossBoundaryGenerator : ISourceGenerator
     }
 }
 
-public class CrossBoundarySyntaxReceiver : ISyntaxReceiver
-{
-    public List<TypeDeclarationSyntax> CoreToDiscBotTypes { get; } = new();
-    public List<TypeDeclarationSyntax> DiscBotToCoreTypes { get; } = new();
-
-    public void OnVisitSyntaxNode(SyntaxNode syntaxNode)
-    {
-        if (syntaxNode is TypeDeclarationSyntax typeDeclaration)
-        {
-            var attributeType = GetCrossBoundaryAttributeType(typeDeclaration);
-            switch (attributeType)
-            {
-                case CrossBoundaryAttributeType.CoreToDiscBot:
-                    CoreToDiscBotTypes.Add(typeDeclaration);
-                    break;
-                case CrossBoundaryAttributeType.DiscBotToCore:
-                    DiscBotToCoreTypes.Add(typeDeclaration);
-                    break;
-            }
-        }
-    }
-
-    private CrossBoundaryAttributeType GetCrossBoundaryAttributeType(TypeDeclarationSyntax typeDeclaration)
-    {
-        var attributes = typeDeclaration.AttributeLists
-            .SelectMany(attrList => attrList.Attributes);
-
-        foreach (var attr in attributes)
-        {
-            var attrName = attr.Name.ToString();
-
-            // Check for new attributes first
-            if (attrName.Contains("GenerateCoreToDiscBot") ||
-                attrName.EndsWith("GenerateCoreToDiscBot") ||
-                attrName.EndsWith("GenerateCoreToDiscBotAttribute"))
-            {
-                return CrossBoundaryAttributeType.CoreToDiscBot;
-            }
-
-            if (attrName.Contains("GenerateDiscBotToCore") ||
-                attrName.EndsWith("GenerateDiscBotToCore") ||
-                attrName.EndsWith("GenerateDiscBotToCoreAttribute"))
-            {
-                return CrossBoundaryAttributeType.DiscBotToCore;
-            }
-
-        }
-
-        return CrossBoundaryAttributeType.None;
-    }
-}
-
-public enum CrossBoundaryAttributeType
-{
-    None,
-    CoreToDiscBot,
-    DiscBotToCore
-}

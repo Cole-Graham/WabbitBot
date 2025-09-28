@@ -1,51 +1,55 @@
 using System;
+using WabbitBot.Common.Attributes;
 using WabbitBot.Common.Models;
 
 namespace WabbitBot.Core.Common.Models
 {
-    public class Tournament : Entity
+    [EntityMetadata(
+        tableName: "tournaments",
+        archiveTableName: "tournament_archive",
+        maxCacheSize: 50,
+        cacheExpiryMinutes: 30,
+        servicePropertyName: "Tournaments"
+    )]
+    public partial class Tournament : Entity, ITournamentEntity
     {
         public string Name { get; set; } = string.Empty;
+        public TournamentStatus Status { get; set; } = TournamentStatus.Announced;
         public string Description { get; set; } = string.Empty;
-        public EvenTeamFormat EvenTeamFormat { get; set; }
+        public TeamSize TeamSize { get; set; }
         public DateTime StartDate { get; set; }
         public DateTime? EndDate { get; set; }
         public int MaxParticipants { get; set; }
         public int BestOf { get; set; } = 1; // Number of games to win each match
 
-        // State Management Properties - StateHistory stored as JSONB, CurrentStateSnapshot is computed
-        public List<TournamentStateSnapshot> StateHistory { get; set; } = new();
-        public TournamentStateSnapshot CurrentStateSnapshot => StateHistory.LastOrDefault() ?? new TournamentStateSnapshot();
-        
-        public Tournament()
-        {
-            CreatedAt = DateTime.UtcNow;
-        }
+        // State Management Properties - StateHistory stored as JSONB
+        public virtual ICollection<TournamentStateSnapshot> StateHistory { get; set; } = new List<TournamentStateSnapshot>();
 
-        public Tournament Clone()
-        {
-            return new Tournament
-            {
-                Id = Id,
-                Name = Name,
-                Description = Description,
-                EvenTeamFormat = EvenTeamFormat,
-                StartDate = StartDate,
-                EndDate = EndDate,
-                MaxParticipants = MaxParticipants,
-                BestOf = BestOf,
-                CreatedAt = CreatedAt,
-                UpdatedAt = UpdatedAt,
-                StateHistory = StateHistory
-            };
-        }
+        public override Domain Domain => Domain.Tournament;
+    }
+
+    public enum TournamentStatus
+    {
+        Announced,
+        RegistrationOpen,
+        RegistrationClosed,
+        InProgress,
+        Completed,
+        Cancelled
     }
 
     #region # TournamentStateSnapshot
     /// <summary>
     /// Comprehensive tournament state snapshot that captures all possible tournament states
     /// </summary>
-    public class TournamentStateSnapshot : Entity
+    [EntityMetadata(
+        tableName: "tournament_state_snapshots",
+        archiveTableName: "tournament_state_snapshot_archive",
+        maxCacheSize: 200,
+        cacheExpiryMinutes: 15,
+        servicePropertyName: "TournamentStateSnapshots"
+    )]
+    public class TournamentStateSnapshot : Entity, ITournamentEntity
     {
 
         // Tournament state properties
@@ -82,13 +86,11 @@ namespace WabbitBot.Core.Common.Models
         public int CurrentParticipantCount { get; set; }
         public int CurrentRound { get; set; } = 1;
 
-        /// <summary>
-        /// Constructor to initialize Entity properties
-        /// </summary>
-        public TournamentStateSnapshot()
-        {
-            Timestamp = DateTime.UtcNow;
-        }
+        // Parent navigation
+        public virtual Tournament Tournament { get; set; } = null!;
+
+        public override Domain Domain => Domain.Tournament;
+
     }
     #endregion
 }

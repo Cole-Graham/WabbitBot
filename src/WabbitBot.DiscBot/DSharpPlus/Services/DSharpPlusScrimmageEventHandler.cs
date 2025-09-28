@@ -147,7 +147,7 @@ public class DSharpPlusScrimmageEventHandler : IDiscordScrimmageOperations
     /// <summary>
     /// Creates private threads for each team in a match
     /// </summary>
-    public async Task<(ulong channelId, ulong team1ThreadId, ulong team2ThreadId)> CreateMatchThreadsAsync(string matchId, string team1Name, string team2Name, string evenTeamFormat, List<ulong> team1MemberIds, List<ulong> team2MemberIds)
+    public async Task<(ulong channelId, ulong team1ThreadId, ulong team2ThreadId)> CreateMatchThreadsAsync(string matchId, string team1Name, string team2Name, string TeamSize, List<ulong> team1MemberIds, List<ulong> team2MemberIds)
     {
         try
         {
@@ -161,8 +161,8 @@ public class DSharpPlusScrimmageEventHandler : IDiscordScrimmageOperations
             }
 
             // Create thread names
-            var team1ThreadName = $"{team1Name} vs {team2Name} - {evenTeamFormat} (Team 1)";
-            var team2ThreadName = $"{team1Name} vs {team2Name} - {evenTeamFormat} (Team 2)";
+            var team1ThreadName = $"{team1Name} vs {team2Name} - {TeamSize} (Team 1)";
+            var team2ThreadName = $"{team1Name} vs {team2Name} - {TeamSize} (Team 2)";
 
             // Create Team 1 private thread
             var team1Thread = await channel.CreateThreadAsync(
@@ -206,8 +206,8 @@ public class DSharpPlusScrimmageEventHandler : IDiscordScrimmageOperations
             }
 
             // Create initial match embeds for each thread
-            var team1Embed = CreateTeamMatchEmbed(matchId, team1Name, team2Name, evenTeamFormat, "Team 1");
-            var team2Embed = CreateTeamMatchEmbed(matchId, team1Name, team2Name, evenTeamFormat, "Team 2");
+            var team1Embed = CreateTeamMatchEmbed(matchId, team1Name, team2Name, TeamSize, "Team 1");
+            var team2Embed = CreateTeamMatchEmbed(matchId, team1Name, team2Name, TeamSize, "Team 2");
 
             // Send the initial messages with embeds
             var team1Message = await team1Thread.SendMessageAsync(team1Embed);
@@ -264,11 +264,11 @@ public class DSharpPlusScrimmageEventHandler : IDiscordScrimmageOperations
     /// <summary>
     /// Creates a team-specific match embed for a new thread
     /// </summary>
-    private DiscordEmbed CreateTeamMatchEmbed(string matchId, string team1Name, string team2Name, string evenTeamFormat, string teamLabel)
+    private DiscordEmbed CreateTeamMatchEmbed(string matchId, string team1Name, string team2Name, string TeamSize, string teamLabel)
     {
         var embedBuilder = new DiscordEmbedBuilder()
             .WithTitle($"Match: {team1Name} vs {team2Name} - {teamLabel}")
-            .WithDescription($"Game Size: {evenTeamFormat}")
+            .WithDescription($"Game Size: {TeamSize}")
             .WithColor(DiscordColor.Blue)
             .WithTimestamp(DateTimeOffset.UtcNow)
             .AddField("Match ID", matchId, true)

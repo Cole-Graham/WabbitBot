@@ -96,17 +96,17 @@ public partial class DatabaseService<TEntity>
 public partial class CoreService
 {
     // Single service per entity - no more complex wiring
-    private readonly DatabaseService<Player> _playerDb;
-    private readonly DatabaseService<Team> _teamDb;
-    private readonly DatabaseService<Game> _gameDb;
+    private readonly DatabaseService<Player> _playerData;
+    private readonly DatabaseService<Team> _teamData;
+    private readonly DatabaseService<Game> _gameData;
 
     public CoreService(ICoreEventBus eventBus, ICoreErrorHandler errorHandler)
         : base(eventBus, errorHandler)
     {
         // Direct instantiation - no DataServiceManager complexity
-        _playerDb = new DatabaseService<Player>();
-        _teamDb = new DatabaseService<Team>();
-        _gameDb = new DatabaseService<Game>();
+        _playerData = new DatabaseService<Player>();
+        _teamData = new DatabaseService<Team>();
+        _gameData = new DatabaseService<Game>();
     }
 }
 ```

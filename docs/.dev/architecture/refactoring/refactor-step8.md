@@ -28,17 +28,20 @@ public partial class CoreService
 {
     #region Player Business Logic
 
-    // ✅ CORRECT: Use generic methods directly - no thin wrappers
-    // Call GetByIdAsync(playerId, _playerRepositoryData, _playerCacheData) directly
+    // ✅ CORRECT: Call the unified DatabaseService directly.
+    public async Task<Player?> GetPlayerAsync(Guid playerId)
+    {
+        return await _playerData.GetByIdAsync(playerId);
+    }
 
     // Only create specific methods when there's unique business logic
     public async Task<Result<Player>> CreatePlayerWithValidationAsync(Player player)
     {
         // Business logic validation specific to player creation
-        var validation = await ValidatePlayerAsync(player);
-        if (!validation.Success) return validation;
+        var validationResult = await ValidatePlayerAsync(player);
+        if (!validationResult.Success) return validationResult;
 
-        return await CreateEntityAsync(player, _playerRepositoryData, _playerCacheData);
+        return await _playerData.CreateAsync(player);
     }
 
     #endregion
@@ -55,8 +58,11 @@ public partial class CoreService
 {
     #region User Business Logic
 
-    // ✅ CORRECT: Use generic methods directly - no thin wrappers
-    // Call GetByStringIdAsync(discordId, _userRepositoryData, _userCacheData) directly
+    public async Task<User?> GetUserByDiscordIdAsync(ulong discordId)
+    {
+        // Example assumes a custom query method in the repository partial
+        return await _userData.GetByDiscordIdAsync(discordId);
+    }
 
     // Only create specific methods when there's unique business logic
     public async Task<Result<User>> CreateUserWithDiscordValidationAsync(User user)
@@ -65,7 +71,7 @@ public partial class CoreService
         var discordValidation = await ValidateDiscordUserAsync(user);
         if (!discordValidation.Success) return discordValidation;
 
-        return await CreateEntityAsync(user, _userRepositoryData, _userCacheData);
+        return await _userData.CreateAsync(user);
     }
 
     #endregion
@@ -82,8 +88,10 @@ public partial class CoreService
 {
     #region Team Business Logic
 
-    // ✅ CORRECT: Use generic methods directly - no thin wrappers
-    // Call GetByStringIdAsync(teamId, _teamRepositoryData, _teamCacheData) directly
+    public async Task<Team?> GetTeamByIdAsync(Guid teamId)
+    {
+        return await _teamData.GetByIdAsync(teamId);
+    }
 
     // Only create specific methods when there's unique business logic
     public async Task<Result<Team>> CreateTeamWithPlayerLimitsAsync(Team team)
@@ -92,7 +100,7 @@ public partial class CoreService
         var validation = await ValidateTeamAsync(team);
         if (!validation.Success) return validation;
 
-        return await CreateEntityAsync(team, _teamRepositoryData, _teamCacheData);
+        return await _teamData.CreateAsync(team);
     }
 
     #endregion
@@ -109,17 +117,16 @@ public partial class CoreService
 {
     #region Map Business Logic
 
-    // ✅ CORRECT: Use generic methods directly - no thin wrappers
-    // Call GetByStringIdAsync(mapId, _mapRepositoryData, _mapCacheData) directly
+    public async Task<Map?> GetMapByIdAsync(Guid mapId)
+    {
+        return await _mapData.GetByIdAsync(mapId);
+    }
 
     // Only create specific methods when there's unique business logic
     public async Task<IEnumerable<Map>> GetActiveTournamentMapsAsync()
     {
-        // Custom query for tournament-active maps with additional filtering
-        return await _mapRepositoryData.QueryAsync(
-            "IsActive = @isActive AND TournamentEligible = @eligible",
-            new { isActive = true, eligible = true },
-            DatabaseComponent.Repository);
+        // Custom query for tournament-active maps
+        return await _mapData.GetActiveTournamentMapsAsync();
     }
 
     #endregion
@@ -189,17 +196,18 @@ public class PlayerService
 // After: CoreService.Player operations
 public partial class CoreService
 {
-    // Direct usage of generic methods
-    public async Task DoSomethingWithPlayer()
+    // Direct usage of unified DatabaseService
+    public async Task DoSomethingWithPlayer(Guid playerId)
     {
-        var player = await GetByIdAsync(playerId, _playerRepositoryData, _playerCacheData);
+        var player = await _playerData.GetByIdAsync(playerId);
+        // ...
     }
 
     // Specific business logic only when needed
     public async Task<Player?> GetPlayerByNameAsync(string name)
     {
-        // Custom logic here
-        var player = await GetByNameAsync(name, _playerRepositoryData, _playerCacheData);
+        // Custom logic here, calling a custom method on DatabaseService
+        var player = await _playerData.GetByNameAsync(name);
         return player;
     }
 }

@@ -70,12 +70,11 @@ public partial class ConfigurationCommands
 
         if (saveResult.Success)
         {
-            // Publish specific server ID set event
-            await _eventBus.PublishAsync(new ServerIdSetEvent
-            {
-                ServerId = serverId,
-                PreviousServerId = previousServerId?.ToString()
-            });
+            // Publish specific server ID set event (primitive-only payloads)
+            await _eventBus.PublishAsync(new ServerIdSetEvent(
+                serverId,
+                previousServerId?.ToString()
+            ));
         }
 
         return saveResult;
@@ -126,13 +125,12 @@ public partial class ConfigurationCommands
 
         if (saveResult.Success)
         {
-            // Publish specific channel configured event
-            await _eventBus.PublishAsync(new ChannelConfiguredEvent
-            {
-                ChannelType = channelType,
-                ChannelId = channelId,
-                PreviousChannelId = previousChannelId
-            });
+            // Publish specific channel configured event (primitive-only payloads)
+            await _eventBus.PublishAsync(new ChannelConfiguredEvent(
+                channelType,
+                channelId,
+                previousChannelId
+            ));
         }
 
         return saveResult;
@@ -171,13 +169,12 @@ public partial class ConfigurationCommands
 
         if (saveResult.Success)
         {
-            // Publish specific role configured event
-            await _eventBus.PublishAsync(new RoleConfiguredEvent
-            {
-                RoleType = roleType,
-                RoleId = roleId,
-                PreviousRoleId = previousRoleId
-            });
+            // Publish specific role configured event (primitive-only payloads)
+            await _eventBus.PublishAsync(new RoleConfiguredEvent(
+                roleType,
+                roleId,
+                previousRoleId
+            ));
         }
 
         return saveResult;
@@ -242,12 +239,11 @@ public partial class ConfigurationCommands
                 return Result<BotOptions>.Failure("Failed to save configuration to appsettings.json");
             }
 
-            // Publish configuration changed event
-            await _eventBus.PublishAsync(new ConfigurationChangedEvent
-            {
-                Configuration = config,
-                ChangeType = "Save"
-            });
+            // Publish configuration changed event (primitive + simple types)
+            await _eventBus.PublishAsync(new ConfigurationChangedEvent(
+                config,
+                "Save"
+            ));
 
             return Result<BotOptions>.CreateSuccess(config, "Configuration saved successfully");
         }

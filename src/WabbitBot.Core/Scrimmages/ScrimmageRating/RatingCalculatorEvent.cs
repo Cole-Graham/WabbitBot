@@ -4,122 +4,132 @@ using WabbitBot.Core.Common.Models;
 using WabbitBot.Common.Attributes;
 using WabbitBot.Common.Events.EventInterfaces;
 
-namespace WabbitBot.Core.Scrimmages.ScrimmageRating
+namespace WabbitBot.Core.Scrimmages
 {
-    public class RatingAdjustmentEvent : IEvent
+    public record RatingAdjustmentEvent(
+        Guid Team1Id,
+        Guid Team2Id,
+        double Adjustment,
+        EventBusType EventBusType = EventBusType.Core,
+        Guid EventId = default,
+        DateTime Timestamp = default) : IEvent;
+
+    public record ApplyProvenPotentialAdjustmentEvent(
+        Guid ChallengerId,
+        Guid OpponentId,
+        double Adjustment,
+        TeamSize TeamSize,
+        string Reason,
+        EventBusType EventBusType = EventBusType.Core,
+        Guid EventId = default,
+        DateTime Timestamp = default) : IEvent;
+
+    public record UpdateTeamRatingEvent(
+        Guid TeamId,
+        double NewRating,
+        TeamSize TeamSize,
+        string Reason,
+        EventBusType EventBusType = EventBusType.Core,
+        Guid EventId = default,
+        DateTime Timestamp = default) : IEvent;
+
+    public record ApplyTeamRatingChangeEvent(
+        Guid TeamId,
+        double RatingChange,
+        TeamSize TeamSize,
+        string Reason,
+        EventBusType EventBusType = EventBusType.Core,
+        Guid EventId = default,
+        DateTime Timestamp = default) : IEvent;
+
+    public record AllTeamRatingsRequest(
+        EventBusType EventBusType = EventBusType.Core) : IEvent
     {
-        public EventBusType EventBusType { get; init; } = EventBusType.Core;
-        public string EventId { get; init; } = Guid.NewGuid().ToString();
+        public Guid EventId { get; init; } = Guid.NewGuid();
         public DateTime Timestamp { get; init; } = DateTime.UtcNow;
-        public string Team1Id { get; init; } = string.Empty;
-        public string Team2Id { get; init; } = string.Empty;
-        public double Adjustment { get; init; }
     }
 
-    public class ApplyProvenPotentialAdjustmentEvent : IEvent
+    public record AllTeamRatingsResponse(
+        EventBusType EventBusType = EventBusType.Core) : IEvent
     {
-        public EventBusType EventBusType { get; init; } = EventBusType.Core;
-        public string EventId { get; init; } = Guid.NewGuid().ToString();
+        public Guid EventId { get; init; } = Guid.NewGuid();
         public DateTime Timestamp { get; init; } = DateTime.UtcNow;
-        public string ChallengerId { get; init; } = string.Empty;
-        public string OpponentId { get; init; } = string.Empty;
-        public double Adjustment { get; init; }
-        public EvenTeamFormat EvenTeamFormat { get; init; }
-        public string Reason { get; init; } = string.Empty;
+        // Ratings and TeamIds should be fetched from database by handlers
     }
 
-    public class UpdateTeamRatingEvent : IEvent
+    public record TeamOpponentStatsRequest(
+        Guid TeamId,
+        DateTime Since,
+        EventBusType EventBusType = EventBusType.Core) : IEvent
     {
-        public EventBusType EventBusType { get; init; } = EventBusType.Core;
-        public string EventId { get; init; } = Guid.NewGuid().ToString();
+        public Guid EventId { get; init; } = Guid.NewGuid();
         public DateTime Timestamp { get; init; } = DateTime.UtcNow;
-        public string TeamId { get; init; } = string.Empty;
-        public double NewRating { get; init; }
-        public EvenTeamFormat EvenTeamFormat { get; init; }
-        public string Reason { get; init; } = string.Empty;
     }
 
-    public class ApplyTeamRatingChangeEvent : IEvent
+    public record TeamOpponentStatsResponse(
+        Guid TeamId,
+        EventBusType EventBusType = EventBusType.Core) : IEvent
     {
-        public EventBusType EventBusType { get; init; } = EventBusType.Core;
-        public string EventId { get; init; } = Guid.NewGuid().ToString();
+        public Guid EventId { get; init; } = Guid.NewGuid();
         public DateTime Timestamp { get; init; } = DateTime.UtcNow;
-        public string TeamId { get; init; } = string.Empty;
-        public double RatingChange { get; init; }
-        public EvenTeamFormat EvenTeamFormat { get; init; }
-        public string Reason { get; init; } = string.Empty;
+        // Team rating, size, and opponent stats should be fetched from database by handlers using TeamId
     }
 
-    public class AllTeamRatingsRequest
+    public record AllTeamOpponentDistributionsRequest(
+        DateTime Since,
+        EventBusType EventBusType = EventBusType.Core) : IEvent
     {
-        // No additional properties needed
+        public Guid EventId { get; init; } = Guid.NewGuid();
+        public DateTime Timestamp { get; init; } = DateTime.UtcNow;
     }
 
-    public class AllTeamRatingsResponse
+    public record AllTeamOpponentDistributionsResponse(
+        EventBusType EventBusType = EventBusType.Core) : IEvent
     {
-        public IEnumerable<double> Ratings { get; set; } = Array.Empty<double>();
-        public IEnumerable<string> TeamIds { get; set; } = Array.Empty<string>();
+        public Guid EventId { get; init; } = Guid.NewGuid();
+        public DateTime Timestamp { get; init; } = DateTime.UtcNow;
+        // Distributions should be fetched from database by handlers
     }
 
-    public class TeamOpponentStatsRequest
+    public record CalculateConfidenceRequest(
+        Guid TeamId,
+        TeamSize TeamSize,
+        EventBusType EventBusType = EventBusType.Core) : IEvent
     {
-        public string TeamId { get; set; } = string.Empty;
-        public DateTime Since { get; set; }
-        public EvenTeamFormat EvenTeamFormat { get; set; }
+        public Guid EventId { get; init; } = Guid.NewGuid();
+        public DateTime Timestamp { get; init; } = DateTime.UtcNow;
     }
 
-    public class TeamOpponentStatsResponse
+    public record CalculateConfidenceResponse(
+        Guid TeamId,
+        double Confidence,
+        EventBusType EventBusType = EventBusType.Core) : IEvent
     {
-        public double TeamRating { get; set; }
-        public EvenTeamFormat? EvenTeamFormat { get; set; }
-        public Dictionary<string, (int Count, double Rating)> OpponentMatches { get; set; } = new();
+        public Guid EventId { get; init; } = Guid.NewGuid();
+        public DateTime Timestamp { get; init; } = DateTime.UtcNow;
     }
 
-    public class AllTeamOpponentDistributionsRequest
+    public record CalculateRatingChangeRequest(
+        Guid Team1Id,
+        Guid Team2Id,
+        double Team1Rating,
+        double Team2Rating,
+        int Team1Score,
+        int Team2Score,
+        EventBusType EventBusType = EventBusType.Core) : IEvent
     {
-        public DateTime Since { get; set; }
+        public Guid EventId { get; init; } = Guid.NewGuid();
+        public DateTime Timestamp { get; init; } = DateTime.UtcNow;
     }
 
-    public class AllTeamOpponentDistributionsResponse
+    public record CalculateRatingChangeResponse(
+        Guid MatchId,
+        double Team1Change,
+        double Team2Change,
+        EventBusType EventBusType = EventBusType.Core) : IEvent
     {
-        public List<(string TeamId, Dictionary<string, double> NormalizedWeights)> Distributions { get; set; } = new();
-    }
-
-    public class GetTeamRatingRequest
-    {
-        public string TeamId { get; set; } = string.Empty;
-    }
-
-    public class GetTeamRatingResponse
-    {
-        public double Rating { get; set; }
-    }
-
-    public class CalculateConfidenceRequest
-    {
-        public string TeamId { get; set; } = string.Empty;
-        public EvenTeamFormat EvenTeamFormat { get; set; }
-    }
-
-    public class CalculateConfidenceResponse
-    {
-        public double Confidence { get; set; }
-    }
-
-    public class CalculateRatingChangeRequest
-    {
-        public string Team1Id { get; set; } = string.Empty;
-        public string Team2Id { get; set; } = string.Empty;
-        public double Team1Rating { get; set; }
-        public double Team2Rating { get; set; }
-        public EvenTeamFormat EvenTeamFormat { get; set; }
-        public int Team1Score { get; set; }
-        public int Team2Score { get; set; }
-    }
-
-    public class CalculateRatingChangeResponse
-    {
-        public double Team1Change { get; set; }
-        public double Team2Change { get; set; }
+        public Guid EventId { get; init; } = Guid.NewGuid();
+        public DateTime Timestamp { get; init; } = DateTime.UtcNow;
+        // MatchId is used to correlate with the original request
     }
 }

@@ -1,5 +1,6 @@
 using System;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 
 namespace WabbitBot.Core.Common.Database
 {
@@ -14,15 +15,45 @@ namespace WabbitBot.Core.Common.Database
         private static string? _connectionString;
 
         /// <summary>
-        /// Initializes the provider with database settings
+        /// Initializes the provider with database settings from configuration
         /// </summary>
-        public static void Initialize(string connectionString)
+        public static void Initialize(IConfiguration configuration)
         {
-            _connectionString = connectionString ?? throw new ArgumentNullException(nameof(connectionString));
+            var databaseSettings = new DatabaseSettings();
+            configuration.GetSection("Bot:Database").Bind(databaseSettings);
+            databaseSettings.Validate();
 
-            _options = new DbContextOptionsBuilder<WabbitBotDbContext>()
-                .UseNpgsql(connectionString)
-                .Options;
+            _connectionString = databaseSettings.GetEffectiveConnectionString();
+
+            var optionsBuilder = new DbContextOptionsBuilder<WabbitBotDbContext>();
+
+            if (databaseSettings.Provider.ToLowerInvariant() == "postgresql")
+            {
+                optionsBuilder.UseNpgsql(_connectionString, npgsqlOptions =>
+                {
+                    npgsqlOptions.EnableRetryOnFailure(
+                        maxRetryCount: 3,
+                        maxRetryDelay: TimeSpan.FromSeconds(30),
+                        errorCodesToAdd: null);
+                    npgsqlOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
+                });
+            }
+            else
+            {
+                throw new NotSupportedException($"Database provider '{databaseSettings.Provider}' is not supported. Only 'postgresql' is supported.");
+            }
+
+            if (configuration.GetValue<bool>("UseDetailedErrors", false))
+            {
+                optionsBuilder.EnableDetailedErrors();
+            }
+
+            if (configuration.GetValue<bool>("UseSensitiveDataLogging", false))
+            {
+                optionsBuilder.EnableSensitiveDataLogging();
+            }
+
+            _options = optionsBuilder.Options;
         }
 
         /// <summary>

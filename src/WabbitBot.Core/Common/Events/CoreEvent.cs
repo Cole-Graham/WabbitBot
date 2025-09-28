@@ -4,77 +4,43 @@ using WabbitBot.Common.Events.EventInterfaces;
 namespace WabbitBot.Core.Common.BotCore
 {
     #region Startup Events
-    public class CoreStartupCompletedEvent : IEvent
-    {
-        public EventBusType EventBusType { get; init; } = EventBusType.Core;
-        public string EventId { get; init; } = Guid.NewGuid().ToString();
-        public DateTime Timestamp { get; init; } = DateTime.UtcNow;
-        public DateTime CompletedAt { get; } = DateTime.UtcNow;
-    }
+    public record CoreStartupCompletedEvent(
+        EventBusType EventBusType = EventBusType.Core,
+        Guid EventId = default,
+        DateTime Timestamp = default,
+        DateTime CompletedAt = default) : IEvent;
 
-    public class CoreServicesInitializedEvent : IEvent
-    {
-        public EventBusType EventBusType { get; init; } = EventBusType.Core;
-        public string EventId { get; init; } = Guid.NewGuid().ToString();
-        public DateTime Timestamp { get; init; } = DateTime.UtcNow;
-        public string[] InitializedServices { get; }
+    public record CoreServicesInitializedEvent(
+        string[] InitializedServices,
+        EventBusType EventBusType = EventBusType.Core,
+        Guid EventId = default,
+        DateTime Timestamp = default) : IEvent;
 
-        public CoreServicesInitializedEvent(string[] initializedServices)
-        {
-            InitializedServices = initializedServices;
-        }
-    }
+    public record CoreFeatureReadyEvent(
+        string FeatureName,
+        EventBusType EventBusType = EventBusType.Core,
+        Guid EventId = default,
+        DateTime Timestamp = default) : IEvent;
 
-    public class CoreFeatureReadyEvent : IEvent
-    {
-        public EventBusType EventBusType { get; init; } = EventBusType.Core;
-        public string EventId { get; init; } = Guid.NewGuid().ToString();
-        public DateTime Timestamp { get; init; } = DateTime.UtcNow;
-        public string FeatureName { get; }
-
-        public CoreFeatureReadyEvent(string featureName)
-        {
-            FeatureName = featureName;
-        }
-    }
-
-    public class CoreErrorHandlingReadyEvent : IEvent
-    {
-        public EventBusType EventBusType { get; init; } = EventBusType.Core;
-        public string EventId { get; init; } = Guid.NewGuid().ToString();
-        public DateTime Timestamp { get; init; } = DateTime.UtcNow;
-    }
+    public record CoreErrorHandlingReadyEvent(
+        EventBusType EventBusType = EventBusType.Core,
+        Guid EventId = default,
+        DateTime Timestamp = default) : IEvent;
     #endregion
 
     #region Error Events
-    public class CoreServiceErrorEvent : IEvent
-    {
-        public EventBusType EventBusType { get; init; } = EventBusType.Core;
-        public string EventId { get; init; } = Guid.NewGuid().ToString();
-        public DateTime Timestamp { get; init; } = DateTime.UtcNow;
-        public string ServiceName { get; }
-        public Exception Exception { get; }
+    public record CoreServiceErrorEvent(
+        string ServiceName,
+        Exception Exception,
+        EventBusType EventBusType = EventBusType.Core,
+        Guid EventId = default,
+        DateTime Timestamp = default) : IEvent;
 
-        public CoreServiceErrorEvent(string serviceName, Exception exception)
-        {
-            ServiceName = serviceName;
-            Exception = exception;
-        }
-    }
-
-    public class CoreStartupFailedEvent : IEvent
-    {
-        public EventBusType EventBusType { get; init; } = EventBusType.Core;
-        public string EventId { get; init; } = Guid.NewGuid().ToString();
-        public DateTime Timestamp { get; init; } = DateTime.UtcNow;
-        public Exception Exception { get; }
-        public string Component { get; }
-
-        public CoreStartupFailedEvent(Exception exception, string component = "Unknown")
-        {
-            Exception = exception;
-            Component = component;
-        }
-    }
+    public record CoreStartupFailedEvent(
+        Exception Exception,
+        string Component = "Unknown",
+        EventBusType EventBusType = EventBusType.Core,
+        Guid EventId = default,
+        DateTime Timestamp = default) : IEvent;
     #endregion
 }

@@ -6,67 +6,39 @@
 
 #### 7a. Create Main CoreService.cs
 
-Implement the main CoreService class as a BackgroundService with direct instantiation of data services.
+Implement the main CoreService class with direct instantiation of data and error services.
 
 ```csharp
 // File: src/WabbitBot.Core/Common/Services/Core/CoreService.cs
-public partial class CoreService : BackgroundService
+public partial class CoreService
 {
-    // Entity configurations
-    private readonly PlayerDbConfig _playerDbConfig;
-    private readonly UserDbConfig _userDbConfig;
-    private readonly TeamDbConfig _teamDbConfig;
-    private readonly MapConfig _mapDbConfig;
+    // Unified DatabaseService per entity
+    private readonly DatabaseService<Player> _playerData;
+    private readonly DatabaseService<User> _userData;
+    private readonly DatabaseService<Team> _teamData;
+    private readonly DatabaseService<Map> _mapData;
 
-    // Data services (generic, configured per entity)
-    private readonly RepositoryService<Player> _playerRepositoryData;
-    private readonly CacheService<Player> _playerCacheData;
-    private readonly ArchiveService<Player> _playerArchiveData;
-
-    // Event bus and error handling
+    // Event bus and unified error handling
     private readonly ICoreEventBus _eventBus;
-    private readonly ICoreErrorHandler _errorHandler;
+    private readonly IErrorService _errorService;
 
     public CoreService(
         ICoreEventBus eventBus,
-        ICoreErrorHandler errorHandler)
-        // Data services created via direct instantiation (no runtime DI)
-        // RepositoryService<Player> playerRepository,
-        // CacheService<Player> playerCache,
-        // ArchiveService<Player> playerArchive)
+        IErrorService errorService)
     {
         _eventBus = eventBus;
-        _errorHandler = errorHandler;
+        _errorService = errorService;
 
-        // Initialize configurations
-        _playerDbConfig = new PlayerDbConfig();
-        _userDbConfig = new UserDbConfig();
-        _teamDbConfig = new TeamDbConfig();
-        _mapDbConfig = new MapConfig();
-
-        // Create data services via direct instantiation (no runtime DI)
-        _playerRepositoryData = new RepositoryService<Player>(
-            new DatabaseConnectionProvider(),
-            _playerDbConfig.TableName,
-            _playerDbConfig.Columns);
-        _playerCacheData = new CacheService<Player>(
-            new CacheMonitor(),
-            _playerDbConfig.MaxCacheSize);
-        _playerArchiveData = new ArchiveService<Player>(
-            new DatabaseConnectionProvider(),
-            _playerDbConfig.ArchiveTableName,
-            _playerDbConfig.Columns);
+        // Create DatabaseService for each entity via direct instantiation
+        _playerData = new DatabaseService<Player>();
+        _userData = new DatabaseService<User>();
+        _teamData = new DatabaseService<Team>();
+        _mapData = new DatabaseService<Map>();
     }
 
-    public override Task StartAsync(CancellationToken cancellationToken)
+    public Task InitializeAsync(CancellationToken cancellationToken)
     {
-        // Initialize data services
-        return Task.CompletedTask;
-    }
-
-    public override Task StopAsync(CancellationToken cancellationToken)
-    {
-        // Cleanup
+        // Initialization logic for the service
         return Task.CompletedTask;
     }
 }
@@ -74,54 +46,34 @@ public partial class CoreService : BackgroundService
 
 #### 7b. Create CoreService.Data.cs with Generic Operations
 
-Implement generic data operations that all entity services can use.
+The unified `DatabaseService<TEntity>` encapsulates generic data operations, removing the need for them in `CoreService`. The service now directly uses the `DatabaseService` instances.
 
 ```csharp
 // File: src/WabbitBot.Core/Common/Services/Core/CoreService.Data.cs
+// DEPRECATED: Generic data operations are now part of DatabaseService<TEntity>
+// This partial class can be removed or repurposed for entity-specific data logic orchestration if needed.
 public partial class CoreService
 {
-    #region Generic Data Operations
-
-    private async Task<Result<TEntity>> CreateEntityAsync<TEntity>(
-        TEntity entity,
-        RepositoryService<TEntity> repository,
-        CacheService<TEntity> cache) where TEntity : IEntity
+    // Example of direct usage from a business logic method:
+    public async Task<Player?> GetPlayerAsync(Guid playerId)
     {
-        // Create in repository
-        var result = await repository.CreateAsync(entity, DatabaseComponent.Repository);
-        if (result.Success)
-        {
-            // Cache the result
-            await cache.CreateAsync(result.Data!, DatabaseComponent.Cache);
-        }
+        // DatabaseService handles the cache-repository logic automatically.
+        var player = await _playerData.GetByIdAsync(playerId);
+        return player;
+    }
+
+    public async Task<Result<Player>> CreatePlayerAsync(Player newPlayer)
+    {
+        // DatabaseService handles write-through caching automatically.
+        var result = await _playerData.CreateAsync(newPlayer);
         return result;
     }
-
-    private async Task<TEntity?> GetByIdAsync<TEntity>(
-        object id,
-        RepositoryService<TEntity> repository,
-        CacheService<TEntity> cache) where TEntity : IEntity
-    {
-        // Try cache first
-        var cached = await cache.GetByIdAsync(id, DatabaseComponent.Cache);
-        if (cached != null) return cached;
-
-        // Fall back to repository
-        var entity = await repository.GetByIdAsync(id, DatabaseComponent.Repository);
-        if (entity != null)
-        {
-            await cache.CreateAsync(entity, DatabaseComponent.Cache);
-        }
-        return entity;
-    }
-
-    #endregion
 }
 ```
 
 #### 7c. Create CoreService.Player.cs with Business Logic
 
-Implement player-specific business logic using generic operations directly.
+Implement player-specific business logic using the unified `DatabaseService` directly.
 
 ```csharp
 // File: src/WabbitBot.Core/Common/Services/Core/Player/CoreService.Player.cs
@@ -129,28 +81,20 @@ public partial class CoreService
 {
     #region Player Business Logic
 
-    IMPORTANT: Start with MINIMAL business logic
-    Use generic methods directly - NO thin wrappers or pseudonyms
+    // IMPORTANT: Business logic methods now call the unified DatabaseService directly.
 
-    ❌ AVOID: Pseudonym methods that confuse intent
-    public Task<Player?> GetPlayerByIdAsync(object id) =>
-        GetByIdAsync(id, _playerRepositoryData, _playerCacheData); // Confusing!
+    // ✅ GOOD: Direct and clear data access.
+    public async Task<Player?> GetPlayerByIdAsync(Guid id)
+    {
+        return await _playerData.GetByIdAsync(id);
+    }
 
-    ✅ GOOD: Use generic methods directly from calling code
-    var player = await GetByIdAsync(playerId, _playerRepositoryData, _playerCacheData);
-
-    ✅ GOOD: Create specific methods ONLY when there's unique business logic
+    // ✅ GOOD: Specific methods for unique business logic are still valuable.
     public async Task<Player?> GetPlayerByNameAsync(string name)
     {
-        // Custom caching logic, validation, or business rules here
-        var cached = await GetByNameAsync(name, _playerCacheData, DatabaseComponent.Cache);
-        if (cached != null) return cached;
-
-        var player = await GetByNameAsync(name, _playerRepositoryData, DatabaseComponent.Repository);
-        if (player != null)
-        {
-            await CreateAsync(player, _playerCacheData, DatabaseComponent.Cache);
-        }
+        // Custom logic can still exist, but data access is simplified.
+        // Assuming a custom query method exists on DatabaseService.Repository.cs
+        var player = await _playerData.GetByNameAsync(name);
         return player;
     }
 
@@ -160,33 +104,21 @@ public partial class CoreService
 
 #### 7d. Create CoreService.Player.Data.cs with Data Operations
 
-Implement player-specific data operations that are immediately needed.
-
 ```csharp
 // File: src/WabbitBot.Core/Common/Services/Core/Player/CoreService.Player.Data.cs
 public partial class CoreService
 {
     #region Player Data Operations
 
-    // IMPORTANT: Only implement data operations when they are actually needed
-    // Start with basic CRUD operations and add complex queries as required
-
-    // Example: Start with just the basic operations and add more as needed
-    // Don't implement speculative methods like archiving, complex queries, etc.
-
-    // public async Task<IEnumerable<Player>> GetPlayersByTeamAsync(string teamId)
-    // {
-    //     // Only implement this when the feature is actually needed
-    //     // Don't assume we'll need team-based queries
-    // }
+    // IMPORTANT: Entity-specific data operations now belong in the relevant partial
+    // class of DatabaseService, e.g., DatabaseService.Repository.cs for custom queries.
+    // This CoreService partial should only contain orchestration logic if needed.
 
     #endregion
 }
 ```
 
 #### 7e. Create CoreService.Player.Validation.cs with Validation
-
-Implement player-specific validation logic only when needed.
 
 ```csharp
 // File: src/WabbitBot.Core/Common/Services/Core/Player/CoreService.Player.Validation.cs
@@ -218,19 +150,17 @@ Configure the service for direct instantiation and event-driven communication.
 // File: src/WabbitBot.Core/Program.cs - Service Registration (No Runtime DI)
 public class Program
 {
-    public static void Main(string[] args)
+    public static async Task Main(string[] args)
     {
         var host = CreateHostBuilder(args).Build();
 
         // Direct instantiation - no runtime dependency injection
         var coreService = new CoreService(
             eventBus: new CoreEventBus(),
-            errorHandler: new CoreErrorHandler());
+            errorService: new ErrorService());
 
         // Start the core service
-        host.Services.GetRequiredService<IServiceProvider>()
-            .GetRequiredService<CoreService>()
-            .StartAsync(CancellationToken.None);
+        await coreService.InitializeAsync(CancellationToken.None);
 
         host.Run();
     }
@@ -245,43 +175,42 @@ public class Program
 ```csharp
 // ❌ OLD: Multiple service classes with unclear responsibilities
 public class PlayerService      // Business logic mixed with data access
-public class PlayerRepository   // Data access with business logic
-public class PlayerCache        // Caching mixed with business rules
-public class PlayerValidator    // Validation scattered across services
-
-// Complex dependency injection setup
-services.AddScoped<IPlayerService, PlayerService>();
-services.AddScoped<IPlayerRepository, PlayerRepository>();
-// ... many more registrations
+public class PlayerRepository   // Data access layer
+public class PlayerCache        // Caching layer
+public class DataServiceManager // Complex coordination
 ```
 
 #### After (Unified Partial Classes):
 ```csharp
-// ✅ NEW: Single CoreService with clear separation via partial classes
+// ✅ NEW: Single CoreService for business logic, single DatabaseService for data access
 public partial class CoreService
 {
-    // CoreService.cs - Main service orchestration
-    // CoreService.Data.cs - Generic data operations
     // CoreService.Player.cs - Player business logic
-    // CoreService.Player.Data.cs - Player-specific data operations
-    // CoreService.Player.Validation.cs - Player validation rules
+    // CoreService.Team.cs - Team business logic
+}
+
+public partial class DatabaseService<TEntity>
+{
+    // DatabaseService.cs - High-level coordination (e.g., cache-first reads)
+    // DatabaseService.Repository.cs - Database operations
+    // DatabaseService.Cache.cs - Caching operations
+    // DatabaseService.Archive.cs - Archiving operations
 }
 
 // Direct instantiation - no runtime DI complexity
-var coreService = new CoreService(eventBus, errorHandler);
+var errorService = new ErrorService();
+var coreService = new CoreService(new CoreEventBus(), errorService);
 ```
 
 ### Architecture Benefits Achieved
 
 #### 1. **🎯 Single Responsibility Principle**
-- **CoreService.cs**: Service orchestration and configuration
-- **CoreService.Data.cs**: Generic CRUD operations for all entities
-- **CoreService.Player.cs**: Player-specific business logic only
-- **CoreService.Player.Data.cs**: Player data operations when needed
-- **CoreService.Player.Validation.cs**: Player validation rules when required
+- **CoreService**: Business logic and orchestration.
+- **DatabaseService**: All data access concerns (Repository, Cache, Archive).
+- **ErrorService**: Centralized error handling.
 
 #### 2. **🧹 Clean Code Organization**
-- Business logic separated from data access
+- Business logic fully separated from data access.
 - Validation concerns isolated
 - Generic operations reusable across entities
 - Easy to locate and maintain specific functionality
@@ -293,8 +222,8 @@ var coreService = new CoreService(eventBus, errorHandler);
 - No boilerplate service registration
 
 #### 4. **🚀 Direct Instantiation Benefits**
-- No runtime dependency injection overhead
-- Clear service initialization flow
+- No runtime dependency injection overhead.
+- Clear service initialization flow.
 - Easier debugging and testing
 - Compile-time dependency verification
 
@@ -313,10 +242,10 @@ var coreService = new CoreService(eventBus, errorHandler);
 ### Lean Implementation Approach
 
 **Phase 1 - Minimal Viable CoreService:**
-- ✅ CoreService.cs with basic orchestration
-- ✅ CoreService.Data.cs with essential CRUD generics
-- ✅ CoreService.Player.cs with direct generic usage
-- ✅ Empty validation and data operations files (add when needed)
+- ✅ CoreService.cs with business logic orchestration.
+- ✅ `DatabaseService<TEntity>` handling all data access.
+- ✅ Direct usage of `DatabaseService` from `CoreService`.
+- ✅ `ErrorService` handling all error logic.
 
 **Phase 2 - Iterative Enhancement:**
 - 🔄 Add player-specific data queries only when required
@@ -327,8 +256,9 @@ var coreService = new CoreService(eventBus, errorHandler);
 ### Success Metrics
 
 The CoreService refactor succeeds when:
-- ✅ All entity operations work through a single service instance
-- ✅ Code is organized with clear separation of concerns
+- ✅ All entity business logic flows through a single `CoreService` instance.
+- ✅ All data access flows through `DatabaseService<T>` instances.
+- ✅ Code is organized with clear separation of concerns.
 - ✅ New entity support requires minimal boilerplate
 - ✅ Direct instantiation eliminates DI complexity
 - ✅ Event messaging enables loose coupling

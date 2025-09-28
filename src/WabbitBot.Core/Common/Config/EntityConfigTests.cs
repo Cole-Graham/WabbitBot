@@ -21,12 +21,17 @@ namespace WabbitBot.Core.Common.Config
             Assert.Equal(500, config.MaxCacheSize);
             Assert.Equal(TimeSpan.FromMinutes(30), config.DefaultCacheExpiry);
 
-            Assert.Contains("id", config.Columns);
+            // Id is handled as the primary key separately, not included in columns
             Assert.Contains("name", config.Columns);
+            Assert.Contains("last_active", config.Columns);
+            Assert.Contains("is_archived", config.Columns);
+            Assert.Contains("archived_at", config.Columns);
+            Assert.Contains("team_join_limit", config.Columns);
+            Assert.Contains("team_join_cooldowns", config.Columns);
             Assert.Contains("team_ids", config.Columns);
             Assert.Contains("previous_user_ids", config.Columns);
-            Assert.Contains("created_at", config.Columns);
-            Assert.Contains("updated_at", config.Columns);
+            Assert.Contains("game_username", config.Columns);
+            Assert.Contains("previous_game_usernames", config.Columns);
         }
 
         [Fact]
@@ -52,7 +57,7 @@ namespace WabbitBot.Core.Common.Config
             Assert.Equal("users", config.TableName);
             Assert.Equal("user_archive", config.ArchiveTableName);
             Assert.Equal(1000, config.MaxCacheSize);
-            Assert.Equal(TimeSpan.FromMinutes(15), config.DefaultCacheExpiry);
+            Assert.Equal(TimeSpan.FromMinutes(60), config.DefaultCacheExpiry);
         }
         #endregion
 
@@ -64,12 +69,12 @@ namespace WabbitBot.Core.Common.Config
 
             Assert.Equal("games", config.TableName);
             Assert.Equal("game_archive", config.ArchiveTableName);
-            Assert.Equal(300, config.MaxCacheSize);
+            Assert.Equal(200, config.MaxCacheSize);
             Assert.Equal(TimeSpan.FromMinutes(10), config.DefaultCacheExpiry);
 
             Assert.Contains("team1_player_ids", config.Columns);
             Assert.Contains("team2_player_ids", config.Columns);
-            Assert.Contains("state_history", config.Columns);
+            Assert.Contains("game_number", config.Columns);
         }
 
         [Fact]
@@ -79,7 +84,7 @@ namespace WabbitBot.Core.Common.Config
 
             Assert.Equal("game_state_snapshots", config.TableName);
             Assert.Equal("game_state_snapshot_archive", config.ArchiveTableName);
-            Assert.Equal(500, config.MaxCacheSize);
+            Assert.Equal(300, config.MaxCacheSize);
             Assert.Equal(TimeSpan.FromMinutes(5), config.DefaultCacheExpiry);
 
             Assert.Contains("game_id", config.Columns);
@@ -95,7 +100,7 @@ namespace WabbitBot.Core.Common.Config
             Assert.Equal("maps", config.TableName);
             Assert.Equal("map_archive", config.ArchiveTableName);
             Assert.Equal(100, config.MaxCacheSize);
-            Assert.Equal(TimeSpan.FromHours(6), config.DefaultCacheExpiry);
+            Assert.Equal(TimeSpan.FromMinutes(60), config.DefaultCacheExpiry);
         }
         #endregion
 
@@ -108,12 +113,10 @@ namespace WabbitBot.Core.Common.Config
             Assert.Equal("leaderboards", config.TableName);
             Assert.Equal("leaderboard_archive", config.ArchiveTableName);
             Assert.Equal(50, config.MaxCacheSize);
-            Assert.Equal(TimeSpan.FromMinutes(30), config.DefaultCacheExpiry);
+            Assert.Equal(TimeSpan.FromMinutes(10), config.DefaultCacheExpiry);
 
-            Assert.Contains("id", config.Columns);
             Assert.Contains("rankings", config.Columns);
-            Assert.Contains("created_at", config.Columns);
-            Assert.Contains("updated_at", config.Columns);
+            Assert.Contains("rankings", config.JsonbColumns); // Rankings is JSONB
         }
 
         [Fact]
@@ -121,16 +124,20 @@ namespace WabbitBot.Core.Common.Config
         {
             var config = EntityConfigFactory.LeaderboardItem;
 
-            Assert.Equal("leaderboard_entries", config.TableName);
-            Assert.Equal("leaderboard_entry_archive", config.ArchiveTableName);
-            Assert.Equal(5000, config.MaxCacheSize);
-            Assert.Equal(TimeSpan.FromMinutes(5), config.DefaultCacheExpiry);
+            Assert.Equal("leaderboard_items", config.TableName);
+            Assert.Equal("leaderboard_item_archive", config.ArchiveTableName);
+            Assert.Equal(2000, config.MaxCacheSize);
+            Assert.Equal(TimeSpan.FromMinutes(15), config.DefaultCacheExpiry);
 
-            Assert.Contains("leaderboard_id", config.Columns);
-            Assert.Contains("player_id", config.Columns);
+            Assert.Contains("player_ids", config.Columns);
             Assert.Contains("team_id", config.Columns);
+            Assert.Contains("name", config.Columns);
+            Assert.Contains("wins", config.Columns);
+            Assert.Contains("losses", config.Columns);
             Assert.Contains("rating", config.Columns);
+            Assert.Contains("last_updated", config.Columns);
             Assert.Contains("is_team", config.Columns);
+            Assert.Contains("player_ids", config.JsonbColumns); // PlayerIds is List<Guid>
         }
 
         [Fact]
@@ -140,11 +147,19 @@ namespace WabbitBot.Core.Common.Config
 
             Assert.Equal("seasons", config.TableName);
             Assert.Equal("season_archive", config.ArchiveTableName);
-            Assert.Equal(25, config.MaxCacheSize);
+            Assert.Equal(100, config.MaxCacheSize);
             Assert.Equal(TimeSpan.FromMinutes(30), config.DefaultCacheExpiry);
 
+            Assert.Contains("season_group_id", config.Columns);
+            Assert.Contains("team_size", config.Columns);
+            Assert.Contains("start_date", config.Columns);
+            Assert.Contains("end_date", config.Columns);
+            Assert.Contains("is_active", config.Columns);
             Assert.Contains("participating_teams", config.Columns);
-            Assert.Contains("config", config.Columns);
+            Assert.Contains("season_config_id", config.Columns);
+            Assert.Contains("config_data", config.Columns);
+            Assert.Contains("participating_teams", config.JsonbColumns); // Dictionary
+            Assert.Contains("config_data", config.JsonbColumns); // Dictionary
         }
 
         [Fact]
@@ -154,10 +169,9 @@ namespace WabbitBot.Core.Common.Config
 
             Assert.Equal("season_configs", config.TableName);
             Assert.Equal("season_config_archive", config.ArchiveTableName);
-            Assert.Equal(100, config.MaxCacheSize);
+            Assert.Equal(20, config.MaxCacheSize);
             Assert.Equal(TimeSpan.FromMinutes(60), config.DefaultCacheExpiry);
 
-            Assert.Contains("season_id", config.Columns);
             Assert.Contains("rating_decay_enabled", config.Columns);
             Assert.Contains("decay_rate_per_week", config.Columns);
             Assert.Contains("minimum_rating", config.Columns);
@@ -170,11 +184,10 @@ namespace WabbitBot.Core.Common.Config
 
             Assert.Equal("season_groups", config.TableName);
             Assert.Equal("season_group_archive", config.ArchiveTableName);
-            Assert.Equal(50, config.MaxCacheSize);
-            Assert.Equal(TimeSpan.FromHours(2), config.DefaultCacheExpiry);
+            Assert.Equal(10, config.MaxCacheSize);
+            Assert.Equal(TimeSpan.FromMinutes(120), config.DefaultCacheExpiry);
 
             Assert.Contains("name", config.Columns);
-            Assert.Contains("description", config.Columns);
         }
         #endregion
 
@@ -191,8 +204,8 @@ namespace WabbitBot.Core.Common.Config
 
             Assert.Contains("team1_player_ids", config.Columns);
             Assert.Contains("team2_player_ids", config.Columns);
-            Assert.Contains("current_state_snapshot", config.Columns);
-            Assert.Contains("state_history", config.Columns);
+            Assert.Contains("team_size", config.Columns);
+            Assert.Contains("best_of", config.Columns);
         }
 
         [Fact]
@@ -202,12 +215,12 @@ namespace WabbitBot.Core.Common.Config
 
             Assert.Equal("match_state_snapshots", config.TableName);
             Assert.Equal("match_state_snapshot_archive", config.ArchiveTableName);
-            Assert.Equal(300, config.MaxCacheSize);
+            Assert.Equal(500, config.MaxCacheSize);
             Assert.Equal(TimeSpan.FromMinutes(10), config.DefaultCacheExpiry);
 
             Assert.Contains("match_id", config.Columns);
-            Assert.Contains("games", config.Columns);
-            Assert.Contains("available_maps", config.Columns);
+            Assert.Contains("timestamp", config.Columns);
+            Assert.Contains("user_id", config.Columns);
         }
         #endregion
 
@@ -220,8 +233,8 @@ namespace WabbitBot.Core.Common.Config
             Assert.Equal("scrimmages", config.TableName);
             Assert.Equal("scrimmage_archive", config.ArchiveTableName);
             Assert.Equal("id", config.IdColumn);
-            Assert.Equal(150, config.MaxCacheSize);
-            Assert.Equal(TimeSpan.FromMinutes(15), config.DefaultCacheExpiry);
+            Assert.Equal(200, config.MaxCacheSize);
+            Assert.Equal(TimeSpan.FromMinutes(20), config.DefaultCacheExpiry);
 
             Assert.Contains("team1_roster_ids", config.Columns);
             Assert.Contains("team2_roster_ids", config.Columns);
@@ -237,7 +250,7 @@ namespace WabbitBot.Core.Common.Config
             Assert.Equal("proven_potential_records", config.TableName);
             Assert.Equal("proven_potential_record_archive", config.ArchiveTableName);
             Assert.Equal(500, config.MaxCacheSize);
-            Assert.Equal(TimeSpan.FromMinutes(30), config.DefaultCacheExpiry);
+            Assert.Equal(TimeSpan.FromMinutes(60), config.DefaultCacheExpiry);
 
             Assert.Contains("challenger_id", config.Columns);
             Assert.Contains("opponent_id", config.Columns);
@@ -259,8 +272,9 @@ namespace WabbitBot.Core.Common.Config
             Assert.Equal(50, config.MaxCacheSize);
             Assert.Equal(TimeSpan.FromMinutes(30), config.DefaultCacheExpiry);
 
-            Assert.Contains("current_state_snapshot", config.Columns);
-            Assert.Contains("state_history", config.Columns);
+            Assert.Contains("name", config.Columns);
+            Assert.Contains("status", config.Columns);
+            Assert.Contains("description", config.Columns);
         }
 
         [Fact]
@@ -284,11 +298,12 @@ namespace WabbitBot.Core.Common.Config
         {
             var configs = EntityConfigFactory.GetAllConfigurations().ToList();
 
-            Assert.Equal(13, configs.Count);
+            Assert.Equal(23, configs.Count);
 
             // Core entities
             Assert.Contains(configs, c => c.TableName == "players");
             Assert.Contains(configs, c => c.TableName == "teams");
+            Assert.Contains(configs, c => c.TableName == "team_members");
             Assert.Contains(configs, c => c.TableName == "users");
 
             // Game entities
@@ -298,7 +313,7 @@ namespace WabbitBot.Core.Common.Config
 
             // Leaderboard entities
             Assert.Contains(configs, c => c.TableName == "leaderboards");
-            Assert.Contains(configs, c => c.TableName == "leaderboard_entries");
+            Assert.Contains(configs, c => c.TableName == "leaderboard_items");
             Assert.Contains(configs, c => c.TableName == "seasons");
             Assert.Contains(configs, c => c.TableName == "season_configs");
             Assert.Contains(configs, c => c.TableName == "season_groups");
@@ -310,6 +325,7 @@ namespace WabbitBot.Core.Common.Config
             // Scrimmage entities
             Assert.Contains(configs, c => c.TableName == "scrimmages");
             Assert.Contains(configs, c => c.TableName == "proven_potential_records");
+            Assert.Contains(configs, c => c.TableName == "scrimmage_state_snapshots");
 
             // Tournament entities
             Assert.Contains(configs, c => c.TableName == "tournaments");

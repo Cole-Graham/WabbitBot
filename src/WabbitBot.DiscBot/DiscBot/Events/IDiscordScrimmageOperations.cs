@@ -35,5 +35,5 @@ public interface IDiscordScrimmageOperations
     /// <summary>
     /// Creates private threads for each team in a match when scrimmage is accepted
     /// </summary>
-    Task<(ulong channelId, ulong team1ThreadId, ulong team2ThreadId)> CreateMatchThreadsAsync(string matchId, string team1Name, string team2Name, string evenTeamFormat, List<ulong> team1MemberIds, List<ulong> team2MemberIds);
+    Task<(ulong channelId, ulong team1ThreadId, ulong team2ThreadId)> CreateMatchThreadsAsync(string matchId, string team1Name, string team2Name, string TeamSize, List<ulong> team1MemberIds, List<ulong> team2MemberIds);
 }

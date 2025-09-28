@@ -1,4 +1,4 @@
-# WabbitBot Source Generators
+# WabbitBot Source Generators (THIS README OUT OF DATE, IGNORE)
 
 This project contains source generators for the WabbitBot Discord bot, providing compile-time code generation for commands, embeds, events, and other boilerplate code.
 

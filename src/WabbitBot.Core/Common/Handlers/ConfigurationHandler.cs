@@ -2,13 +2,13 @@ using WabbitBot.Common.Events.EventInterfaces;
 using WabbitBot.Core.Common.BotCore;
 using WabbitBot.Core.Common.Events;
 using WabbitBot.Common.Attributes;
+using WabbitBot.Common.Models;
 
 namespace WabbitBot.Core.Common.Handlers;
 
 /// <summary>
 /// Handles configuration-related events and coordinates configuration operations
 /// </summary>
-[GenerateEventSubscriptions(EnableMetrics = true, EnableErrorHandling = true, EnableLogging = true)]
 public partial class ConfigurationHandler : CoreHandler
 {
     private readonly ICoreEventBus _eventBus;
@@ -23,7 +23,7 @@ public partial class ConfigurationHandler : CoreHandler
     public override Task InitializeAsync()
     {
         // Register auto-generated event subscriptions
-        RegisterEventSubscriptions();
+        // RegisterEventSubscriptions();
         return Task.CompletedTask;
     }
 

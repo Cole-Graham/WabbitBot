@@ -2,6 +2,7 @@ using System;
 using WabbitBot.Common.Data.Service;
 using WabbitBot.Common.Models;
 using WabbitBot.Core.Common.Models;
+using WabbitBot.Core.Common.Database;
 
 namespace WabbitBot.Core.Common.Services
 {
@@ -9,95 +10,74 @@ namespace WabbitBot.Core.Common.Services
     /// Database service coordination for CoreService
     /// Provides unified DatabaseService instances for all entities
     /// </summary>
-    public partial class CoreService
+    public static partial class CoreService
     {
-        // DatabaseService instances for each entity type
-        // Set to nullable because compiler can't guarantee InitalizeDatabaseServices()
-        // will be called before these are used. Which also means we changed CoreService.Database.cs
-        // to use null-forgiving operators (yikes!). We should probably find a better solution
-        // for this.
-        private DatabaseService<Player>? _playerDb;
-        private DatabaseService<Team>? _teamDb;
-        private DatabaseService<Game>? _gameDb;
-        private DatabaseService<User>? _userDb;
-        private DatabaseService<Map>? _mapDb;
+        // Static lazy accessors for DatabaseService instances
 
-        // Vertical slice database services (to be added later)
-        // private readonly DatabaseService<Match> _matchDb;
-        // private readonly DatabaseService<Scrimmage> _scrimmageDb;
-        // private readonly DatabaseService<Tournament> _tournamentDb;
-        // private readonly DatabaseService<Leaderboard> _leaderboardDb;
-        // private readonly DatabaseService<Season> _seasonDb;
+
+
 
         /// <summary>
-        /// Initializes database services for common entities
+        /// Executes work within a safely managed DbContext scope
         /// </summary>
-        private void InitializeDatabaseServices()
+        public static async Task WithDbContext(Func<WabbitBotDbContext, Task> work)
         {
-            // Initialize DatabaseService instances for common entities
-            _playerDb = new DatabaseService<Player>(
-                tableName: "players",
-                columns: new[] { "Id", "Name", "DisplayName", "Rating", "TeamIds", "CreatedAt", "UpdatedAt" },
-                archiveTableName: "players_archive",
-                archiveColumns: new[] { "Id", "Name", "DisplayName", "Rating", "TeamIds", "CreatedAt", "UpdatedAt", "ArchivedAt" }
-            );
-
-            _teamDb = new DatabaseService<Team>(
-                tableName: "teams",
-                columns: new[] { "Id", "Name", "TeamCaptainId", "TeamMember.PlayerId", "TeamMember.JoinedAt", "Stats", "CreatedAt", "UpdatedAt" },
-                archiveTableName: "teams_archive",
-                archiveColumns: new[] { "Id", "Name", "TeamCaptainId", "TeamMember.PlayerId", "TeamMember.JoinedAt", "Stats", "CreatedAt", "UpdatedAt", "ArchivedAt" }
-            );
-
-            _gameDb = new DatabaseService<Game>(
-                tableName: "games",
-                columns: new[] { "Id", "MatchId", "MapId", "Team1PlayerIds", "Team2PlayerIds", "WinnerId", "GameFormat", "GameStateSnapshot", "CancelledByUserId", "ForfeitedByUserId", "ForfeitedTeamId", "CreatedAt", "UpdatedAt" },
-                archiveTableName: "games_archive",
-                archiveColumns: new[] { "Id", "MatchId", "MapId", "Team1PlayerIds", "Team2PlayerIds", "WinnerId", "GameFormat", "GameStateSnapshot", "CancelledByUserId", "ForfeitedByUserId", "ForfeitedTeamId", "CreatedAt", "UpdatedAt", "ArchivedAt" }
-            );
-
-            _userDb = new DatabaseService<User>(
-                tableName: "users",
-                columns: new[] { "Id", "DiscordUserId", "PlayerId", "Username", "Discriminator", "AvatarUrl", "CreatedAt", "UpdatedAt" },
-                archiveTableName: "users_archive",
-                archiveColumns: new[] { "Id", "DiscordUserId", "PlayerId", "Username", "Discriminator", "AvatarUrl", "CreatedAt", "UpdatedAt", "ArchivedAt" }
-            );
-
-            _mapDb = new DatabaseService<Map>(
-                tableName: "maps",
-                columns: new[] { "Id", "Name", "Description", "IsActive", "Size", "IsInRandomPool", "IsInTournamentPool", "ThumbnailFilename", "CreatedAt", "UpdatedAt" },
-                archiveTableName: "maps_archive",
-                archiveColumns: new[] { "Id", "Name", "Description", "IsActive", "Size", "IsInRandomPool", "IsInTournamentPool", "ThumbnailFilename", "CreatedAt", "UpdatedAt", "ArchivedAt" }
-            );
+            await using var context = await DbContextFactory.CreateDbContextAsync();
+            await work(context);
         }
 
-        #region Database Service Properties
+        /// <summary>
+        /// Executes work within a safely managed DbContext scope for fire-and-forget operations
+        /// </summary>
+        public static async Task WithDbContext(Action<WabbitBotDbContext> work)
+        {
+            await using var context = await DbContextFactory.CreateDbContextAsync();
+            work(context);
+        }
 
         /// <summary>
-        /// Gets the player database service
+        /// Executes work within a safely managed DbContext scope and returns a result
         /// </summary>
-        public DatabaseService<Player> Players => _playerDb!;
+        public static async Task<T> WithDbContext<T>(Func<WabbitBotDbContext, Task<T>> work)
+        {
+            await using var context = await DbContextFactory.CreateDbContextAsync();
+            return await work(context);
+        }
 
         /// <summary>
-        /// Gets the team database service
+        /// Executes work within a safely managed DbContext scope with standardized error handling
         /// </summary>
-        public DatabaseService<Team> Teams => _teamDb!;
+        public static async Task<Result> TryWithDbContext(Func<WabbitBotDbContext, Task> work, string operationName)
+        {
+            try
+            {
+                await using var context = await DbContextFactory.CreateDbContextAsync();
+                await work(context);
+                return Result.CreateSuccess();
+            }
+            catch (Exception ex)
+            {
+                await ErrorHandler.CaptureAsync(ex, $"Database operation failed: {operationName}", operationName);
+                return Result.Failure($"An error occurred during {operationName}: {ex.Message}");
+            }
+        }
 
         /// <summary>
-        /// Gets the game database service
+        /// Executes work within a safely managed DbContext scope with standardized error handling and returns a result
         /// </summary>
-        public DatabaseService<Game> Games => _gameDb!;
-
-        /// <summary>
-        /// Gets the user database service
-        /// </summary>
-        public DatabaseService<User> Users => _userDb!;
-
-        /// <summary>
-        /// Gets the map database service
-        /// </summary>
-        public DatabaseService<Map> Maps => _mapDb!;
-
-        #endregion
+        public static async Task<Result<T>> TryWithDbContext<T>(Func<WabbitBotDbContext, Task<T>> work, string operationName)
+        {
+            try
+            {
+                await using var context = await DbContextFactory.CreateDbContextAsync();
+                var result = await work(context);
+                return Result<T>.CreateSuccess(result);
+            }
+            catch (Exception ex)
+            {
+                await ErrorHandler.CaptureAsync(ex, $"Database operation failed: {operationName}", operationName);
+                return Result<T>.Failure($"An error occurred during {operationName}: {ex.Message}");
+            }
+        }
     }
 }

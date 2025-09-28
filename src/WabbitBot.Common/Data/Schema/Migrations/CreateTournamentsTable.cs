@@ -24,7 +24,7 @@ namespace WabbitBot.Common.Data.Schema.Migrations
                         Id TEXT PRIMARY KEY,
                         Name TEXT NOT NULL,
                         Description TEXT NOT NULL,
-                        EvenTeamFormat INTEGER NOT NULL,
+                        TeamSize INTEGER NOT NULL,
                         StartDate DATETIME NOT NULL,
                         EndDate DATETIME NULL,
                         Status INTEGER NOT NULL,

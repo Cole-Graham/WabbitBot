@@ -11,7 +11,7 @@ namespace WabbitBot.DiscBot.DiscBot.Base;
 public abstract record DiscordBaseEvent : IEvent
 {
     public EventBusType EventBusType => EventBusType.DiscBot;
-    public string EventId { get; init; } = Guid.NewGuid().ToString();
+    public Guid EventId { get; init; } = Guid.NewGuid();
     public DateTime Timestamp { get; init; } = DateTime.UtcNow;
     public string EventType => GetType().Name;
 }

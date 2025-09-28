@@ -1,11 +1,13 @@
 using WabbitBot.Core.Scrimmages;
-using WabbitBot.Core.Scrimmages.Validation;
-using WabbitBot.Core.Scrimmages.Data;
-using WabbitBot.Core.Matches;
 using WabbitBot.Core.Common.Models;
 using WabbitBot.Core.Common.Services;
 using WabbitBot.Common.Attributes;
 using WabbitBot.Common.Data;
+using WabbitBot.Common.Data.Service;
+using WabbitBot.Common.Data.Interfaces;
+using FluentValidation;
+using FluentValidation.Results;
+using WabbitBot.Common.Events.EventInterfaces;
 
 namespace WabbitBot.Core.Scrimmages;
 
@@ -15,32 +17,112 @@ namespace WabbitBot.Core.Scrimmages;
 [WabbitCommand("Scrimmage")]
 public partial class ScrimmageCommands
 {
+    private readonly ICoreEventBus _eventBus;
+
     #region Private Fields - Clean Architecture
 
-    private static readonly ScrimmageStateMachine _stateMachine = ScrimmageStateMachine.GetInstance();
-    private static readonly ScrimmageRepository _scrimmageRepository = new(DatabaseConnectionProvider.GetConnectionAsync().Result, _stateMachine);
+    private static readonly DatabaseService<Scrimmage> _scrimmageData = new();
+    private static readonly DatabaseService<Team> _teamData = new();
 
     #endregion
 
     #region Business Logic Methods
 
-    public async Task<ScrimmageResult> ChallengeAsync(string challengerTeamName, string opponentTeamName, EvenTeamFormat evenTeamFormat)
+    public class ScrimmageChallengeRequest
+    {
+        public string ChallengerTeamName { get; set; } = string.Empty;
+        public string OpponentTeamName { get; set; } = string.Empty;
+        public TeamSize TeamSize { get; set; }
+        // Teams fetched via Npgsql earlier—passed in for validation (or fetch inside async rule)
+        public Team? ChallengerTeam { get; set; }
+        public Team? OpponentTeam { get; set; }
+    }
+
+    public class ScrimmageChallengeValidator : AbstractValidator<ScrimmageChallengeRequest>
+    {
+        public ScrimmageChallengeValidator()
+        {
+            // Rule for team names: Reuse your CoreValidation via custom validator
+            // RuleFor(x => x.ChallengerTeamName)
+            //     .NotEmpty().WithMessage("Challenger team name is required")
+                //.Must(BeValidTeamName).WithMessage("Invalid challenger team name");  // Wrap CoreValidation.ValidateString
+
+            // RuleFor(x => x.OpponentTeamName)
+            //     .NotEmpty().WithMessage("Opponent team name is required")
+            //     .Must(BeValidTeamName).WithMessage("Invalid opponent team name");
+
+            // Cross-property: Not self-challenge
+            RuleFor(x => x)
+                .Must(NotBeSelfChallenge)
+                .WithMessage("A team cannot challenge itself")
+                .WithName("SelfChallenge");  // Groups error under one key if needed
+
+            // Async rule: Teams exist (injects your repo/service for Npgsql fetch if needed)
+            RuleFor(x => x.ChallengerTeam)
+                .NotNull()
+                .WithMessage(x => $"Challenger team '{x.ChallengerTeamName}' not found")
+                .DependentRules(() =>  // Only run if not null
+                {
+                    RuleFor(x => x.ChallengerTeam)
+                        .MustAsync(async (team, ct) => !team.IsArchived)  // Reuse your archive check
+                        .WithMessage(x => $"Challenger team '{x.ChallengerTeamName}' is archived and cannot participate");
+                });
+
+            RuleFor(x => x.OpponentTeam)
+                .NotNull()
+                .WithMessage(x => $"Opponent team '{x.OpponentTeamName}' not found")
+                .DependentRules(() =>
+                {
+                    RuleFor(x => x.OpponentTeam)
+                        .MustAsync(async (team, ct) => !team.IsArchived)
+                        .WithMessage(x => $"Opponent team '{x.OpponentTeamName}' is archived and cannot participate");
+                });
+
+            // Game sizes: Cross-validation with TeamSize
+            RuleFor(x => x)
+                .Must(TeamsMatchTeamSize)
+                .WithMessage(x =>
+                {
+                    // TODO: Dynamic message based on mismatch
+                    return string.Empty;
+                })
+                .When(x => x.ChallengerTeam != null && x.OpponentTeam != null);  // Only if teams loaded
+        }
+
+        // Custom validators (extract your existing logic here—keeps it procedural if you like)
+        //private static bool BeValidTeamName(string name) => CoreValidation.ValidateString(
+        //    name, "TeamName", required: true).Success;
+        //}
+
+        private static bool NotBeSelfChallenge(
+            ScrimmageChallengeRequest request) => request.ChallengerTeamName != request.OpponentTeamName;
+
+        private static bool TeamsMatchTeamSize(ScrimmageChallengeRequest request)
+        {
+            return request.ChallengerTeam?.TeamSize == request.TeamSize &&
+                request.OpponentTeam?.TeamSize == request.TeamSize;
+        }
+    }
+
+    public async Task<ScrimmageResult> ChallengeAsync(string challengerTeamName, string opponentTeamName, TeamSize TeamSize)
     {
         try
         {
             // Get team information first
-            var teamService = new WabbitBot.Core.Common.Services.TeamService();
-            var challengerTeam = await teamService.GetByNameAsync(challengerTeamName);
-            var opponentTeam = await teamService.GetByNameAsync(opponentTeamName);
+            var challengerTeam = await _teamData.GetByNameAsync(challengerTeamName, DatabaseComponent.Repository);
+            var opponentTeam = await _teamData.GetByNameAsync(opponentTeamName, DatabaseComponent.Repository);
 
             // Perform all validation checks with actual team data
-            var validationResult = await ScrimmageCommandsValidation.ValidateScrimmageChallenge(challengerTeamName, opponentTeamName, evenTeamFormat, challengerTeam, opponentTeam);
+            // var validationResult = await ScrimmageCommandsValidation.ValidateScrimmageChallenge(
+            //     challengerTeamName, opponentTeamName, TeamSize, challengerTeam, opponentTeam);
+            // TODO: Implement validation
+            var validationResult = new ValidationResult();
             if (!validationResult.IsValid)
             {
                 return new ScrimmageResult
                 {
                     Success = false,
-                    ErrorMessage = validationResult.ErrorMessage
+                    ErrorMessage = validationResult.Errors.FirstOrDefault()?.ErrorMessage
                 };
             }
 
@@ -48,22 +130,21 @@ public partial class ScrimmageCommands
             var scrimmage = new Scrimmage
             {
                 Id = Guid.NewGuid(),
-                Team1Id = challengerTeam!.Id.ToString(),
-                Team2Id = opponentTeam!.Id.ToString(),
-                EvenTeamFormat = evenTeamFormat,
-                Status = ScrimmageStatus.Created,
+                Team1Id = challengerTeam!.Data!.Id,
+                Team2Id = opponentTeam!.Data!.Id,
+                TeamSize = TeamSize,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
 
             // Save the scrimmage using the repository
-            var savedScrimmage = await _scrimmageRepository.CreateScrimmageHybridAsync(scrimmage);
-            if (savedScrimmage == null)
+            var savedScrimmage = await _scrimmageData.CreateAsync(scrimmage, DatabaseComponent.Repository);
+            if (!savedScrimmage.Success)
             {
                 return new ScrimmageResult
                 {
                     Success = false,
-                    ErrorMessage = "Failed to create scrimmage in database"
+                    ErrorMessage = savedScrimmage.ErrorMessage
                 };
             }
 
@@ -71,7 +152,7 @@ public partial class ScrimmageCommands
             {
                 Success = true,
                 Message = $"Scrimmage challenge created successfully between {challengerTeamName} and {opponentTeamName}",
-                Scrimmage = savedScrimmage,
+                Scrimmage = savedScrimmage.Data,
                 ChallengerTeamName = challengerTeamName,
                 OpponentTeamName = opponentTeamName
             };
@@ -87,129 +168,135 @@ public partial class ScrimmageCommands
     }
 
 
-    public async Task<ScrimmageResult> SubmitMapBansAsync(string scrimmageId, string teamId, List<string> mapBans)
-    {
-        try
-        {
-            // Get scrimmage using repository's hybrid approach
-            var scrimmage = await _scrimmageRepository.GetScrimmageHybridAsync(scrimmageId);
-            if (scrimmage == null)
-                return new ScrimmageResult { Success = false, ErrorMessage = "Scrimmage not found" };
+    // public async Task<ScrimmageResult> SubmitMapBansAsync(string scrimmageId, string teamId, List<string> mapBans)
+    // {
+    //     try
+    //     {
+    //         // Get scrimmage using repository's hybrid approach
+    //         var scrimmage = await _scrimmageData.GetByIdAsync(scrimmageId, DatabaseComponent.Repository);
+    //         if (scrimmage == null)
+    //             return new ScrimmageResult { Success = false, ErrorMessage = "Scrimmage not found" };
 
-            // Check if scrimmage is in the right state
-            if (scrimmage.Status != ScrimmageStatus.InProgress)
-                return new ScrimmageResult { Success = false, ErrorMessage = "Scrimmage is not in progress" };
+    //         // TODO: Check right state to submit map bans
+    //         var scrimmageState = ScrimmageCore.StateMachine.CanTransition(scrimmage, ScrimmageCore.ScrimmageStatus.InProgress);
 
-            // Get the associated match
-            if (scrimmage.Match == null)
-                return new ScrimmageResult { Success = false, ErrorMessage = "Match not found" };
+    //         // Check if scrimmage is in the right state
+    //         if (!scrimmageState)
+    //             return new ScrimmageResult { Success = false, ErrorMessage = "Scrimmage is not in progress" };
 
-            // SubmitMapBans() moved to MatchService - will be handled by ScrimmageService
-            // TODO: Update to use MatchService.SubmitMapBansAsync()
+    //         // Get the associated match
+    //         if (scrimmage.Match == null)
+    //             return new ScrimmageResult { Success = false, ErrorMessage = "Match not found" };
 
-            // Persist changes using repository's hybrid approach
-            await _scrimmageRepository.UpdateScrimmageHybridAsync(scrimmage);
+    //         // SubmitMapBans() moved to MatchService - will be handled by ScrimmageService
+    //         // TODO: Update to use MatchService.SubmitMapBansAsync()
 
-            return new ScrimmageResult
-            {
-                Success = true,
-                Message = "Map bans submitted successfully"
-            };
-        }
-        catch (Exception ex)
-        {
-            return new ScrimmageResult
-            {
-                Success = false,
-                ErrorMessage = $"Error submitting map bans: {ex.Message}"
-            };
-        }
-    }
+    //         // Persist changes using repository's hybrid approach
+    //         await _scrimmageData.UpdateAsync(scrimmage, DatabaseComponent.Repository);
 
-    public async Task<ScrimmageResult> SubmitDeckCodeAsync(string scrimmageId, string teamId, string deckCode)
-    {
-        try
-        {
-            // Get scrimmage using repository's hybrid approach
-            var scrimmage = await _scrimmageRepository.GetScrimmageHybridAsync(scrimmageId);
-            if (scrimmage == null)
-                return new ScrimmageResult { Success = false, ErrorMessage = "Scrimmage not found" };
+    //         return new ScrimmageResult
+    //         {
+    //             Success = true,
+    //             Message = "Map bans submitted successfully"
+    //         };
+    //     }
+    //     catch (Exception ex)
+    //     {
+    //         return new ScrimmageResult
+    //         {
+    //             Success = false,
+    //             ErrorMessage = $"Error submitting map bans: {ex.Message}"
+    //         };
+    //     }
+    // }
 
-            // Check if scrimmage is in the right state
-            if (scrimmage.Status != ScrimmageStatus.InProgress)
-                return new ScrimmageResult { Success = false, ErrorMessage = "Scrimmage is not in progress" };
+    // public async Task<ScrimmageResult> SubmitDeckCodeAsync(string scrimmageId, string teamId, string deckCode)
+    // {
+    //     try
+    //     {
+    //         // Get scrimmage using repository's hybrid approach
+    //         var scrimmage = await _scrimmageData.GetByIdAsync(scrimmageId, DatabaseComponent.Repository);
+    //         if (scrimmage == null)
+    //             return new ScrimmageResult { Success = false, ErrorMessage = "Scrimmage not found" };
 
-            // Get the associated match
-            if (scrimmage.Match == null)
-                return new ScrimmageResult { Success = false, ErrorMessage = "Match not found" };
+    //         // Check if scrimmage is in the right state
+    //         if (!ScrimmageCore.StateMachine.CanTransition(scrimmage, ScrimmageCore.ScrimmageStatus.InProgress))
+    //             return new ScrimmageResult { Success = false, ErrorMessage = "Scrimmage is not in progress" };
 
-            // SubmitDeckCode() moved to MatchService - will be handled by ScrimmageService
-            // TODO: Update to use MatchService.SubmitDeckCodeAsync()
+    //         // Get the associated match
+    //         if (scrimmage.Match == null)
+    //             return new ScrimmageResult { Success = false, ErrorMessage = "Match not found" };
 
-            // Persist changes using repository's hybrid approach
-            await _scrimmageRepository.UpdateScrimmageHybridAsync(scrimmage);
+    //         // SubmitDeckCode() moved to MatchService - will be handled by ScrimmageService
+    //         // TODO: Update to use MatchService.SubmitDeckCodeAsync()
 
-            return new ScrimmageResult
-            {
-                Success = true,
-                Message = "Deck code submitted successfully"
-            };
-        }
-        catch (Exception ex)
-        {
-            return new ScrimmageResult
-            {
-                Success = false,
-                ErrorMessage = $"Error submitting deck code: {ex.Message}"
-            };
-        }
-    }
+    //         // Persist changes using repository's hybrid approach
+    //         await _scrimmageData.UpdateAsync(scrimmage, DatabaseComponent.Repository);
 
-    public async Task<ScrimmageResult> ReportGameResultAsync(string scrimmageId, string winnerId)
-    {
-        try
-        {
-            // Get scrimmage using repository's hybrid approach
-            var scrimmage = await _scrimmageRepository.GetScrimmageHybridAsync(scrimmageId);
-            if (scrimmage == null)
-                return new ScrimmageResult { Success = false, ErrorMessage = "Scrimmage not found" };
+    //         return new ScrimmageResult
+    //         {
+    //             Success = true,
+    //             Message = "Deck code submitted successfully"
+    //         };
+    //     }
+    //     catch (Exception ex)
+    //     {
+    //         return new ScrimmageResult
+    //         {
+    //             Success = false,
+    //             ErrorMessage = $"Error submitting deck code: {ex.Message}"
+    //         };
+    //     }
+    // }
 
-            // Check if scrimmage is in the right state
-            if (scrimmage.Status != ScrimmageStatus.InProgress)
-                return new ScrimmageResult { Success = false, ErrorMessage = "Scrimmage is not in progress" };
+    // public async Task<ScrimmageResult> ReportGameResultAsync(string scrimmageId, string winnerId)
+    // {
+    //     try
+    //     {
+    //         // Get scrimmage using repository's hybrid approach
+    //         var scrimmage = await _scrimmageData.GetByIdAsync(scrimmageId, DatabaseComponent.Repository);
+    //         if (scrimmage == null)
+    //             return new ScrimmageResult { Success = false, ErrorMessage = "Scrimmage not found" };
 
-            // Get the associated match
-            if (scrimmage.Match == null)
-                return new ScrimmageResult { Success = false, ErrorMessage = "Match not found" };
+    //         // Check if scrimmage is in the right state
+    //         if (!ScrimmageCore.StateMachine.CanTransition(scrimmage, ScrimmageCore.ScrimmageStatus.InProgress))
+    //             return new ScrimmageResult { Success = false, ErrorMessage = "Scrimmage is not in progress" };
 
-            // ReportGameResult() moved to MatchService - will be handled by ScrimmageService
-            // TODO: Update to use MatchService.ReportGameResultAsync()
+    //         // Get the associated match
+    //         if (scrimmage.Match == null)
+    //             return new ScrimmageResult { Success = false, ErrorMessage = "Match not found" };
 
-            // Check if the match is completed and update scrimmage status if needed
-            if (scrimmage.Match.CurrentState == MatchState.Completed)
-            {
-                // Complete the scrimmage using existing method
-                await scrimmage.CompleteAsync(winnerId);
-            }
+    //         // ReportGameResult() moved to MatchService - will be handled by ScrimmageService
+    //         // TODO: Update to use MatchService.ReportGameResultAsync()
 
-            // Persist changes using repository's hybrid approach
-            await _scrimmageRepository.UpdateScrimmageHybridAsync(scrimmage);
+    //         // TODO: Set up event subscription to get match state
+    //         // var matchState = await _eventBus.RequestAsync
 
-            return new ScrimmageResult
-            {
-                Success = true,
-                Message = "Game result reported successfully"
-            };
-        }
-        catch (Exception ex)
-        {
-            return new ScrimmageResult
-            {
-                Success = false,
-                ErrorMessage = $"Error reporting game result: {ex.Message}"
-            };
-        }
-    }
+    //         // Check if the match is completed and update scrimmage status if needed
+    //         // if (matchState == MatchCore.MatchStatus.Completed)
+    //         // {
+    //         //     // Complete the scrimmage using existing method
+    //         //     await scrimmage.CompleteAsync(winnerId);
+    //         // }
+
+    //         // Persist changes using repository's hybrid approach
+    //         await _scrimmageData.UpdateAsync(scrimmage, DatabaseComponent.Repository);
+
+    //         return new ScrimmageResult
+    //         {
+    //             Success = true,
+    //             Message = "Game result reported successfully"
+    //         };
+    //     }
+    //     catch (Exception ex)
+    //     {
+    //         return new ScrimmageResult
+    //         {
+    //             Success = false,
+    //             ErrorMessage = $"Error reporting game result: {ex.Message}"
+    //         };
+    //     }
+    // }
 
     #endregion
 

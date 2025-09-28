@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using WabbitBot.Common.Data;
 using WabbitBot.Common.Data.Interfaces;
+using WabbitBot.Common.Data.Schema;
 using WabbitBot.Common.Models;
 
 namespace WabbitBot.Common.Data.Service;
@@ -24,7 +25,7 @@ public partial class DatabaseService<TEntity> : IDatabaseService<TEntity> where 
         // These would be overridden by entity-specific factory methods
         InitializeRepository("entities", new[] { "Id", "Name", "CreatedAt", "UpdatedAt" });
         InitializeCache(1000, TimeSpan.FromHours(1));
-        InitializeArchive("entities_archive", new[] { "Id", "Name", "CreatedAt", "UpdatedAt", "ArchivedAt" });
+        // InitializeArchive("entities_archive", new[] { "Id", "Name", "CreatedAt", "UpdatedAt", "ArchivedAt" });
     }
 
     /// <summary>
@@ -41,108 +42,242 @@ public partial class DatabaseService<TEntity> : IDatabaseService<TEntity> where 
     {
         InitializeRepository(tableName, columns, idColumn);
         InitializeCache(cacheMaxSize, cacheDefaultExpiry);
-        InitializeArchive(archiveTableName, archiveColumns);
+        // InitializeArchive(archiveTableName, archiveColumns);
     }
 
     #region IDatabaseService Implementation
 
     public async Task<Result<TEntity>> CreateAsync(TEntity entity, DatabaseComponent component)
     {
-        return component switch
+        Result<TEntity>? result;
+        switch (component)
         {
-            DatabaseComponent.Repository => await CreateInRepositoryAsync(entity),
-            DatabaseComponent.Cache => await CreateInCacheAsync(entity),
-            DatabaseComponent.Archive => await CreateInArchiveAsync(entity),
-            _ => throw new ArgumentException($"Unsupported component: {component}", nameof(component))
-        };
+            case DatabaseComponent.Repository:
+                result = await CreateInRepositoryAsync(entity);
+                break;
+            case DatabaseComponent.Cache:
+                result = await CreateInCacheAsync(entity);
+                break;
+            // case DatabaseComponent.Archive:
+            //     result = await CreateInArchiveAsync(entity);
+            //     break;
+            default:
+                throw new ArgumentException($"Unsupported component: {component}", nameof(component));
+        }
+
+        if (result is null)
+        {
+            throw new ArgumentException($"Create operation for component '{component}' returned null.", nameof(component));
+        }
+
+        return result;
     }
 
     public async Task<Result<TEntity>> UpdateAsync(TEntity entity, DatabaseComponent component)
     {
-        return component switch
+        Result<TEntity>? result;
+        switch (component)
         {
-            DatabaseComponent.Repository => await UpdateInRepositoryAsync(entity),
-            DatabaseComponent.Cache => await UpdateInCacheAsync(entity),
-            _ => throw new ArgumentException($"Unsupported component for update: {component}", nameof(component))
-        };
+            case DatabaseComponent.Repository:
+                result = await UpdateInRepositoryAsync(entity);
+                if (result.Success)
+                {
+                    await UpdateInCacheAsync(result.Data!);
+                }
+                break;
+            case DatabaseComponent.Cache:
+                result = await UpdateInCacheAsync(entity);
+                break;
+            // case DatabaseComponent.Archive:
+            //     result = await UpdateInArchiveAsync(entity);
+            //     break;
+            default:
+                throw new ArgumentException($"Unsupported component for update: {component}", nameof(component));
+        }
+
+        if (result is null)
+        {
+            throw new ArgumentException($"Update operation for component '{component}' returned null.", nameof(component));
+        }
+
+        return result;
     }
 
     public async Task<Result<TEntity>> DeleteAsync(object id, DatabaseComponent component)
     {
-        return component switch
+        Result<TEntity>? result;
+        switch (component)
         {
-            DatabaseComponent.Repository => await DeleteFromRepositoryAsync(id),
-            DatabaseComponent.Cache => await DeleteFromCacheAsync(id),
-            _ => throw new ArgumentException($"Unsupported component for delete: {component}", nameof(component))
-        };
-    }
-
-    public async Task<bool> ExistsAsync(object id, DatabaseComponent component)
-    {
-        return component switch
-        {
-            DatabaseComponent.Repository => await ExistsInRepositoryAsync(id),
-            DatabaseComponent.Cache => await ExistsInCacheAsync(id),
-            _ => throw new ArgumentException($"Unsupported component for exists: {component}", nameof(component))
-        };
-    }
-
-    public async Task<TEntity?> GetByIdAsync(object id, DatabaseComponent component)
-    {
-        return component switch
-        {
-            DatabaseComponent.Repository => await GetByIdFromRepositoryAsync(id),
-            DatabaseComponent.Cache => await GetByIdFromCacheAsync(id),
-            _ => throw new ArgumentException($"Unsupported component for GetById: {component}", nameof(component))
-        };
-    }
-
-    public async Task<TEntity?> GetByStringIdAsync(string id, DatabaseComponent component)
-    {
-        // Convert string to appropriate type (Guid for now)
-        if (Guid.TryParse(id, out var guid))
-        {
-            return await GetByIdAsync(guid, component);
+            case DatabaseComponent.Repository:
+                result = await DeleteFromRepositoryAsync(id);
+                if (result.Success)
+                {
+                    await DeleteFromCacheAsync(id);
+                }
+                break;
+            case DatabaseComponent.Cache:
+                result = await DeleteFromCacheAsync(id);
+                break;
+            // case DatabaseComponent.Archive:
+            //     result = await DeleteFromArchiveAsync(id);
+            //     break;
+            default:
+                throw new ArgumentException($"Unsupported component for delete: {component}", nameof(component));
         }
-        return null;
+
+        if (result is null)
+        {
+            throw new ArgumentException($"Delete operation for component '{component}' returned null.", nameof(component));
+        }
+
+        return result;
     }
 
-    public async Task<TEntity?> GetByNameAsync(string name, DatabaseComponent component)
+    public async Task<Result<bool>> ExistsAsync(object id, DatabaseComponent component)
     {
-        return component switch
+        switch (component)
         {
-            DatabaseComponent.Repository => await GetByNameFromRepositoryAsync(name),
-            DatabaseComponent.Cache => await GetByNameFromCacheAsync(name),
-            _ => throw new ArgumentException($"Unsupported component for GetByName: {component}", nameof(component))
-        };
+            case DatabaseComponent.Repository:
+                if (await ExistsInCacheAsync(id))
+                {
+                    return Result<bool>.CreateSuccess(true);
+                }
+                return Result<bool>.CreateSuccess(await ExistsInRepositoryAsync(id));
+            case DatabaseComponent.Cache:
+                return Result<bool>.CreateSuccess(await ExistsInCacheAsync(id));
+            default:
+                return Result<bool>.Failure($"Unsupported component for exists: {component}");
+        }
     }
 
-    public async Task<IEnumerable<TEntity>> GetAllAsync(DatabaseComponent component)
+    public async Task<Result<TEntity?>> GetByIdAsync(object id, DatabaseComponent component)
     {
-        return component switch
+        TEntity? entity;
+        switch (component)
         {
-            DatabaseComponent.Repository => await GetAllFromRepositoryAsync(),
-            DatabaseComponent.Cache => await GetAllFromCacheAsync(),
-            _ => throw new ArgumentException($"Unsupported component for GetAll: {component}", nameof(component))
-        };
+            case DatabaseComponent.Repository:
+                entity = await GetByIdFromCacheAsync(id);
+                if (entity is not null)
+                {
+                    return Result<TEntity?>.CreateSuccess(entity);
+                }
+                entity = await GetByIdFromRepositoryAsync(id);
+                return Result<TEntity?>.CreateSuccess(entity);
+
+            case DatabaseComponent.Cache:
+                entity = await GetByIdFromCacheAsync(id);
+                return Result<TEntity?>.CreateSuccess(entity);
+
+            default:
+                return Result<TEntity?>.Failure(
+                    $"Unsupported component for GetById: {component}"
+                );
+        }
     }
 
-    public async Task<IEnumerable<TEntity>> GetByDateRangeAsync(DateTime startDate, DateTime endDate, DatabaseComponent component)
+    public async Task<Result<TEntity?>> GetByStringIdAsync(string id, DatabaseComponent component)
     {
-        return component switch
+        if (!Guid.TryParse(id, out var guid))
         {
-            DatabaseComponent.Repository => await GetByDateRangeFromRepositoryAsync(startDate, endDate),
-            _ => throw new ArgumentException($"Unsupported component for GetByDateRange: {component}", nameof(component))
-        };
+            return Result<TEntity?>.CreateSuccess(null, "Invalid GUID format.");
+        }
+
+        TEntity? entity;
+        switch (component)
+        {
+            case DatabaseComponent.Repository:
+                entity = await GetByIdFromCacheAsync(guid);
+                if (entity is not null)
+                {
+                    return Result<TEntity?>.CreateSuccess(entity);
+                }
+                entity = await GetByIdFromRepositoryAsync(guid);
+                return Result<TEntity?>.CreateSuccess(entity);
+            case DatabaseComponent.Cache:
+                entity = await GetByIdFromCacheAsync(guid);
+                return Result<TEntity?>.CreateSuccess(entity);
+            default:
+                return Result<TEntity?>.Failure(
+                    $"Unsupported component for GetByStringId: {component}"
+                );
+        }
     }
 
-    public async Task<IEnumerable<TEntity>> QueryAsync(string whereClause, object? parameters, DatabaseComponent component)
+    public async Task<Result<TEntity?>> GetByNameAsync(string name, DatabaseComponent component)
     {
-        return component switch
+        TEntity? entity;
+        switch (component)
         {
-            DatabaseComponent.Repository => await QueryFromRepositoryAsync(whereClause, parameters),
-            _ => throw new ArgumentException($"Unsupported component for Query: {component}", nameof(component))
-        };
+            case DatabaseComponent.Repository:
+                entity = await GetByNameFromCacheAsync(name);
+                if (entity is not null)
+                {
+                    return Result<TEntity?>.CreateSuccess(entity);
+                }
+                entity = await GetByNameFromRepositoryAsync(name);
+                return Result<TEntity?>.CreateSuccess(entity);
+            case DatabaseComponent.Cache:
+                entity = await GetByNameFromCacheAsync(name);
+                return Result<TEntity?>.CreateSuccess(entity);
+            default:
+                return Result<TEntity?>.Failure(
+                    $"Unsupported component for GetByName: {component}"
+                );
+        }
+    }
+
+    public async Task<Result<IEnumerable<TEntity>>> GetAllAsync(DatabaseComponent component)
+    {
+        IEnumerable<TEntity>? result;
+        switch (component)
+        {
+            case DatabaseComponent.Repository:
+                result = await GetAllFromRepositoryAsync();
+                return Result<IEnumerable<TEntity>>.CreateSuccess(result);
+            case DatabaseComponent.Cache:
+                result = await GetAllFromCacheAsync();
+                return Result<IEnumerable<TEntity>>.CreateSuccess(result);
+            default:
+                return Result<IEnumerable<TEntity>>.Failure(
+                    $"Unsupported component for GetAll: {component}"
+                );
+        }
+    }
+
+    public async Task<Result<IEnumerable<TEntity>>> GetByDateRangeAsync(
+        DateTime startDate,
+        DateTime endDate,
+        DatabaseComponent component)
+    {
+        IEnumerable<TEntity>? result;
+        switch (component)
+        {
+            case DatabaseComponent.Repository:
+                result = await GetByDateRangeFromRepositoryAsync(startDate, endDate);
+                return Result<IEnumerable<TEntity>>.CreateSuccess(result);
+            default:
+                return Result<IEnumerable<TEntity>>.Failure(
+                    $"Unsupported component for GetByDateRange: {component}"
+                );
+        }
+    }
+
+    public async Task<Result<IEnumerable<TEntity>>> QueryAsync(
+        string whereClause,
+        object? parameters,
+        DatabaseComponent component)
+    {
+        IEnumerable<TEntity>? result;
+        switch (component)
+        {
+            case DatabaseComponent.Repository:
+                result = await QueryFromRepositoryAsync(whereClause, parameters);
+                return Result<IEnumerable<TEntity>>.CreateSuccess(result);
+            default:
+                return Result<IEnumerable<TEntity>>.Failure(
+                    $"Unsupported component for Query: {component}"
+                );
+        }
     }
 
     #endregion

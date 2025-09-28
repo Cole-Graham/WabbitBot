@@ -33,7 +33,7 @@ namespace WabbitBot.Common.Data.Schema
                         ChallengerOriginalRatingChange REAL NOT NULL,
                         OpponentOriginalRatingChange REAL NOT NULL,
                         RatingAdjustment REAL NOT NULL,
-                        EvenTeamFormat INTEGER NOT NULL,
+                        TeamSize INTEGER NOT NULL,
                         LastCheckedAt DATETIME,
                         IsComplete BOOLEAN NOT NULL,
                         CreatedAt DATETIME NOT NULL,

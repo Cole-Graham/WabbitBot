@@ -36,7 +36,7 @@ public interface IEvent
     /// <summary>
     /// Unique identifier for this event instance.
     /// </summary>
-    string EventId { get; }
+    Guid EventId { get; }
 
     /// <summary>
     /// Timestamp when the event was created.

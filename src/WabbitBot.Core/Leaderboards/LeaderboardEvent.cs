@@ -13,13 +13,13 @@ namespace WabbitBot.Core.Leaderboards;
 /// Event published when a leaderboard is successfully refreshed from Season data.
 /// </summary>
 public partial record LeaderboardRefreshedEvent(
-    EvenTeamFormat EvenTeamFormat,
+    TeamSize TeamSize,
     int TeamCount,
     DateTime RefreshedAt = default
 ) : IEvent
 {
     public EventBusType EventBusType { get; init; } = EventBusType.Core;
-    public string EventId { get; init; } = Guid.NewGuid().ToString();
+    public Guid EventId { get; init; } = Guid.NewGuid();
     public DateTime Timestamp { get; init; } = DateTime.UtcNow;
     public DateTime RefreshedAt { get; init; } = RefreshedAt == default ? DateTime.UtcNow : RefreshedAt;
 }
@@ -28,13 +28,13 @@ public partial record LeaderboardRefreshedEvent(
 /// Event published when leaderboard refresh fails.
 /// </summary>
 public partial record LeaderboardRefreshFailedEvent(
-    EvenTeamFormat EvenTeamFormat,
+    TeamSize TeamSize,
     string ErrorMessage,
     DateTime FailedAt = default
 ) : IEvent
 {
     public EventBusType EventBusType { get; init; } = EventBusType.Core;
-    public string EventId { get; init; } = Guid.NewGuid().ToString();
+    public Guid EventId { get; init; } = Guid.NewGuid();
     public DateTime Timestamp { get; init; } = DateTime.UtcNow;
     public DateTime FailedAt { get; init; } = FailedAt == default ? DateTime.UtcNow : FailedAt;
 }
@@ -48,7 +48,7 @@ public partial record AllLeaderboardsRefreshedEvent(
 ) : IEvent
 {
     public EventBusType EventBusType { get; init; } = EventBusType.Core;
-    public string EventId { get; init; } = Guid.NewGuid().ToString();
+    public Guid EventId { get; init; } = Guid.NewGuid();
     public DateTime Timestamp { get; init; } = DateTime.UtcNow;
     public DateTime RefreshedAt { get; init; } = RefreshedAt == default ? DateTime.UtcNow : RefreshedAt;
 }

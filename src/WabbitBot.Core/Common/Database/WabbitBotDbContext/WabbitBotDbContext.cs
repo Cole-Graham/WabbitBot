@@ -2,12 +2,8 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using WabbitBot.Core.Common.Models;
 using WabbitBot.Core.Leaderboards;
-using WabbitBot.Core.Matches;
-using WabbitBot.Core.Matches.Data;
 using WabbitBot.Core.Tournaments;
-using WabbitBot.Core.Tournaments.Data;
 using WabbitBot.Core.Scrimmages;
-using WabbitBot.Core.Scrimmages.ScrimmageRating;
 
 namespace WabbitBot.Core.Common.Database
 {
@@ -33,6 +29,7 @@ namespace WabbitBot.Core.Common.Database
             ConfigureMap(modelBuilder);
             ConfigurePlayer(modelBuilder);
             ConfigureTeam(modelBuilder);
+            ConfigureTeamVarietyStats(modelBuilder);
             ConfigureUser(modelBuilder);
 
             // LEADERBOARD entities
@@ -42,6 +39,8 @@ namespace WabbitBot.Core.Common.Database
 
             // MATCH entities
             ConfigureMatch(modelBuilder);
+            ConfigureMatchParticipant(modelBuilder);
+            ConfigureTeamOpponentEncounter(modelBuilder);
             ConfigureMatchStateSnapshot(modelBuilder); // Property class used in Match entity
 
             // SCRIMMAGE entities
@@ -132,7 +131,7 @@ namespace WabbitBot.Core.Common.Database
                 .HasDatabaseName("idx_leaderboard_items_last_updated");
 
             modelBuilder.Entity<Season>()
-                .HasIndex(s => s.EvenTeamFormat)
+                .HasIndex(s => s.TeamSize)
                 .HasDatabaseName("idx_seasons_game_size");
 
             modelBuilder.Entity<SeasonConfig>()
@@ -161,13 +160,14 @@ namespace WabbitBot.Core.Common.Database
 
             #region Match
             // initialschema.match.cs
-            modelBuilder.Entity<Match>()
-                .HasIndex(m => m.Team1Id)
-                .HasDatabaseName("idx_matches_team1_id");
+            // TODO: These were moved to MatchParticipant
+            // modelBuilder.Entity<Match>()
+            //     .HasIndex(m => m.Team1Id)
+            //     .HasDatabaseName("idx_matches_team1_id");
 
-            modelBuilder.Entity<Match>()
-                .HasIndex(m => m.Team2Id)
-                .HasDatabaseName("idx_matches_team2_id");
+            // modelBuilder.Entity<Match>()
+            //     .HasIndex(m => m.Team2Id)
+            //     .HasDatabaseName("idx_matches_team2_id");
 
             modelBuilder.Entity<MatchStateSnapshot>()
                 .HasIndex(mss => mss.MatchId)
@@ -201,14 +201,14 @@ namespace WabbitBot.Core.Common.Database
                 .HasDatabaseName("idx_proven_potential_records_opponent_id");
 
             modelBuilder.Entity<ProvenPotentialRecord>()
-                .HasIndex(ppr => ppr.EvenTeamFormat)
+                .HasIndex(ppr => ppr.TeamSize)
                 .HasDatabaseName("idx_proven_potential_records_game_size");
             #endregion
 
             #region Tournament
             // initialschema.tournament.cs
             modelBuilder.Entity<Tournament>()
-                .HasIndex(t => t.EvenTeamFormat)
+                .HasIndex(t => t.TeamSize)
                 .HasDatabaseName("idx_tournaments_game_size");
 
             modelBuilder.Entity<TournamentStateSnapshot>()

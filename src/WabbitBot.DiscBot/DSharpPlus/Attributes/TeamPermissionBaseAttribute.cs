@@ -6,9 +6,9 @@ using DSharpPlus.Commands.ContextChecks;
 using DSharpPlus.Commands.Trees;
 using WabbitBot.Core.Common.Models;
 using WabbitBot.Common.Models;
-using WabbitBot.Core.Common.Data.Interface;
-using WabbitBot.Core.Common.Services;
 using WabbitBot.DiscBot.DSharpPlus;
+using WabbitBot.Common.Data.Service;
+using WabbitBot.Common.Data.Interfaces;
 
 namespace WabbitBot.DiscBot.DSharpPlus.Attributes
 {
@@ -18,6 +18,7 @@ namespace WabbitBot.DiscBot.DSharpPlus.Attributes
     [AttributeUsage(AttributeTargets.Method, AllowMultiple = false)]
     public abstract class TeamPermissionBaseAttribute : Attribute, IContextCheck
     {
+        private readonly DatabaseService<Team> _teamData = new();
         /// <summary>
         /// The name of the parameter that contains the team ID or name
         /// </summary>
@@ -60,17 +61,17 @@ namespace WabbitBot.DiscBot.DSharpPlus.Attributes
                     return $"Parameter '{TeamParameterName}' cannot be empty.";
 
                 // Get the team (could be by ID or name)
-                var teamService = new TeamService();
+                // TODO: Make sure teamParameter is a valid ID or name
                 var team = teamParameter.StartsWith("team-")
-                    ? await teamService.GetByNameAsync(teamParameter)
-                    : await teamService.GetByTagAsync(teamParameter);
+                    ? await _teamData.GetByNameAsync(teamParameter, DatabaseComponent.Repository)
+                    : await _teamData.GetByIdAsync(teamParameter, DatabaseComponent.Repository);
 
                 // If team not found, fail
                 if (team == null)
                     return $"Team '{teamParameter}' not found.";
 
                 // Perform the specific permission check for this attribute
-                return await PerformTeamPermissionCheckAsync(context, team);
+                return await PerformTeamPermissionCheckAsync(context, team.Data!);
             }
             catch (Exception ex)
             {

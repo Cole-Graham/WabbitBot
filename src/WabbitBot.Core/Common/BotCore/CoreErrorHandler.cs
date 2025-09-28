@@ -10,13 +10,13 @@ namespace WabbitBot.Core.Common.BotCore;
 public class CoreErrorHandler : CoreHandler, ICoreErrorHandler
 {
     private static CoreErrorHandler? _instance;
-    private static readonly object _instanceLock = new();
+    private static readonly Lock _instanceLock = new();
 
     public static CoreErrorHandler Instance
     {
         get
         {
-            if (_instance == null)
+            if (_instance is null)
             {
                 lock (_instanceLock)
                 {
@@ -117,7 +117,7 @@ public class CoreErrorHandler : CoreHandler, ICoreErrorHandler
     /// <summary>
     /// Logs an error with timestamp and context
     /// </summary>
-    private void LogError(Exception ex, string? context = null)
+    private static void LogError(Exception ex, string? context = null)
     {
         var timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
         var contextInfo = string.IsNullOrEmpty(context) ? "" : $" [{context}]";
@@ -148,6 +148,7 @@ public class CoreErrorHandler : CoreHandler, ICoreErrorHandler
         }
     }
 
+
     /// <summary>
     /// Publishes an error event to the global event bus
     /// </summary>
@@ -173,24 +174,26 @@ public class CoreErrorHandler : CoreHandler, ICoreErrorHandler
 /// </summary>
 internal class MinimalCoreEventBus : ICoreEventBus
 {
-    public Task PublishAsync<TEvent>(TEvent @event) where TEvent : class
+    public ValueTask PublishAsync<TEvent>(TEvent @event) where TEvent : class, IEvent
     {
         // Just log that we can't publish - this is a fallback scenario
         Console.WriteLine($"[MinimalCoreEventBus] Cannot publish {typeof(TEvent).Name} - CoreEventBus not available");
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
-    public void Subscribe<TEvent>(Func<TEvent, Task> handler) where TEvent : class
+    public void Subscribe<TEvent>(Func<TEvent, Task> handler) where TEvent : class, IEvent
     {
         // No-op for minimal implementation
     }
 
-    public void Unsubscribe<TEvent>(Func<TEvent, Task> handler) where TEvent : class
+    public void Unsubscribe<TEvent>(Func<TEvent, Task> handler) where TEvent : class, IEvent
     {
         // No-op for minimal implementation
     }
 
-    public Task<TResponse?> RequestAsync<TRequest, TResponse>(TRequest request) where TRequest : class where TResponse : class
+    public Task<TResponse?> RequestAsync<TRequest, TResponse>(TRequest request)
+        where TRequest : class, IEvent
+        where TResponse : class, IEvent
     {
         return Task.FromResult<TResponse?>(null);
     }

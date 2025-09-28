@@ -11,7 +11,7 @@ namespace WabbitBot.DiscBot.DiscBot.Events;
 public abstract record ScrimmageDiscordEvent : IEvent
 {
     public EventBusType EventBusType => EventBusType.DiscBot;
-    public string EventId { get; init; } = Guid.NewGuid().ToString();
+    public Guid EventId { get; init; } = Guid.NewGuid();
     public DateTime Timestamp { get; init; } = DateTime.UtcNow;
     public string ScrimmageId { get; init; } = string.Empty;
 }
@@ -42,7 +42,7 @@ public record ScrimmageCompletedDiscordEvent : ScrimmageDiscordEvent
     public string Team2Id { get; init; } = string.Empty;
     public int Team1Score { get; init; }
     public int Team2Score { get; init; }
-    public EvenTeamFormat EvenTeamFormat { get; init; }
+    public TeamSize TeamSize { get; init; }
     public double Team1Confidence { get; init; } = 0.0;
     public double Team2Confidence { get; init; } = 0.0;
 }

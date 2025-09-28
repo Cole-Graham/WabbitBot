@@ -14,12 +14,11 @@
 2d. Set up Connection String Management
 
 ## Step 3: Database Layer Refinement ✅ COMPLETE
-3a. Implement `IDatabaseService<TEntity>` Interface
-3b. Update Generic `RepositoryService<TEntity>` with EF Core Automatic Mapping
-3c. Update Generic `CacheService<TEntity>`
-3d. Update Generic `ArchiveService<TEntity>`
-3e. Remove MapEntity/BuildParameters Methods from Component Classes
-3f. Implement Entity Configuration Pattern
+3a. Implement `DatabaseService<TEntity>` with partial classes for Repository, Cache, and Archive
+3b. Consolidate logic from `RepositoryService`, `CacheService`, and `ArchiveService` into `DatabaseService` partials
+3c. Remove old `RepositoryService`, `CacheService`, and `ArchiveService` classes
+3d. Remove MapEntity/BuildParameters Methods from Component Classes
+3e. Implement Entity Configuration Pattern
 
 ## Step 4: Schema Migration ✅ COMPLETE
 4a. Implement Database Versioning Strategy
@@ -81,26 +80,31 @@
 6.4f. Migrate Entities to DatabaseService ⏳ PENDING (boilerplate left as-is)
 6.4g. Clean Up Old Services ✅ COMPLETED
 
-## Step 6.5: Application & Database Versioning Strategy ⭐ NEW
-6.5a. Create Application Version Tracking (ApplicationInfo Class)
-6.5b. Implement Schema Version Tracking (SchemaVersionTracker Class)
-6.5c. Add Version Compatibility Checking on Startup
-6.5d. Create Feature Flags System (FeatureManager for Gradual Rollouts)
-6.5e. Implement Version Metadata Table (Schema_Metadata for Audit Trail)
-6.5f. Add Version Drift Monitoring (Alerting for Incompatible Combinations)
-6.5g. Create Compatibility Test Suite (VersionCompatibilityTests)
-6.5h. Update Migration Templates (Version Metadata Integration)
+## Step 6.5: Legacy Closure and Gap Remediation ✨ NEW
+6.5a. Implement unified `ErrorService` architecture
+6.5b. Finish Step 6.4f by migrating active features to `DatabaseService<T>`
+6.5c. Replace lingering runtime DI or event bus hooks that point at legacy assemblies
+6.5d. Refresh tests to match the refactored paths and remove suites tied to deprecated code
+
+## Step 6.6: Application & Database Versioning Strategy ✨ NEW
+6.6a. Create Application Version Tracking (ApplicationInfo Class)
+6.6b. Implement Schema Version Tracking (SchemaVersionTracker Class)
+6.6c. Add Version Compatibility Checking on Startup
+6.6d. Create Feature Flags System (FeatureManager for Gradual Rollouts)
+6.6e. Implement Version Metadata Table (Schema_Metadata for Audit Trail)
+6.6f. Add Version Drift Monitoring (Alerting for Incompatible Combinations)
+6.6g. Create Compatibility Test Suite (VersionCompatibilityTests)
+6.6h. Update Migration Templates (Version Metadata Integration)
 
 ## Step 7: CoreService Organization
-7a. Create Main CoreService.cs
-7b. Create CoreService.Data.cs with Generic Operations
-7c. Create CoreService.Player.cs with Business Logic
-7d. Create CoreService.Player.Data.cs with Data Operations
-7e. Create CoreService.Player.Validation.cs with Validation
-7f. Set up Direct Instantiation and Event Messaging (No Runtime DI)
+7a. Create Main `CoreService.cs` for business logic orchestration
+7b. Utilize `DatabaseService<TEntity>` for all data access
+7c. Utilize `ErrorService` for all error handling
+7d. Organize `CoreService` with partial classes for different domains (e.g., Player, Team)
+7e. Set up Direct Instantiation and Event Messaging (No Runtime DI)
 
 ## Step 8: Entity Migration
-8a. Migration Strategy
+8a. Migration Strategy: Move all entity-specific business logic into `CoreService` partials
 8b. Foundation Phase
 8c. CoreService Structure Phase
 8d. Entity Migration Phase
@@ -137,9 +141,9 @@
 - **Code Quality Verification**: Lean implementation, consistent patterns, proper error handling
 
 ### Success Metrics
-- ✅ All tests pass (unit, integration, performance)
-- ✅ Zero breaking changes (existing functionality preserved)
-- ✅ Performance improved (measurable gains over old architecture)
-- ✅ Code maintainable (new features easy to add)
-- ✅ Documentation complete (all changes documented)
-- ✅ Clean architecture (no deprecated code remaining)
+- ⚪ All tests pass (unit, integration, performance)
+- ⚪ Zero breaking changes (existing functionality preserved)
+- ⚪ Performance improved (measurable gains over old architecture)
+- ⚪ Code maintainable (new features easy to add)
+- ⚪ Documentation complete (all changes documented)
+- ⚪ Clean architecture (no deprecated code remaining)

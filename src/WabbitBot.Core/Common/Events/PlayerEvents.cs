@@ -3,41 +3,8 @@ using WabbitBot.Common.Events.EventInterfaces;
 
 namespace WabbitBot.Core.Common.Events
 {
-    /// <summary>
-    /// Event published when a player is created
-    /// </summary>
-    public partial record PlayerCreatedEvent(
-        string PlayerId
-    ) : IEvent
-    {
-        public EventBusType EventBusType { get; init; } = EventBusType.Core;
-        public string EventId { get; init; } = Guid.NewGuid().ToString();
-        public DateTime Timestamp { get; init; } = DateTime.UtcNow;
-    }
-
-    /// <summary>
-    /// Event published when a player is updated
-    /// </summary>
-    public partial record PlayerUpdatedEvent(
-        string PlayerId
-    ) : IEvent
-    {
-        public EventBusType EventBusType { get; init; } = EventBusType.Core;
-        public string EventId { get; init; } = Guid.NewGuid().ToString();
-        public DateTime Timestamp { get; init; } = DateTime.UtcNow;
-    }
-
-    /// <summary>
-    /// Event published when a player is deleted
-    /// </summary>
-    public partial record PlayerDeletedEvent(
-        string PlayerId
-    ) : IEvent
-    {
-        public EventBusType EventBusType { get; init; } = EventBusType.Core;
-        public string EventId { get; init; } = Guid.NewGuid().ToString();
-        public DateTime Timestamp { get; init; } = DateTime.UtcNow;
-    }
+    // CRUD events removed: PlayerCreatedEvent, PlayerUpdatedEvent, PlayerDeletedEvent
+    // These were database operations and violate the critical principle that events are not for CRUD.
 
     /// <summary>
     /// Business logic event for player archive checking - unique to Player entity
@@ -46,7 +13,7 @@ namespace WabbitBot.Core.Common.Events
     public partial class PlayerArchiveCheckEvent : IEvent
     {
         public EventBusType EventBusType { get; init; } = EventBusType.Core;
-        public string EventId { get; init; } = Guid.NewGuid().ToString();
+        public Guid EventId { get; init; } = Guid.NewGuid();
         public DateTime Timestamp { get; init; } = DateTime.UtcNow;
         public Guid PlayerId { get; }
         public bool HasActiveUsers { get; set; }
@@ -60,29 +27,6 @@ namespace WabbitBot.Core.Common.Events
         }
     }
 
-    /// <summary>
-    /// Event published when a player is archived
-    /// </summary>
-    public partial record PlayerArchivedEvent(
-        string PlayerId
-    ) : IEvent
-    {
-        public EventBusType EventBusType { get; init; } = EventBusType.Core;
-        public string EventId { get; init; } = Guid.NewGuid().ToString();
-        public DateTime Timestamp { get; init; } = DateTime.UtcNow;
-    }
-
-    /// <summary>
-    /// Event published when a player is unarchived
-    /// </summary>
-    public partial record PlayerUnarchivedEvent(
-        string PlayerId,
-        DateTime UnarchivedAt = default
-    ) : IEvent
-    {
-        public EventBusType EventBusType { get; init; } = EventBusType.Core;
-        public string EventId { get; init; } = Guid.NewGuid().ToString();
-        public DateTime Timestamp { get; init; } = DateTime.UtcNow;
-        public DateTime UnarchivedAt { get; init; } = UnarchivedAt == default ? DateTime.UtcNow : UnarchivedAt;
-    }
+    // Additional CRUD events removed: PlayerArchivedEvent, PlayerUnarchivedEvent
+    // These were database operations and violate the critical principle that events are not for CRUD.
 }

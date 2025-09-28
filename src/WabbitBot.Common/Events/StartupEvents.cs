@@ -1,71 +1,72 @@
 using WabbitBot.Common.Configuration;
 using WabbitBot.Common.Models;
+using WabbitBot.Common.Events.EventInterfaces;
 
 namespace WabbitBot.Common.Events
 {
+    #region Startup Sequence Events
     /// <summary>
     /// Events for the global startup sequence. These events coordinate startup across all projects.
     /// They are part of the infrastructure layer and therefore live in the Common project.
     /// </summary>
-
-    #region Startup Sequence Events
-    public class StartupInitiatedEvent
+    public record StartupInitiatedEvent(
+    BotOptions Configuration,
+    IBotConfigurationService ConfigurationService,
+    EventBusType EventBusType = EventBusType.Global) : IEvent
     {
-        public BotOptions Configuration { get; }
-        public IBotConfigurationService ConfigurationService { get; }
-
-        public StartupInitiatedEvent(BotOptions configuration, IBotConfigurationService configService)
-        {
-            Configuration = configuration;
-            ConfigurationService = configService;
-        }
+        public Guid EventId { get; init; } = Guid.NewGuid();
+        public DateTime Timestamp { get; init; } = DateTime.UtcNow;
     }
 
-    public class SystemReadyEvent
+    public record SystemReadyEvent(
+    EventBusType EventBusType = EventBusType.Global) : IEvent
     {
-        public DateTime StartupTime { get; } = DateTime.UtcNow;
+        public Guid EventId { get; init; } = Guid.NewGuid();
+        public DateTime Timestamp { get; init; } = DateTime.UtcNow;
     }
 
-    public class ApplicationReadyEvent
+    public record ApplicationReadyEvent(
+    EventBusType EventBusType = EventBusType.Global) : IEvent
     {
-        public TimeSpan StartupDuration { get; }
-        public IBotConfigurationService ConfigurationService { get; init; }
-
-        public ApplicationReadyEvent(TimeSpan startupDuration, IBotConfigurationService configService)
-        {
-            StartupDuration = startupDuration;
-            ConfigurationService = configService;
-        }
+        public Guid EventId { get; init; } = Guid.NewGuid();
+        public DateTime Timestamp { get; init; } = DateTime.UtcNow;
     }
     #endregion
 
     #region Shutdown Events
-    public class ApplicationShuttingDownEvent
+    public record ApplicationShuttingDownEvent(
+    EventBusType EventBusType = EventBusType.Global) : IEvent
     {
-        public string Reason { get; }
-        public bool IsGraceful { get; }
-
-        public ApplicationShuttingDownEvent(string reason, bool isGraceful = true)
-        {
-            Reason = reason;
-            IsGraceful = isGraceful;
-        }
+        public Guid EventId { get; init; } = Guid.NewGuid();
+        public DateTime Timestamp { get; init; } = DateTime.UtcNow;
     }
+
     #endregion
 
     #region Error Events
-    public class GlobalErrorHandlingReadyEvent { }
-
-    public class CriticalStartupErrorEvent
+    public record GlobalErrorHandlingReadyEvent(
+    EventBusType EventBusType = EventBusType.Global) : IEvent
     {
-        public Exception Exception { get; }
-        public string Component { get; }
+        public Guid EventId { get; init; } = Guid.NewGuid();
+        public DateTime Timestamp { get; init; } = DateTime.UtcNow;
+    }
 
-        public CriticalStartupErrorEvent(Exception exception, string component = "Unknown")
-        {
-            Exception = exception;
-            Component = component;
-        }
+    public record CriticalStartupErrorEvent(
+    Exception Exception,
+    string Component = "Unknown",
+    EventBusType EventBusType = EventBusType.Global) : IEvent
+    {
+        public Guid EventId { get; init; } = Guid.NewGuid();
+        public DateTime Timestamp { get; init; } = DateTime.UtcNow;
+    }
+
+    public record BoundaryErrorEvent(
+    Exception Exception,
+    string Boundary,
+    EventBusType EventBusType = EventBusType.Global) : IEvent
+    {
+        public Guid EventId { get; init; } = Guid.NewGuid();
+        public DateTime Timestamp { get; init; } = DateTime.UtcNow;
     }
     #endregion
 }

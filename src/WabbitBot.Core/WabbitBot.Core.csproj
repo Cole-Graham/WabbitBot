@@ -1,26 +1,18 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
     <LangVersion>13.0</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <!-- Enable source generator output to disk for debugging -->
+    <!-- Enable source generator output to obj/ directory for debugging (follows best practices) -->
     <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
-    <CompilerGeneratedFilesOutputPath>Generated</CompilerGeneratedFilesOutputPath>
   </PropertyGroup>
-
   <ItemGroup>
     <ProjectReference Include="..\WabbitBot.Common\WabbitBot.Common.csproj" />
     <ProjectReference Include="..\WabbitBot.SourceGenerators\WabbitBot.SourceGenerators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\WabbitBot.Analyzers\WabbitBot.Analyzers.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\WabbitBot.Generator.Shared\WabbitBot.Generator.Shared.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   </ItemGroup>
-
-  <ItemGroup>
-    <Analyzer Remove="**/WabbitBot.SourceGenerators.dll" />
-    <!-- Only include EventBusSourceGenerator for Core project -->
-    <Analyzer Include="**/WabbitBot.SourceGenerators.dll" Condition="'$(MSBuildProjectName)' == 'WabbitBot.Core'" />
-  </ItemGroup>
-
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.0" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.0" />
@@ -30,12 +22,9 @@
     <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="9.0.0" />
     <PackageReference Include="Microsoft.Extensions.Options" Version="9.0.0" />
   </ItemGroup>
-
-  <ItemGroup Condition="'$(Configuration)' == 'Debug'">
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.0" />
-    <PackageReference Include="xunit" Version="2.9.0" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+  <ItemGroup>
+    <PackageReference Include="xunit" Version="2.9.3" /> <!-- Updated -->
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" /> <!-- Updated -->
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" /> <!-- Updated -->
   </ItemGroup>
-
 </Project>

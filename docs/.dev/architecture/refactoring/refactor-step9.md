@@ -28,10 +28,10 @@
 
 #### Example Npgsql JSON Usage:
 ```csharp
-// Instead of manual JSON utilities
-public class PlayerRepository : NpgsqlRepository<Player>
+// The DatabaseService<TEntity> will handle the underlying DbContext operations.
+public partial class DatabaseService<Player>
 {
-    // Npgsql handles JSON automatically
+    // Custom query method in the Repository partial class
     public async Task<IEnumerable<Player>> GetPlayersInTeam(Guid teamId)
     {
         return await _dbContext.Players
@@ -244,49 +244,53 @@ public class MatchDto
 }
 ```
 
-#### IDatabaseService Interface (Aligned with Guid Architecture)
+#### `DatabaseService<TEntity>` (Aligned with Guid Architecture)
+
+The `DatabaseService` itself doesn't need a public interface, as it is instantiated directly. Its public methods serve as the contract.
 
 ```csharp
-public interface IDatabaseService<TEntity> where TEntity : IEntity
+// From: src/WabbitBot.Common/Data/Service/DatabaseService.cs
+public partial class DatabaseService<TEntity> where TEntity : Entity
 {
-    // Core CRUD operations with entity objects
-    Task<Result<TEntity>> CreateAsync(TEntity entity, DatabaseComponent component);
-    Task<Result<TEntity>> UpdateAsync(TEntity entity, DatabaseComponent component);
-    Task<Result<TEntity>> DeleteAsync(Guid id, DatabaseComponent component);
-    Task<bool> ExistsAsync(Guid id, DatabaseComponent component);
+    // High-level coordination methods
+    public async Task<TEntity?> GetByIdAsync(Guid id, bool useCache = true) { /* ... */ }
+    public async Task<Result<TEntity>> CreateAsync(TEntity entity) { /* ... */ }
+    public async Task<Result<TEntity>> UpdateAsync(TEntity entity) { /* ... */ }
+    public async Task<Result> DeleteAsync(Guid id) { /* ... */ }
 
-    // Guid-based lookups (primary method)
-    Task<TEntity?> GetByIdAsync(Guid id, DatabaseComponent component);
-    Task<TEntity?> GetByStringIdAsync(string id, DatabaseComponent component);
-
-    // Query methods
-    Task<IEnumerable<TEntity>> GetAllAsync(DatabaseComponent component);
-    Task<TEntity?> GetByNameAsync(string name, DatabaseComponent component);
-    Task<IEnumerable<TEntity>> GetByDateRangeAsync(DateTime start, DateTime end, DatabaseComponent component);
-    Task<IEnumerable<TEntity>> QueryAsync(string whereClause, object? parameters, DatabaseComponent component);
+    // Methods to directly access a specific component (Repository, Cache, Archive)
+    // These might be internal or used for specific scenarios where coordination is bypassed.
+    public Task<TEntity?> GetByIdAsync(Guid id, DatabaseComponent component) { /* ... */ }
+    // ... other component-specific methods
 }
 ```
 
 #### Direct Usage Pattern - No Thin Wrappers
 
 ```csharp
-// ✅ CORRECT: Use database service methods directly
-public class MatchService
+// ✅ CORRECT: Use DatabaseService methods directly from a business logic service
+public class MatchLogicService // Example of a class in CoreService partials
 {
-    private readonly IDatabaseService<Match> _matchService;
-    private readonly IDatabaseService<Team> _teamService;
+    private readonly DatabaseService<Match> _matchData;
+    private readonly DatabaseService<Team> _teamData;
+
+    public MatchLogicService(DatabaseService<Match> matchData, DatabaseService<Team> teamData)
+    {
+        _matchData = matchData;
+        _teamData = teamData;
+    }
 
     public async Task<MatchResultDto?> ProcessMatchResultAsync(Guid matchId, Guid winnerTeamId)
     {
         // Direct usage - no wrapper methods needed
-        var match = await _matchService.GetByIdAsync(matchId, DatabaseComponent.Repository);
+        var match = await _matchData.GetByIdAsync(matchId);
         if (match == null) return null;
 
         // Update with Guid properties
         match.WinnerId = winnerTeamId;
         match.Status = MatchStatus.Completed;
 
-        var updateResult = await _matchService.UpdateAsync(match, DatabaseComponent.Repository);
+        var updateResult = await _matchData.UpdateAsync(match);
         if (!updateResult.Success) return null;
 
         // Convert to DTO for external consumption
@@ -298,12 +302,14 @@ public class MatchService
 #### When to Create Service Methods (Business Logic Only)
 
 ```csharp
-public class TournamentService
+public class TournamentLogicService
 {
+    private readonly DatabaseService<Tournament> _tournamentData;
+
     // ✅ GOOD: Real business logic with complex operations
     public async Task<TournamentBracketDto> GenerateBracketAsync(Guid tournamentId)
     {
-        var tournament = await _tournamentService.GetByIdAsync(tournamentId, DatabaseComponent.Repository);
+        var tournament = await _tournamentData.GetByIdAsync(tournamentId);
         if (tournament == null) throw new NotFoundException();
 
         // Complex business logic: matchmaking, seeding, bracket generation
@@ -312,7 +318,7 @@ public class TournamentService
 
         // Update tournament with bracket data
         tournament.BracketData = JsonSerializer.Serialize(bracket);
-        await _tournamentService.UpdateAsync(tournament, DatabaseComponent.Repository);
+        await _tournamentData.UpdateAsync(tournament);
 
         return TournamentBracketDto.FromTournament(tournament, bracket);
     }
@@ -320,7 +326,7 @@ public class TournamentService
     // ❌ BAD: Thin wrapper - DON'T CREATE THIS
     // public async Task<Tournament?> GetTournamentAsync(Guid id)
     // {
-    //     return await _tournamentService.GetByIdAsync(id, DatabaseComponent.Repository);
+    //     return await _tournamentData.GetByIdAsync(id);
     // }
 }
 ```
@@ -329,30 +335,21 @@ public class TournamentService
 
 Even with Guid properties internally, strings remain crucial for several technical and practical reasons:
 
-##### 🔑 **Cache Keys (Abstracted by CacheService)**
+##### 🔑 **Cache Keys (Abstracted by `DatabaseService.Cache.cs`)**
 ```csharp
-// CacheService automatically handles Guid-to-string conversion for cache keys
-private async Task<Player?> GetPlayerCachedAsync(Guid playerId)
+// DatabaseService automatically handles cache key creation internally.
+public async Task<Player?> GetPlayerAsync(Guid playerId)
 {
-    // Try cache first - CacheService handles Guid-to-string conversion internally
-    var cachedPlayer = await _playerCache.GetByIdAsync(playerId, DatabaseComponent.Cache);
-    if (cachedPlayer != null)
-    {
-        return cachedPlayer;
-    }
-
-    // Cache miss - get from repository
-    var player = await _playerService.GetByIdAsync(playerId, DatabaseComponent.Repository);
-    if (player != null)
-    {
-        // Store in cache - CacheService handles serialization and key management
-        await _playerCache.CreateAsync(player, DatabaseComponent.Cache);
-    }
+    // The GetByIdAsync method in DatabaseService handles the full cache-first logic.
+    // 1. Checks cache using a key derived from the Guid.
+    // 2. If miss, gets from repository.
+    // 3. If found in repo, stores in cache.
+    var player = await _playerData.GetByIdAsync(playerId);
     return player;
 }
 ```
 
-*Note: CacheService internally uses strings for cache keys but abstracts this complexity away, allowing Guid-based lookups.*
+*Note: `DatabaseService.Cache.cs` internally uses strings for cache keys but abstracts this complexity away, allowing Guid-based lookups through the main `DatabaseService` methods.*
 
 
 ##### 🌐 **API and Network Protocols**
@@ -377,9 +374,11 @@ public async Task SyncDiscordUserAsync(string discordUserId)
     if (!ulong.TryParse(discordUserId, out var discordId))
         throw new ArgumentException("Invalid Discord ID format");
 
-    var user = await _userService.GetByDiscordIdAsync(discordId);
-    // Convert to Guid for internal operations
-    var player = await _playerService.GetByIdAsync(user.PlayerId, DatabaseComponent.Cache);
+    var user = await _userData.GetByDiscordIdAsync(discordId); // Assumes custom method
+    if (user == null) return;
+
+    // Use the user's PlayerId (Guid) for further internal operations
+    var player = await _playerData.GetByIdAsync(user.PlayerId);
 }
 ```
 
@@ -397,7 +396,7 @@ public async Task<IActionResult> UpdatePlayer(string id, PlayerUpdateDto update)
         return BadRequest("Malformed GUID");
 
     // 3. Only then convert to Guid for type safety
-    var player = await _playerService.GetByIdAsync(playerId, DatabaseComponent.Cache);
+    var player = await _playerData.GetByIdAsync(playerId);
     // ... update logic
 }
 ```
@@ -419,7 +418,7 @@ grep "match:550e8400-e29b-41d4-a716-446655440000" application.log
 public async Task<bool> IsPlayerInTournamentAsync(Guid playerId, Guid tournamentId)
 {
     // Check membership without loading full objects
-    var tournament = await _tournamentService.GetByIdAsync(tournamentId, DatabaseComponent.Cache);
+    var tournament = await _tournamentData.GetByIdAsync(tournamentId);
     return tournament?.ParticipantPlayerIds.Contains(playerId) ?? false;
 }
 
@@ -448,7 +447,7 @@ public async Task GetMatchAsync(CommandContext ctx, string matchIdString)
     }
 
     // 2. Use Guid internally for type safety
-    var match = await _matchService.GetByIdAsync(matchId, DatabaseComponent.Cache);
+    var match = await _matchData.GetByIdAsync(matchId);
     if (match == null)
     {
         await ctx.RespondAsync("❌ Match not found");
@@ -470,24 +469,24 @@ public async Task<IActionResult> GetMatch(string id)
     if (!Guid.TryParse(id, out var matchId))
         return BadRequest("Invalid match ID format");
 
-    var match = await _matchService.GetByIdAsync(matchId, DatabaseComponent.Cache);
+    var match = await _matchData.GetByIdAsync(matchId);
     return match != null ? Ok(MatchDto.FromEntity(match)) : NotFound();
 }
 
-// ✅ Service Layer: Guids for type safety, strings for flexibility
-public class MatchService
+// ✅ Service Layer: Guids for type safety
+public class MatchLogicService
 {
     public async Task<MatchResultDto?> ProcessMatchResultAsync(Guid matchId, Guid winnerTeamId)
     {
         // Guids provide compile-time type safety
-        var match = await _matchService.GetByIdAsync(matchId, DatabaseComponent.Repository);
+        var match = await _matchData.GetByIdAsync(matchId);
         if (match == null) return null;
 
         // Business logic with Guids
         match.WinnerId = winnerTeamId;
         match.Status = MatchStatus.Completed;
 
-        var updateResult = await _matchService.UpdateAsync(match, DatabaseComponent.Repository);
+        var updateResult = await _matchData.UpdateAsync(match);
         return updateResult.Success ? MatchResultDto.FromEntity(updateResult.Data!) : null;
     }
 }

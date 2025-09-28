@@ -1,5 +1,6 @@
 using WabbitBot.DiscBot.DiscBot.Base;
 using WabbitBot.Common.Attributes;
+using WabbitBot.Common.Models;
 using WabbitBot.Common.Events.EventInterfaces;
 using WabbitBot.DiscBot.DiscBot.Events;
 using DSharpPlus.Commands;
@@ -9,7 +10,6 @@ namespace WabbitBot.DiscBot.DSharpPlus.Commands;
 /// <summary>
 /// Event-driven command registration handler that registers Discord commands when the client is ready
 /// </summary>
-[GenerateEventHandler(EventBusType = EventBusType.DiscBot, EnableMetrics = true)]
 public partial class CommandRegistrationHandler : DiscordBaseHandler
 {
     private CommandsExtension? _commands;
@@ -24,7 +24,6 @@ public partial class CommandRegistrationHandler : DiscordBaseHandler
         EventBus.Subscribe<DiscordClientReadyEvent>(HandleDiscordClientReady);
     }
 
-    [EventHandler(EventType = "DiscordClientReadyEvent")]
     public async Task HandleDiscordClientReady(DiscordClientReadyEvent evt)
     {
         // Commands are now registered during client setup in DiscordBot.cs

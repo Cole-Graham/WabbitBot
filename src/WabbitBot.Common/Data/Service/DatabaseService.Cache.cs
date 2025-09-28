@@ -24,7 +24,7 @@ public partial class DatabaseService<TEntity> where TEntity : Entity
 
     private ConcurrentDictionary<string, CacheEntry>? _cache;
     private int _maxSize;
-    private readonly object _evictionLock = new();
+    private readonly Lock _evictionLock = new();
     private TimeSpan _defaultExpiry;
 
     /// <summary>

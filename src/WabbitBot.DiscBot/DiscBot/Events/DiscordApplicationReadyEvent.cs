@@ -10,7 +10,7 @@ namespace WabbitBot.DiscBot.DiscBot.Events;
 public record DiscordApplicationReadyEvent : IEvent
 {
     public EventBusType EventBusType => EventBusType.DiscBot;
-    public string EventId { get; init; } = Guid.NewGuid().ToString();
+    public Guid EventId { get; init; } = Guid.NewGuid();
     public DateTime Timestamp { get; init; } = DateTime.UtcNow;
     public TimeSpan StartupDuration { get; init; }
     public IBotConfigurationService ConfigurationService { get; init; } = null!;

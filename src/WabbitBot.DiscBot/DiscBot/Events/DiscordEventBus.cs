@@ -8,17 +8,16 @@ namespace WabbitBot.DiscBot.DiscBot.Events;
 /// <summary>
 /// Discord-specific event bus that handles internal Discord events and forwards to GlobalEventBus
 /// </summary>
-[GenerateEventHandler(EventBusType = EventBusType.DiscBot, EnableMetrics = true, EnableErrorHandling = true, EnableLogging = true)]
-public partial class DiscordEventBus : IDiscordEventBus
+public partial class DiscordEventBus(IGlobalEventBus globalEventBus) : IDiscordEventBus
 {
     private static DiscordEventBus? _instance;
-    private static readonly object _instanceLock = new();
+    private static readonly Lock _instanceLock = new();
 
     public static DiscordEventBus Instance
     {
         get
         {
-            if (_instance == null)
+            if (_instance is null)
             {
                 lock (_instanceLock)
                 {
@@ -29,28 +28,20 @@ public partial class DiscordEventBus : IDiscordEventBus
         }
     }
 
-    private readonly Dictionary<Type, List<Delegate>> _handlers = new();
-    private readonly object _lock = new();
-    private readonly IGlobalEventBus _globalEventBus;
+    private readonly Dictionary<Type, List<Delegate>> _handlers = [];
+    private readonly Lock _lock = new();
+    private readonly IGlobalEventBus _globalEventBus = globalEventBus ?? throw new ArgumentNullException(nameof(globalEventBus));
     private bool _isInitialized;
 
-    public DiscordEventBus(IGlobalEventBus globalEventBus)
-    {
-        _globalEventBus = globalEventBus ?? throw new ArgumentNullException(nameof(globalEventBus));
-    }
-
     /// <inheritdoc />
-    public async Task PublishAsync<TEvent>(TEvent @event) where TEvent : class
+    public async ValueTask PublishAsync<TEvent>(TEvent @event) where TEvent : class, IEvent
     {
         if (!_isInitialized)
         {
             throw new InvalidOperationException("DiscordEventBus must be initialized before publishing events");
         }
 
-        if (@event == null)
-        {
-            throw new ArgumentNullException(nameof(@event));
-        }
+        ArgumentNullException.ThrowIfNull(@event);
 
         var eventType = typeof(TEvent);
         List<Delegate>? handlers;
@@ -60,12 +51,12 @@ public partial class DiscordEventBus : IDiscordEventBus
             if (!_handlers.TryGetValue(eventType, out handlers))
             {
                 // If no local handlers, forward to global bus only
-                handlers = new List<Delegate>();
+                handlers = [];
             }
             else
             {
                 // Make a copy to avoid holding the lock during invocation
-                handlers = new List<Delegate>(handlers);
+                handlers = new List<Delegate>(handlers!);
             }
         }
 
@@ -82,58 +73,70 @@ public partial class DiscordEventBus : IDiscordEventBus
 
         // Only forward to global bus if the event is meant for global routing
         // Discord-internal events (EventBusType.DiscBot) stay on DiscordEventBus only
-        if (@event is IEvent eventWithType && eventWithType.EventBusType == EventBusType.Global)
+        if (@event.EventBusType == EventBusType.Global)
         {
-            tasks.Add(_globalEventBus.PublishAsync(@event));
+            tasks.Add(Task.Run(async () =>
+            {
+                try
+                {
+                    await _globalEventBus.PublishAsync(@event);
+                }
+                catch (Exception ex)
+                {
+                    // Emit BoundaryErrorEvent for cross-boundary faults
+                    var errorEvent = new BoundaryErrorEvent(ex, "DiscBot-to-Global", EventBusType.Global);
+                    // Note: Avoid publishing error event to prevent potential recursion
+                    // In a production system, this could be logged or handled via a separate error channel
+                }
+            }));
         }
 
         await Task.WhenAll(tasks);
     }
 
     /// <inheritdoc />
-    public void Subscribe<TEvent>(Func<TEvent, Task> handler) where TEvent : class
+    public void Subscribe<TEvent>(Func<TEvent, Task> handler) where TEvent : class, IEvent
     {
         if (!_isInitialized)
         {
             throw new InvalidOperationException("DiscordEventBus must be initialized before subscribing to events");
         }
 
-        if (handler == null)
-        {
-            throw new ArgumentNullException(nameof(handler));
-        }
+        ArgumentNullException.ThrowIfNull(handler);
 
         var eventType = typeof(TEvent);
         lock (_lock)
         {
-            if (!_handlers.ContainsKey(eventType))
+            if (!_handlers.TryGetValue(eventType, out List<Delegate>? handlers))
             {
-                _handlers[eventType] = new List<Delegate>();
+                handlers = [];
+            }
+            else
+            {
+                // Make a copy to avoid holding the lock during invocation
+                handlers = new List<Delegate>(handlers);
             }
 
-            _handlers[eventType].Add(handler);
+            handlers.Add(handler);
         }
     }
 
     /// <inheritdoc />
-    public void Unsubscribe<TEvent>(Func<TEvent, Task> handler) where TEvent : class
+    public void Unsubscribe<TEvent>(Func<TEvent, Task> handler) where TEvent : class, IEvent
     {
         if (!_isInitialized)
         {
             throw new InvalidOperationException("DiscordEventBus must be initialized before unsubscribing from events");
         }
 
-        if (handler == null)
-        {
-            throw new ArgumentNullException(nameof(handler));
-        }
+        ArgumentNullException.ThrowIfNull(handler);
 
         var eventType = typeof(TEvent);
         lock (_lock)
         {
-            if (_handlers.ContainsKey(eventType))
+            if (_handlers.TryGetValue(eventType, out List<Delegate>? handlers))
             {
-                _handlers[eventType].Remove(handler);
+                handlers.Remove(handler);
             }
         }
     }

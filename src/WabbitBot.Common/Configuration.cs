@@ -1,6 +1,7 @@
 // Modern .NET Configuration System for WabbitBot
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
+using WabbitBot.Common.Events.EventInterfaces;
 using WabbitBot.Common.Models;
 
 namespace WabbitBot.Common.Configuration
@@ -53,6 +54,9 @@ namespace WabbitBot.Common.Configuration
 
             if (_botOptions.Scrimmage.KFactor <= 0)
                 throw new InvalidOperationException("K-factor must be positive");
+
+            if (_botOptions.Scrimmage.MaxRosterSize <= 0)
+                throw new InvalidOperationException("Max roster size must be positive");
 
             if (_botOptions.Scrimmage.MaxConcurrentScrimmages <= 0)
                 throw new InvalidOperationException("Max concurrent scrimmages must be positive");
@@ -115,10 +119,13 @@ namespace WabbitBot.Common.Configuration
         }
     }
 
-    public class BotConfigurationChangedEvent
+    public record BotConfigurationChangedEvent(
+        string Property,
+        object? NewValue,
+        EventBusType EventBusType = EventBusType.Global) : IEvent
     {
-        public required string Property { get; init; }
-        public object? NewValue { get; init; }
+        public Guid EventId { get; init; } = Guid.NewGuid();
+        public DateTime Timestamp { get; init; } = DateTime.UtcNow;
     }
 }
 
@@ -175,15 +182,13 @@ namespace WabbitBot.Common.Models
     public class ScrimmageOptions
     {
         public const string SectionName = "Bot:Scrimmage";
-
+        public int MaxRosterSize { get; set; } = 10; // Number of players in a team
+        public int TeamJoinLimit { get; set; } = 5; // Number of teams a player can join
+        public int RejoinTeamAfterDays { get; set; } = 7; // Timeout for re-joining a team
         public int MaxConcurrentScrimmages { get; set; } = 10;
         public string RatingSystem { get; set; } = "elo";
-        public double InitialRating { get; set; } = 1200;
-        public double KFactor { get; set; } = 32;
-        public int MatchTimeoutMinutes { get; set; } = 15;
-        public int MapBanCount { get; set; } = 1;
-        public int BestOf { get; set; } = 1;
-        public bool RankedOnly { get; set; } = false;
+        public double InitialRating { get; set; } = 1000;
+        public double KFactor { get; set; } = 40;
 
         // Rating System Constants
         public double EloDivisor { get; set; } = 400.0;

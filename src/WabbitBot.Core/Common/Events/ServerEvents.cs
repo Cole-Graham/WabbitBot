@@ -9,7 +9,7 @@ namespace WabbitBot.Core.Common.Events
     public partial class ThumbnailUploadedEvent : IEvent
     {
         public EventBusType EventBusType { get; init; } = EventBusType.Core;
-        public string EventId { get; init; } = Guid.NewGuid().ToString();
+        public Guid EventId { get; init; } = Guid.NewGuid();
         public DateTime Timestamp { get; init; } = DateTime.UtcNow;
         public string FileName { get; set; } = string.Empty;
         public string OriginalFileName { get; set; } = string.Empty;
@@ -23,7 +23,7 @@ namespace WabbitBot.Core.Common.Events
     public partial class ThumbnailDeletedEvent : IEvent
     {
         public EventBusType EventBusType { get; init; } = EventBusType.Core;
-        public string EventId { get; init; } = Guid.NewGuid().ToString();
+        public Guid EventId { get; init; } = Guid.NewGuid();
         public DateTime Timestamp { get; init; } = DateTime.UtcNow;
         public string FileName { get; set; } = string.Empty;
     }

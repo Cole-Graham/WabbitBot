@@ -23,7 +23,7 @@ namespace WabbitBot.Common.Data.Schema.Migrations
                     CREATE TABLE IF NOT EXISTS Seasons (
                         Id TEXT PRIMARY KEY,
                         SeasonGroupId TEXT NOT NULL,
-                        EvenTeamFormat INTEGER NOT NULL,
+                        TeamSize INTEGER NOT NULL,
                         StartDate DATETIME NOT NULL,
                         EndDate DATETIME NOT NULL,
                         IsActive BOOLEAN NOT NULL,
@@ -38,7 +38,7 @@ namespace WabbitBot.Common.Data.Schema.Migrations
                 await QueryUtil.ExecuteNonQueryAsync(conn, @"
                     CREATE INDEX IF NOT EXISTS idx_seasons_seasongroupid ON Seasons(SeasonGroupId)", new { }, transaction);
                 await QueryUtil.ExecuteNonQueryAsync(conn, @"
-                    CREATE INDEX IF NOT EXISTS idx_seasons_gamesize ON Seasons(EvenTeamFormat)", new { }, transaction);
+                    CREATE INDEX IF NOT EXISTS idx_seasons_gamesize ON Seasons(TeamSize)", new { }, transaction);
                 await QueryUtil.ExecuteNonQueryAsync(conn, @"
                     CREATE INDEX IF NOT EXISTS idx_seasons_startdate ON Seasons(StartDate)", new { }, transaction);
                 await QueryUtil.ExecuteNonQueryAsync(conn, @"
@@ -46,7 +46,7 @@ namespace WabbitBot.Common.Data.Schema.Migrations
                 await QueryUtil.ExecuteNonQueryAsync(conn, @"
                     CREATE INDEX IF NOT EXISTS idx_seasons_isactive ON Seasons(IsActive)", new { }, transaction);
                 await QueryUtil.ExecuteNonQueryAsync(conn, @"
-                    CREATE INDEX IF NOT EXISTS idx_seasons_isactive_gamesize ON Seasons(IsActive, EvenTeamFormat)", new { }, transaction);
+                    CREATE INDEX IF NOT EXISTS idx_seasons_isactive_gamesize ON Seasons(IsActive, TeamSize)", new { }, transaction);
 
                 transaction.Commit();
             }

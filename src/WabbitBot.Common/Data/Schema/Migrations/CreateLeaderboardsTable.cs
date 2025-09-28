@@ -23,7 +23,7 @@ namespace WabbitBot.Common.Data.Schema.Migrations
                     CREATE TABLE IF NOT EXISTS Leaderboards (
                         Id TEXT PRIMARY KEY,
                         SeasonId TEXT NOT NULL,
-                        EvenTeamFormat INTEGER NOT NULL,
+                        TeamSize INTEGER NOT NULL,
                         InitialRating REAL NOT NULL,
                         KFactor INTEGER NOT NULL,
                         CreatedAt DATETIME NOT NULL,
@@ -33,7 +33,7 @@ namespace WabbitBot.Common.Data.Schema.Migrations
 
                 // Create indexes for faster lookups
                 await QueryUtil.ExecuteNonQueryAsync(conn, @"
-                    CREATE INDEX IF NOT EXISTS idx_leaderboards_gamesize ON Leaderboards(EvenTeamFormat)", new { }, transaction);
+                    CREATE INDEX IF NOT EXISTS idx_leaderboards_gamesize ON Leaderboards(TeamSize)", new { }, transaction);
 
                 transaction.Commit();
             }

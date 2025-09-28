@@ -1,4 +1,5 @@
 using WabbitBot.Common.Events;
+using WabbitBot.Common.Events.EventInterfaces;
 
 namespace WabbitBot.DiscBot.DSharpPlus;
 
@@ -17,4 +18,9 @@ public class ErrorHandler
     }
 }
 
-public record DiscordErrorEvent(Exception Exception);
+public record DiscordErrorEvent(Exception Exception) : IEvent
+{
+    public EventBusType EventBusType { get; init; } = EventBusType.DiscBot;
+    public Guid EventId { get; init; } = Guid.NewGuid();
+    public DateTime Timestamp { get; init; } = DateTime.UtcNow;
+}

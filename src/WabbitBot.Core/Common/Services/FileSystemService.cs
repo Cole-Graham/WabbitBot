@@ -4,7 +4,7 @@ using WabbitBot.Common.Models;
 using WabbitBot.Core.Common.Events;
 using WabbitBot.Core.Common.BotCore;
 using WabbitBot.Common.Events.EventInterfaces;
-using WabbitBot.Common.Attributes;
+using WabbitBot.Common.ErrorService;
 
 namespace WabbitBot.Core.Common.Services;
 
@@ -12,7 +12,6 @@ namespace WabbitBot.Core.Common.Services;
 /// Service for secure file system operations including image validation and thumbnail management
 /// Handles file uploads, validation, and secure file operations without database dependencies
 /// </summary>
-[GenerateEventPublisher(EventBusType = EventBusType.Core, EnableValidation = true, EnableTimestamps = true)]
 public partial class FileSystemService
 {
     private static readonly HashSet<string> AllowedExtensions = new()
@@ -27,8 +26,8 @@ public partial class FileSystemService
 
     private const long MaxThumbnailSize = 1 * 1024 * 1024; // 1MB
 
-    private readonly ICoreEventBus _eventBus;
-    private readonly ICoreErrorHandler _errorHandler;
+    protected readonly ICoreEventBus EventBus;
+    private readonly IErrorService _errorHandler;
     private readonly string _thumbnailsDirectory;
 
     /// <summary>
@@ -38,10 +37,10 @@ public partial class FileSystemService
     /// <param name="errorHandler">Optional error handler instance, defaults to CoreErrorHandler.Instance</param>
     public FileSystemService(
         ICoreEventBus? eventBus = null,
-        ICoreErrorHandler? errorHandler = null)
+        IErrorService? errorHandler = null)
     {
-        _eventBus = eventBus ?? CoreEventBus.Instance;
-        _errorHandler = errorHandler ?? CoreErrorHandler.Instance;
+        EventBus = eventBus ?? CoreEventBus.Instance;
+        _errorHandler = errorHandler ?? new WabbitBot.Common.ErrorService.ErrorService(); // TODO: Use a shared instance
         _thumbnailsDirectory = Path.GetFullPath("data/maps/thumbnails");
 
         // Ensure directory exists and is secure
@@ -93,7 +92,7 @@ public partial class FileSystemService
             await fileStream.CopyToAsync(fileStream2);
 
             // Publish event for successful upload
-            await _eventBus.PublishAsync(new ThumbnailUploadedEvent
+            await EventBus.PublishAsync(new ThumbnailUploadedEvent
             {
                 FileName = secureFileName,
                 OriginalFileName = originalFileName,
@@ -106,7 +105,7 @@ public partial class FileSystemService
         catch (Exception ex)
         {
             // Handle error through error handler
-            await _errorHandler.HandleErrorAsync(ex, $"File upload validation failed for {originalFileName}");
+            await _errorHandler.CaptureAsync(ex, $"File upload validation failed for {originalFileName}", nameof(ValidateAndSaveImageAsync));
             return null;
         }
     }
@@ -133,7 +132,7 @@ public partial class FileSystemService
                 File.Delete(fullPath);
 
                 // Publish event for successful deletion
-                await _eventBus.PublishAsync(new ThumbnailDeletedEvent
+                await EventBus.PublishAsync(new ThumbnailDeletedEvent
                 {
                     FileName = fileName
                 });
@@ -145,7 +144,7 @@ public partial class FileSystemService
         }
         catch (Exception ex)
         {
-            await _errorHandler.HandleErrorAsync(ex, $"Failed to delete thumbnail {fileName}");
+            await _errorHandler.CaptureAsync(ex, $"Failed to delete thumbnail {fileName}", nameof(DeleteThumbnailAsync));
             return false;
         }
     }
