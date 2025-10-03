@@ -2,8 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using WabbitBot.Common.Attributes;
 using WabbitBot.Core.Common.BotCore;
-using WabbitBot.Core.Common.Models;
+using WabbitBot.Core.Common.Models.Common;
+using WabbitBot.Core.Common.Models.Scrimmage;
 using WabbitBot.Core.Common.Services;
 using WabbitBot.Common.Events.EventInterfaces;
 using WabbitBot.Common.Data.Service;
@@ -16,6 +18,7 @@ using Microsoft.VisualBasic;
 
 namespace WabbitBot.Core.Scrimmages
 {
+    [EventGenerator(GeneratePublishers = true, DefaultBus = EventBusType.Core, TriggerMode = "OptIn")]
     public partial class ScrimmageCore : IScrimmageCore
     {
         /// <inheritdoc />
@@ -315,6 +318,13 @@ namespace WabbitBot.Core.Scrimmages
         }
 
         /// <summary>
+        /// Publishes MatchProvisioningRequested to both Core (local) and Global (cross-boundary) buses.
+        /// Auto-generated publisher will dual-publish this event.
+        /// </summary>
+        [EventTrigger(BusType = EventBusType.Global, Targets = EventTargets.Both)]
+        public partial ValueTask PublishMatchProvisioningRequestedAsync(Guid matchId, Guid scrimmageId);
+
+        /// <summary>
         /// Accepts a scrimmage challenge
         /// </summary>
         public async Task<Result> AcceptScrimmageAsync(Guid scrimmageId)
@@ -350,12 +360,10 @@ namespace WabbitBot.Core.Scrimmages
                     );
                 }
 
-                // Publish event
-                await CoreService.PublishAsync(new ScrimmageAcceptedEvent
-                {
-                    ScrimmageId = scrimmageId,
-                    AcceptedAt = DateTime.UtcNow,
-                });
+                // Create match and publish provisioning request to both Core and Global
+                // TODO: Actually create the match entity here once match creation logic is ready
+                var matchId = Guid.NewGuid(); // Placeholder - should be actual match ID after creation
+                await PublishMatchProvisioningRequestedAsync(matchId, scrimmageId);
 
                 return Result.CreateSuccess();
             }

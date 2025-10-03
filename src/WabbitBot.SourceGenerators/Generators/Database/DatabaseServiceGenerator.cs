@@ -74,6 +74,38 @@ namespace WabbitBot.SourceGenerators.Generators.Database
                     return;
                 spc.AddSource("DatabaseServiceAccessors.g.cs", tuple.Left);
             });
+
+            // Generate optional cache provider registrations partial
+            var cacheRegSource = entityDeclarations
+                .Select((entities, ct) =>
+                {
+                    ct.ThrowIfCancellationRequested();
+                    var nonNull = entities.OfType<WabbitBot.Generator.Shared.Metadata.EntityMetadataInfo>();
+                    return GenerateCacheRegistration(nonNull);
+                });
+
+            context.RegisterSourceOutput(cacheRegSource.Combine(isCoreProject), (spc, tuple) =>
+            {
+                if (!tuple.Right)
+                    return;
+                spc.AddSource("CoreService.CacheRegistrations.g.cs", tuple.Left);
+            });
+
+            // Generate optional archive provider registrations partial
+            var archiveRegSource = entityDeclarations
+                .Select((entities, ct) =>
+                {
+                    ct.ThrowIfCancellationRequested();
+                    var nonNull = entities.OfType<WabbitBot.Generator.Shared.Metadata.EntityMetadataInfo>();
+                    return GenerateArchiveRegistration(nonNull);
+                });
+
+            context.RegisterSourceOutput(archiveRegSource.Combine(isCoreProject), (spc, tuple) =>
+            {
+                if (!tuple.Right)
+                    return;
+                spc.AddSource("CoreService.ArchiveRegistrations.g.cs", tuple.Left);
+            });
         }
 
         private SourceText GenerateDatabaseServiceAccessors(
@@ -84,8 +116,10 @@ namespace WabbitBot.SourceGenerators.Generators.Database
             sourceBuilder.AppendLine(CreateFileHeader("CoreService.Database", "Auto-generated DatabaseService accessors"));
             sourceBuilder.AppendLine("using System;");
             sourceBuilder.AppendLine("using WabbitBot.Common.Data.Service;");
+            sourceBuilder.AppendLine("using WabbitBot.Common.Data;");
+            sourceBuilder.AppendLine("using WabbitBot.Common.Data.Interfaces;");
             sourceBuilder.AppendLine("using WabbitBot.Common.Models;");
-            sourceBuilder.AppendLine("using WabbitBot.Core.Common.Models;");
+            sourceBuilder.AppendLine("using WabbitBot.Core.Common.Models.Common;");
             sourceBuilder.AppendLine("using WabbitBot.Core.Common.Database;");
             sourceBuilder.AppendLine();
             sourceBuilder.AppendLine("namespace WabbitBot.Core.Common.Services");
@@ -132,14 +166,26 @@ namespace WabbitBot.SourceGenerators.Generators.Database
 
                 // Generate lazy field
                 sourceBuilder.AppendLine($"        private static readonly Lazy<DatabaseService<{entityTypeName}>> {lazyFieldName} = new(() =>");
-                sourceBuilder.AppendLine($"            new DatabaseService<{entityTypeName}>(");
+                sourceBuilder.AppendLine($"        {{");
+                sourceBuilder.AppendLine($"            var service = new DatabaseService<{entityTypeName}>(");
                 sourceBuilder.AppendLine($"                \"{metadata.TableName}\",");
                 sourceBuilder.AppendLine($"                new[] {{ {string.Join(", ", metadata.SnakeCaseColumnNames.Select(c => $"\"{c}\""))} }},");
                 sourceBuilder.AppendLine($"                \"{metadata.ArchiveTableName}\",");
                 sourceBuilder.AppendLine($"                new[] {{ {string.Join(", ", metadata.SnakeCaseColumnNames.Select(c => $"\"{c}\""))} }},");
                 sourceBuilder.AppendLine($"                {metadata.MaxCacheSize},");
                 sourceBuilder.AppendLine($"                System.TimeSpan.FromMinutes({metadata.CacheExpiryMinutes}),");
-                sourceBuilder.AppendLine($"                \"id\"));");
+                sourceBuilder.AppendLine($"                \"id\")");
+                sourceBuilder.AppendLine($"            ;");
+                sourceBuilder.AppendLine($"            var adapter = RepositoryAdapterRegistry.GetAdapter<{entityTypeName}>();");
+                sourceBuilder.AppendLine($"            if (adapter is not null) service.UseRepositoryAdapter(adapter);");
+                sourceBuilder.AppendLine($"            var cache = CacheProviderRegistry.GetProvider<{entityTypeName}>();");
+                sourceBuilder.AppendLine($"            if (cache is not null) service.UseCacheProvider(cache);");
+                sourceBuilder.AppendLine($"            else service.UseCacheProvider(new InMemoryLruCacheProvider<{entityTypeName}>({metadata.MaxCacheSize}, System.TimeSpan.FromMinutes({metadata.CacheExpiryMinutes}))); ");
+                sourceBuilder.AppendLine($"            var archive = ArchiveProviderRegistry.GetProvider<{entityTypeName}>();");
+                sourceBuilder.AppendLine($"            if (archive is not null) service.UseArchiveProvider(archive);");
+                sourceBuilder.AppendLine($"            else service.UseArchiveProvider(new NoOpArchiveProvider<{entityTypeName}>());");
+                sourceBuilder.AppendLine($"            return service;");
+                sourceBuilder.AppendLine($"        }});");
 
                 // Generate public property
                 var xml = CommonTemplates
@@ -165,7 +211,7 @@ namespace WabbitBot.SourceGenerators.Generators.Database
             // Handle entities that need full namespace qualification
             var specialEntities = new Dictionary<string, string>
             {
-                ["Stats"] = "WabbitBot.Core.Common.Models.Stats"
+                ["Stats"] = "WabbitBot.Core.Common.Models.Common.Stats"
             };
 
             if (specialEntities.TryGetValue(className, out var fullName))
@@ -177,8 +223,71 @@ namespace WabbitBot.SourceGenerators.Generators.Database
             return entityType.ToDisplayString();
         }
 
+        private SourceText GenerateCacheRegistration(
+            IEnumerable<WabbitBot.Generator.Shared.Metadata.EntityMetadataInfo> entityMetadata)
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine(CreateFileHeader("CoreService.Database", "Auto-generated cache provider registrations"));
+            sb.AppendLine("using System;");
+            sb.AppendLine("using WabbitBot.Common.Data;");
+            sb.AppendLine("using WabbitBot.Common.Data.Service;");
+            sb.AppendLine("using WabbitBot.Core.Common.Models.Common;");
+            sb.AppendLine();
+            sb.AppendLine("namespace WabbitBot.Core.Common.Services");
+            sb.AppendLine("{");
+            sb.AppendLine("    public static partial class CoreService");
+            sb.AppendLine("    {");
+            sb.AppendLine("        static partial void RegisterCacheProviders_Generated()");
+            sb.AppendLine("        {");
 
+            foreach (var metadata in entityMetadata)
+            {
+                if (!metadata.EmitCacheRegistration)
+                    continue;
 
+                var entityTypeName = GetFullEntityTypeName(metadata.ClassName, metadata.EntityType);
+                sb.AppendLine($"            CacheProviderRegistry.RegisterProvider<{entityTypeName}>(new InMemoryLruCacheProvider<{entityTypeName}>({metadata.MaxCacheSize}, System.TimeSpan.FromMinutes({metadata.CacheExpiryMinutes}))); ");
+            }
+
+            sb.AppendLine("        }");
+            sb.AppendLine("    }");
+            sb.AppendLine("}");
+
+            return SourceText.From(sb.ToString(), Encoding.UTF8);
+        }
+
+        private SourceText GenerateArchiveRegistration(
+            IEnumerable<WabbitBot.Generator.Shared.Metadata.EntityMetadataInfo> entityMetadata)
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine(CreateFileHeader("CoreService.Database", "Auto-generated archive provider registrations"));
+            sb.AppendLine("using System;");
+            sb.AppendLine("using WabbitBot.Common.Data;");
+            sb.AppendLine("using WabbitBot.Core.Common.Models.Common;");
+            sb.AppendLine("using WabbitBot.Core.Common.Database;");
+            sb.AppendLine();
+            sb.AppendLine("namespace WabbitBot.Core.Common.Services");
+            sb.AppendLine("{");
+            sb.AppendLine("    public static partial class CoreService");
+            sb.AppendLine("    {");
+            sb.AppendLine("        static partial void RegisterArchiveProviders_Generated()");
+            sb.AppendLine("        {");
+
+            foreach (var metadata in entityMetadata)
+            {
+                if (!metadata.EmitArchiveRegistration)
+                    continue;
+
+                var entityTypeName = GetFullEntityTypeName(metadata.ClassName, metadata.EntityType);
+                sb.AppendLine($"            ArchiveProviderRegistry.RegisterProvider<{entityTypeName}>(new EfArchiveProvider<{entityTypeName}>());");
+            }
+
+            sb.AppendLine("        }");
+            sb.AppendLine("    }");
+            sb.AppendLine("}");
+
+            return SourceText.From(sb.ToString(), Encoding.UTF8);
+        }
         private string CreateFileHeader(string generatorName, string description)
         {
             return $$"""

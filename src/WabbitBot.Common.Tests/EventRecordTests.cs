@@ -1,8 +1,7 @@
 using Xunit;
 using WabbitBot.Common.Events;
-using WabbitBot.Common.Configuration;
 using WabbitBot.Common.Events.EventInterfaces;
-using WabbitBot.Common.Models;
+using WabbitBot.Common.Configuration;
 
 namespace WabbitBot.Common.Tests;
 

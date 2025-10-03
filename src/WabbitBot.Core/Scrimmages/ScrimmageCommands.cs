@@ -1,5 +1,6 @@
 using WabbitBot.Core.Scrimmages;
-using WabbitBot.Core.Common.Models;
+using WabbitBot.Core.Common.Models.Common;
+using WabbitBot.Core.Common.Models.Scrimmage;
 using WabbitBot.Core.Common.Services;
 using WabbitBot.Common.Attributes;
 using WabbitBot.Common.Data;
@@ -45,7 +46,7 @@ public partial class ScrimmageCommands
             // Rule for team names: Reuse your CoreValidation via custom validator
             // RuleFor(x => x.ChallengerTeamName)
             //     .NotEmpty().WithMessage("Challenger team name is required")
-                //.Must(BeValidTeamName).WithMessage("Invalid challenger team name");  // Wrap CoreValidation.ValidateString
+            //.Must(BeValidTeamName).WithMessage("Invalid challenger team name");  // Wrap CoreValidation.ValidateString
 
             // RuleFor(x => x.OpponentTeamName)
             //     .NotEmpty().WithMessage("Opponent team name is required")
@@ -60,23 +61,11 @@ public partial class ScrimmageCommands
             // Async rule: Teams exist (injects your repo/service for Npgsql fetch if needed)
             RuleFor(x => x.ChallengerTeam)
                 .NotNull()
-                .WithMessage(x => $"Challenger team '{x.ChallengerTeamName}' not found")
-                .DependentRules(() =>  // Only run if not null
-                {
-                    RuleFor(x => x.ChallengerTeam)
-                        .MustAsync(async (team, ct) => !team.IsArchived)  // Reuse your archive check
-                        .WithMessage(x => $"Challenger team '{x.ChallengerTeamName}' is archived and cannot participate");
-                });
+                .WithMessage(x => $"Challenger team '{x.ChallengerTeamName}' not found");
 
             RuleFor(x => x.OpponentTeam)
                 .NotNull()
-                .WithMessage(x => $"Opponent team '{x.OpponentTeamName}' not found")
-                .DependentRules(() =>
-                {
-                    RuleFor(x => x.OpponentTeam)
-                        .MustAsync(async (team, ct) => !team.IsArchived)
-                        .WithMessage(x => $"Opponent team '{x.OpponentTeamName}' is archived and cannot participate");
-                });
+                .WithMessage(x => $"Opponent team '{x.OpponentTeamName}' not found");
 
             // Game sizes: Cross-validation with TeamSize
             RuleFor(x => x)

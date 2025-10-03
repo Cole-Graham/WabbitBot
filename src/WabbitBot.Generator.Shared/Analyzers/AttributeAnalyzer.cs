@@ -25,10 +25,7 @@ public static class AttributeAnalyzer
             .FirstOrDefault(kvp => kvp.Key == "Group")
             .Value.Value as string;
 
-        return new CommandInfo(
-            ClassName: classSymbol.Name,
-            CommandName: name ?? classSymbol.Name.ToLower(),
-            Group: group);
+        return new CommandInfo(classSymbol.Name, name ?? classSymbol.Name.ToLower(), group);
     }
 
     /// <summary>
@@ -88,7 +85,7 @@ public static class AttributeAnalyzer
     {
         var entities = ExtractEntityMetadata(compilation);
         // Add other extractions here as needed
-        return new CompilationAnalysisResult(Entities: entities);
+        return new CompilationAnalysisResult(entities);
     }
 
     /// <summary>
@@ -144,6 +141,26 @@ public static class AttributeAnalyzer
 
             var maxCacheSize = (int)(attribute.NamedArguments.FirstOrDefault(kvp => kvp.Key == "MaxCacheSize").Value.Value ?? 1000);
             var cacheExpiryMinutes = (int)(attribute.NamedArguments.FirstOrDefault(kvp => kvp.Key == "CacheExpiryMinutes").Value.Value ?? 60);
+            bool emitCacheRegistration = false;
+            bool emitArchiveRegistration = false;
+            var ctorArgs = attribute.ConstructorArguments;
+            // Constructor parameters order:
+            // 0: tableName, 1: archiveTableName, 2: idColumn, 3: maxCacheSize, 4: cacheExpiryMinutes,
+            // 5: explicitColumns, 6: explicitJsonbColumns, 7: explicitIndexedColumns, 8: servicePropertyName,
+            // 9: emitCacheRegistration, 10: emitArchiveRegistration
+            if (ctorArgs.Length >= 10 && ctorArgs[9].Value is bool c)
+                emitCacheRegistration = c;
+            if (ctorArgs.Length >= 11 && ctorArgs[10].Value is bool a)
+                emitArchiveRegistration = a;
+            // Fallback to named args if ever exposed as settable properties in future
+            if (!emitCacheRegistration)
+            {
+                emitCacheRegistration = (bool)(attribute.NamedArguments.FirstOrDefault(kvp => kvp.Key == "EmitCacheRegistration").Value.Value ?? false);
+            }
+            if (!emitArchiveRegistration)
+            {
+                emitArchiveRegistration = (bool)(attribute.NamedArguments.FirstOrDefault(kvp => kvp.Key == "EmitArchiveRegistration").Value.Value ?? false);
+            }
 
             // Extract column names from public properties
             var columnNames = classSymbol.GetMembers()
@@ -156,7 +173,6 @@ public static class AttributeAnalyzer
             var servicePropertyName = attribute.NamedArguments.FirstOrDefault(kvp => kvp.Key == "ServicePropertyName").Value.Value as string;
             if (string.IsNullOrEmpty(servicePropertyName))
             {
-                var ctorArgs = attribute.ConstructorArguments;
                 if (ctorArgs.Length >= 9 && ctorArgs[8].Value is string s && !string.IsNullOrWhiteSpace(s))
                 {
                     servicePropertyName = s;
@@ -169,6 +185,8 @@ public static class AttributeAnalyzer
                 ArchiveTableName: archiveTableName,
                 MaxCacheSize: maxCacheSize,
                 CacheExpiryMinutes: cacheExpiryMinutes,
+                EmitCacheRegistration: emitCacheRegistration,
+                EmitArchiveRegistration: emitArchiveRegistration,
                 ColumnNames: columnNames,
                 EntityType: classSymbol,
                 ServicePropertyName: servicePropertyName);
@@ -184,13 +202,29 @@ public static class AttributeAnalyzer
 /// <summary>
 /// Information about a command class.
 /// </summary>
-public record CommandInfo(
-    string ClassName,
-    string CommandName,
-    string? Group = null);
+public class CommandInfo
+{
+    public string ClassName { get; }
+    public string CommandName { get; }
+    public string? Group { get; } = null;
+
+    public CommandInfo(string className, string commandName, string? group = null)
+    {
+        ClassName = className;
+        CommandName = commandName;
+        Group = group;
+    }
+}
 
 /// <summary>
 /// Result of analyzing the entire compilation.
 /// </summary>
-public record CompilationAnalysisResult(
-    IEnumerable<EntityMetadataInfo> Entities);
+public class CompilationAnalysisResult
+{
+    public IEnumerable<EntityMetadataInfo> Entities { get; }
+
+    public CompilationAnalysisResult(IEnumerable<EntityMetadataInfo> entities)
+    {
+        Entities = entities;
+    }
+}

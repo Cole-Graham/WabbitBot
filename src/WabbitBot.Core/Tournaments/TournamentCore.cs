@@ -1,7 +1,8 @@
 using System;
 using System.Threading.Tasks;
 using WabbitBot.Core.Common.BotCore;
-using WabbitBot.Core.Common.Models;
+using WabbitBot.Core.Common.Models.Common;
+using WabbitBot.Core.Common.Models.Tournament;
 using WabbitBot.Core.Common.Services;
 using WabbitBot.Common.Events.EventInterfaces;
 using WabbitBot.Common.Data.Service;

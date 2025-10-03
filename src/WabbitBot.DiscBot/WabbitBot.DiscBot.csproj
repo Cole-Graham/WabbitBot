@@ -10,9 +10,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="DSharpPlus" Version="5.0.0-nightly-02544" />
-    <PackageReference Include="DSharpPlus.Commands" Version="5.0.0-nightly-02544" />
-    <PackageReference Include="DSharpPlus.Interactivity" Version="5.0.0-nightly-02544" />
+    <PackageReference Include="DSharpPlus" Version="5.0.0-nightly-02551" />
+    <PackageReference Include="DSharpPlus.Commands" Version="5.0.0-nightly-02551" />
+    <PackageReference Include="DSharpPlus.Interactivity" Version="5.0.0-nightly-02551" />
   </ItemGroup>
 
   <ItemGroup>
@@ -21,8 +21,5 @@
     <ProjectReference Include="..\WabbitBot.SourceGenerators\WabbitBot.SourceGenerators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\WabbitBot.Analyzers\WabbitBot.Analyzers.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   </ItemGroup>
-
-
-
 
 </Project>

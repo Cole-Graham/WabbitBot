@@ -1,5 +1,4 @@
 using System.Text.Json;
-using WabbitBot.Common.Models;
 using WabbitBot.Common.Configuration;
 
 namespace WabbitBot.Core.Common.Services;
@@ -42,7 +41,7 @@ public class ConfigurationService
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error saving configuration: {ex.Message}");
+                await CoreService.ErrorHandler.CaptureAsync(ex, "Error saving configuration", nameof(SaveConfigurationAsync));
                 return false;
             }
         }
@@ -58,7 +57,7 @@ public class ConfigurationService
                 var currentConfig = await LoadConfigurationAsync();
                 if (currentConfig == null)
                 {
-                    Console.WriteLine("Failed to load current configuration");
+                    await CoreService.ErrorHandler.HandleAsync(new WabbitBot.Common.ErrorService.ErrorContext("Failed to load current configuration", WabbitBot.Common.ErrorService.ErrorSeverity.Warning, nameof(SaveMapsConfigurationAsync)), WabbitBot.Common.ErrorService.ErrorComponent.Logging);
                     return false;
                 }
 
@@ -70,7 +69,7 @@ public class ConfigurationService
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error saving maps configuration: {ex.Message}");
+                await CoreService.ErrorHandler.CaptureAsync(ex, "Error saving maps configuration", nameof(SaveMapsConfigurationAsync));
                 return false;
             }
         }
@@ -85,7 +84,7 @@ public class ConfigurationService
                 var fullPath = Path.GetFullPath(AppSettingsFile);
                 if (!File.Exists(fullPath))
                 {
-                    Console.WriteLine($"Configuration file not found at: {fullPath}");
+                    await CoreService.ErrorHandler.HandleAsync(new WabbitBot.Common.ErrorService.ErrorContext($"Configuration file not found at: {fullPath}", WabbitBot.Common.ErrorService.ErrorSeverity.Warning, nameof(LoadConfigurationAsync)), WabbitBot.Common.ErrorService.ErrorComponent.Logging);
                     return null;
                 }
 
@@ -94,7 +93,7 @@ public class ConfigurationService
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error loading configuration: {ex.Message}");
+                await CoreService.ErrorHandler.CaptureAsync(ex, "Error loading configuration", nameof(LoadConfigurationAsync));
                 return null;
             }
         }
@@ -118,7 +117,7 @@ public class ConfigurationService
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error creating configuration backup: {ex.Message}");
+                CoreService.ErrorHandler.CaptureAsync(ex, "Error creating configuration backup", nameof(CreateBackup)).GetAwaiter().GetResult();
                 return null;
             }
         }

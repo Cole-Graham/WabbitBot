@@ -1,14 +1,17 @@
 using WabbitBot.Common.Attributes;
 using WabbitBot.Common.Models;
+using WabbitBot.Core.Common.Models.Common;
 
-namespace WabbitBot.Core.Common.Models
+namespace WabbitBot.Core.Common.Models.Scrimmage
 {
     [EntityMetadata(
         tableName: "scrimmages",
         archiveTableName: "scrimmage_archive",
         maxCacheSize: 200,
         cacheExpiryMinutes: 20,
-        servicePropertyName: "Scrimmages"
+        servicePropertyName: "Scrimmages",
+        emitCacheRegistration: true,
+        emitArchiveRegistration: true
     )]
     public partial class Scrimmage : Entity, IScrimmageEntity
     {
@@ -43,7 +46,9 @@ namespace WabbitBot.Core.Common.Models
         archiveTableName: "proven_potential_record_archive",
         maxCacheSize: 500,
         cacheExpiryMinutes: 60,
-        servicePropertyName: "ProvenPotentialRecords"
+        servicePropertyName: "ProvenPotentialRecords",
+        emitCacheRegistration: true,
+        emitArchiveRegistration: true
     )]
     public class ProvenPotentialRecord : Entity, IScrimmageEntity
     {
@@ -69,7 +74,9 @@ namespace WabbitBot.Core.Common.Models
         archiveTableName: "scrimmage_state_snapshot_archive",
         maxCacheSize: 300,
         cacheExpiryMinutes: 15,
-        servicePropertyName: "ScrimmageStateSnapshots"
+        servicePropertyName: "ScrimmageStateSnapshots",
+        emitCacheRegistration: true,
+        emitArchiveRegistration: true
     )]
     public class ScrimmageStateSnapshot : Entity, IScrimmageEntity
     {
@@ -77,7 +84,6 @@ namespace WabbitBot.Core.Common.Models
         public Guid ScrimmageId { get; set; } // Navigational property
         public Scrimmage? Scrimmage { get; set; } // Navigational property
         public ScrimmageStatus Status { get; set; }
-        public List<ScrimmageStateSnapshot> StateHistory { get; set; } = new();
         public override Domain Domain => Domain.Scrimmage;
     }
 

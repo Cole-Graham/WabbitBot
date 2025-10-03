@@ -6,7 +6,7 @@ import statistics
 import math
 
 from .base_scenario import BaseScenario
-from dev.tools.rating_simulator.rating_calculator import RatingCalculator
+from rating_calculator import RatingCalculator
 
 
 class LadderResetScenario(BaseScenario):
@@ -41,7 +41,8 @@ class LadderResetScenario(BaseScenario):
 
         # Scenario-specific rating parameters
         self.catch_up_bonus_config = {
-            "enabled": True,
+            "enabled": False,
+            "apply_to_loser": False,
             "target_rating": self.intended_average,
             "threshold": self.convergence_threshold,
             "max_bonus": 1.0,

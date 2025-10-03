@@ -45,14 +45,18 @@ public class CoreEventBus(IGlobalEventBus globalEventBus) : ICoreEventBus
 
         ArgumentNullException.ThrowIfNull(@event);
 
-        // Check if this is a response to a pending request
-        if (_pendingRequests.TryRemove(@event.EventId, out var tcs))
+        // Only treat explicit Response types as request completions
+        var evtType = @event.GetType();
+        if (evtType.Name.EndsWith("Response", StringComparison.Ordinal))
         {
-            tcs.TrySetResult(@event);
-            return; // Don't process further for responses
+            if (_pendingRequests.TryRemove(@event.EventId, out var tcs))
+            {
+                tcs.TrySetResult(@event);
+                return; // Don't process further for responses
+            }
         }
 
-        var eventType = typeof(TEvent);
+        var eventType = @event.GetType();
         List<Delegate>? handlers;
 
         lock (_lock)
@@ -74,10 +78,7 @@ public class CoreEventBus(IGlobalEventBus globalEventBus) : ICoreEventBus
         // Execute all local handlers
         foreach (var handler in handlers)
         {
-            if (handler is Func<TEvent, Task> typedHandler)
-            {
-                tasks.Add(typedHandler(@event));
-            }
+            tasks.Add((Task)handler.DynamicInvoke(@event)!);
         }
 
         // Only forward to global bus if the event is meant for global routing
@@ -87,14 +88,15 @@ public class CoreEventBus(IGlobalEventBus globalEventBus) : ICoreEventBus
             {
                 try
                 {
-                    await _globalEventBus.PublishAsync(@event);
+                    var evtType2 = @event.GetType();
+                    var method = typeof(IGlobalEventBus).GetMethod("PublishAsync")!;
+                    var generic = method.MakeGenericMethod(evtType2);
+                    var task = (Task)generic.Invoke(_globalEventBus, new object[] { @event })!;
+                    await task;
                 }
                 catch (Exception ex)
                 {
-                    // Emit BoundaryErrorEvent for cross-boundary faults
                     var errorEvent = new BoundaryErrorEvent(ex, "Core-to-Global", EventBusType.Global);
-                    // Note: Avoid publishing error event to prevent potential recursion
-                    // In a production system, this could be logged or handled via a separate error channel
                 }
             }));
         }
@@ -118,12 +120,8 @@ public class CoreEventBus(IGlobalEventBus globalEventBus) : ICoreEventBus
         {
             if (!_handlers.TryGetValue(eventType, out List<Delegate>? handlers))
             {
-                handlers = [];
-            }
-            else
-            {
-                // Make a copy to avoid holding the lock during invocation
-                handlers = new List<Delegate>(handlers);
+                handlers = new List<Delegate>();
+                _handlers[eventType] = handlers;
             }
 
             handlers.Add(handler);

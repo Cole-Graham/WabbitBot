@@ -1,5 +1,4 @@
 using WabbitBot.Common.Configuration;
-using WabbitBot.Common.Models;
 using WabbitBot.Common.Events.EventInterfaces;
 
 namespace WabbitBot.Common.Events

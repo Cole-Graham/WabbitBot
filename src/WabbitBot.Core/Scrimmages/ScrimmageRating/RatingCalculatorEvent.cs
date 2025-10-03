@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using WabbitBot.Core.Common.Models;
+using WabbitBot.Core.Common.Models.Common;
 using WabbitBot.Common.Attributes;
 using WabbitBot.Common.Events.EventInterfaces;
 

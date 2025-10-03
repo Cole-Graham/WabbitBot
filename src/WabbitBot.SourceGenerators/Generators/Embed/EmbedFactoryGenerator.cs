@@ -10,7 +10,11 @@ namespace WabbitBot.SourceGenerators.Generators.Embed;
 /// <summary>
 /// Generates embed factory code for classes marked with [GenerateEmbedFactory].
 /// Creates a static factory for instantiating and managing Discord embeds.
+/// 
+/// DEPRECATED: This generator is obsolete. Use ComponentFactoryGenerator instead.
+/// This class will be removed in a future version.
 /// </summary>
+[Obsolete("Use ComponentFactoryGenerator for component models instead. This generator is deprecated and will be removed.")]
 [Generator]
 public class EmbedFactoryGenerator : IIncrementalGenerator
 {

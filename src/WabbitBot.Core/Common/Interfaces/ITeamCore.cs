@@ -1,6 +1,6 @@
 using WabbitBot.Common.Data.Service;
 using WabbitBot.Common.Models;
-using WabbitBot.Core.Common.Models;
+using WabbitBot.Core.Common.Models.Common;
 
 namespace WabbitBot.Core.Common.Interfaces
 {
@@ -50,13 +50,23 @@ namespace WabbitBot.Core.Common.Interfaces
         Task ReactivatePlayer(Guid teamId, Guid playerId);
 
         /// <summary>
-        /// Updates the stats for a team after a match result
+        /// Updates the Scrimmage stats for a team after a match result
         /// </summary>
-        Task<Result> UpdateStats(Guid teamId, TeamSize teamSize, bool isWin);
+        Task<Result> UpdateScrimmageStats(Guid teamId, TeamSize teamSize, bool isWin);
 
         /// <summary>
-        /// Updates the rating for a team
+        /// Updates the Scrimmage rating for a team
         /// </summary>
-        Task<Result> UpdateRating(Guid teamId, TeamSize teamSize, double newRating);
+        Task<Result> UpdateScrimmageRating(Guid teamId, TeamSize teamSize, double newRating);
+
+        /// <summary>
+        /// Updates the Tournament stats for a team
+        /// </summary>
+        Task<Result> UpdateTournamentStats(Guid teamId, TeamSize teamSize, bool isWin);
+
+        /// <summary>
+        /// Updates the Tournament rating for a team
+        /// </summary>
+        Task<Result> UpdateTournamentRating(Guid teamId, TeamSize teamSize, double newRating);
     }
 }

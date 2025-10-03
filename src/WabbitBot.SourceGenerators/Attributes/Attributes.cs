@@ -24,6 +24,29 @@ namespace WabbitBot.SourceGenerators.Attributes
         /// </summary>
         DiscBot
     }
+
+    /// <summary>
+    /// Defines the target event buses for event publishing.
+    /// Used with EventTrigger to specify where events should be published.
+    /// </summary>
+    [Flags]
+    public enum EventTargets
+    {
+        /// <summary>
+        /// Publish to the local/default event bus only.
+        /// </summary>
+        Local = 1,
+
+        /// <summary>
+        /// Publish to the Global event bus only.
+        /// </summary>
+        Global = 2,
+
+        /// <summary>
+        /// Publish to both local and Global event buses (dual-publish).
+        /// </summary>
+        Both = Local | Global
+    }
     #region Command
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method)]
     public class WabbitCommandAttribute(string name) : Attribute
@@ -126,6 +149,85 @@ namespace WabbitBot.SourceGenerators.Attributes
         public bool EnableMetrics { get; } = enableMetrics;
         public bool EnableErrorHandling { get; } = enableErrorHandling;
         public bool EnableLogging { get; } = enableLogging;
+    }
+    #endregion
+
+    #region Event Generator and Trigger
+    /// <summary>
+    /// Marks a class for automatic event publisher and subscriber generation.
+    /// Supports opt-in trigger mode where methods marked with [EventTrigger] will have publishers generated.
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
+    public class EventGeneratorAttribute : Attribute
+    {
+        /// <summary>
+        /// Default event bus type for generated events when not overridden by EventTrigger.
+        /// </summary>
+        public EventBusType DefaultBus { get; set; } = EventBusType.Global;
+
+        /// <summary>
+        /// Whether to generate publisher methods for events.
+        /// </summary>
+        public bool GeneratePublishers { get; set; } = false;
+
+        /// <summary>
+        /// Whether to generate subscriber registrations for events.
+        /// </summary>
+        public bool GenerateSubscribers { get; set; } = false;
+
+        /// <summary>
+        /// Whether to generate request-response patterns.
+        /// </summary>
+        public bool GenerateRequestResponse { get; set; } = false;
+
+        /// <summary>
+        /// Trigger mode: "OptIn" means only methods with [EventTrigger] will generate events.
+        /// Other modes like "Convention" could be added later.
+        /// </summary>
+        public string TriggerMode { get; set; } = "OptIn";
+    }
+
+    /// <summary>
+    /// Marks a method for automatic event publisher generation.
+    /// Must be used on a class decorated with [EventGenerator(TriggerMode = "OptIn")].
+    /// The method signature determines the event payload.
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Method, AllowMultiple = false)]
+    public class EventTriggerAttribute : Attribute
+    {
+        /// <summary>
+        /// Override the event bus type for this specific trigger.
+        /// Uses the DefaultBus from EventGenerator when not explicitly set.
+        /// </summary>
+        public EventBusType BusType { get; set; } = EventBusType.Global;
+
+        /// <summary>
+        /// Target event buses for publishing.
+        /// Local = publish to default/local bus only
+        /// Global = publish to Global bus only
+        /// Both = dual-publish to both local and Global buses
+        /// </summary>
+        public EventTargets Targets { get; set; } = EventTargets.Global;
+    }
+    #endregion
+
+    #region Component Factory Generation
+    /// <summary>
+    /// Marks a component model class for factory generation.
+    /// The generator will create factory methods to build Discord components from these POCOs.
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
+    public class GenerateComponentFactoryAttribute : Attribute
+    {
+        /// <summary>
+        /// Optional theme/color for the component (e.g., "Info", "Success", "Warning", "Error").
+        /// </summary>
+        public string? Theme { get; set; }
+
+        /// <summary>
+        /// Whether this component supports attachments.
+        /// </summary>
+        public bool SupportsAttachments { get; set; } = false;
     }
     #endregion
 

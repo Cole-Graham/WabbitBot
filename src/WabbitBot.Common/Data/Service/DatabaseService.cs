@@ -16,6 +16,8 @@ namespace WabbitBot.Common.Data.Service;
 /// </summary>
 public partial class DatabaseService<TEntity> : IDatabaseService<TEntity> where TEntity : Entity
 {
+    private IRepositoryAdapter<TEntity>? _repositoryAdapter;
+    private ICacheProvider<TEntity>? _cacheProvider;
     /// <summary>
     /// Creates a new DatabaseService with default configuration
     /// </summary>
@@ -43,6 +45,16 @@ public partial class DatabaseService<TEntity> : IDatabaseService<TEntity> where 
         InitializeRepository(tableName, columns, idColumn);
         InitializeCache(cacheMaxSize, cacheDefaultExpiry);
         // InitializeArchive(archiveTableName, archiveColumns);
+    }
+
+    public void UseRepositoryAdapter(IRepositoryAdapter<TEntity> adapter)
+    {
+        _repositoryAdapter = adapter ?? throw new ArgumentNullException(nameof(adapter));
+    }
+
+    public void UseCacheProvider(ICacheProvider<TEntity> cacheProvider)
+    {
+        _cacheProvider = cacheProvider ?? throw new ArgumentNullException(nameof(cacheProvider));
     }
 
     #region IDatabaseService Implementation
@@ -109,6 +121,12 @@ public partial class DatabaseService<TEntity> : IDatabaseService<TEntity> where 
         switch (component)
         {
             case DatabaseComponent.Repository:
+                // Optional: archive snapshot on delete if provider configured
+                var existing = await GetByIdFromRepositoryAsync(id);
+                if (existing is not null)
+                {
+                    await ArchiveOnDeleteAsync(existing, Guid.Empty, "Repository delete");
+                }
                 result = await DeleteFromRepositoryAsync(id);
                 if (result.Success)
                 {
@@ -262,23 +280,7 @@ public partial class DatabaseService<TEntity> : IDatabaseService<TEntity> where 
         }
     }
 
-    public async Task<Result<IEnumerable<TEntity>>> QueryAsync(
-        string whereClause,
-        object? parameters,
-        DatabaseComponent component)
-    {
-        IEnumerable<TEntity>? result;
-        switch (component)
-        {
-            case DatabaseComponent.Repository:
-                result = await QueryFromRepositoryAsync(whereClause, parameters);
-                return Result<IEnumerable<TEntity>>.CreateSuccess(result);
-            default:
-                return Result<IEnumerable<TEntity>>.Failure(
-                    $"Unsupported component for Query: {component}"
-                );
-        }
-    }
+    // QueryAsync removed. Use CoreService.WithDbContext for complex queries.
 
     #endregion
 

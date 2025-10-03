@@ -1,8 +1,7 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
+using WabbitBot.Common.Data.Interfaces;
 using WabbitBot.Common.Models;
 
 namespace WabbitBot.Common.Data.Service;
@@ -13,167 +12,87 @@ namespace WabbitBot.Common.Data.Service;
 /// </summary>
 public partial class DatabaseService<TEntity> where TEntity : Entity
 {
-    // Cache implementation based on existing CacheService
-    private class CacheEntry
-    {
-        public required object Value { get; set; }
-        public DateTime? ExpiryTime { get; set; }
-        public DateTime LastAccessed { get; set; }
-        public bool IsExpired => ExpiryTime.HasValue && DateTime.UtcNow > ExpiryTime.Value;
-    }
-
-    private ConcurrentDictionary<string, CacheEntry>? _cache;
-    private int _maxSize;
-    private readonly Lock _evictionLock = new();
-    private TimeSpan _defaultExpiry;
-
     /// <summary>
-    /// Initialize cache configuration
+    /// No-op. Cache is provided via ICacheProvider and configured by generator/startup.
     /// </summary>
     private void InitializeCache(int maxSize = 1000, TimeSpan? defaultExpiry = null)
     {
-        _maxSize = maxSize > 0 ? maxSize : throw new ArgumentException("Max size must be greater than 0", nameof(maxSize));
-        _cache = new ConcurrentDictionary<string, CacheEntry>();
-        _defaultExpiry = defaultExpiry ?? TimeSpan.FromHours(1);
+        // Intentionally empty: legacy internal cache removed in favor of ICacheProvider
     }
 
-    #region Cache Operations Implementation
+    #region Cache Operations (provider-backed)
 
     protected virtual async Task<Result<TEntity>> CreateInCacheAsync(TEntity entity)
     {
-        try
+        if (_cacheProvider is null)
         {
-            await SetInCacheAsync(entity.Id.ToString(), entity, _defaultExpiry);
-            return Result<TEntity>.CreateSuccess(entity);
+            return Result<TEntity>.Failure("No cache provider configured");
         }
-        catch (Exception ex)
-        {
-            return Result<TEntity>.Failure($"Failed to create entity in cache: {ex.Message}");
-        }
+
+        await _cacheProvider.SetAsync(entity.Id, entity);
+        return Result<TEntity>.CreateSuccess(entity);
     }
 
     protected virtual async Task<Result<TEntity>> UpdateInCacheAsync(TEntity entity)
     {
-        try
+        if (_cacheProvider is null)
         {
-            await SetInCacheAsync(entity.Id.ToString(), entity, _defaultExpiry);
-            return Result<TEntity>.CreateSuccess(entity);
+            return Result<TEntity>.Failure("No cache provider configured");
         }
-        catch (Exception ex)
-        {
-            return Result<TEntity>.Failure($"Failed to update entity in cache: {ex.Message}");
-        }
+
+        await _cacheProvider.SetAsync(entity.Id, entity);
+        return Result<TEntity>.CreateSuccess(entity);
     }
 
     protected virtual async Task<Result<TEntity>> DeleteFromCacheAsync(object id)
     {
-        try
+        if (_cacheProvider is null)
         {
-            var key = id.ToString();
-            if (_cache.TryGetValue(key, out var entry))
-            {
-                _cache.TryRemove(key, out _);
-                return Result<TEntity>.CreateSuccess((TEntity)entry.Value);
-            }
-            return Result<TEntity>.Failure("Entity not found in cache");
+            return Result<TEntity>.Failure("No cache provider configured");
         }
-        catch (Exception ex)
-        {
-            return Result<TEntity>.Failure($"Failed to delete entity from cache: {ex.Message}");
-        }
+
+        // Best-effort remove; we cannot return the removed value via provider contract
+        await _cacheProvider.RemoveAsync(id);
+        return Result<TEntity>.Failure("Removed from cache (value not available)");
     }
 
     protected virtual async Task<bool> ExistsInCacheAsync(object id)
     {
-        var key = id.ToString();
-        if (_cache.TryGetValue(key, out var entry))
+        if (_cacheProvider is null)
         {
-            if (!entry.IsExpired)
-            {
-                // Update last accessed time for LRU tracking
-                entry.LastAccessed = DateTime.UtcNow;
-                return true;
-            }
-
-            // Remove expired entry
-            _cache.TryRemove(key, out _);
+            return false;
         }
 
-        return false;
+        var found = await _cacheProvider.TryGetAsync(id, out var _);
+        return found;
     }
 
     protected virtual async Task<TEntity?> GetByIdFromCacheAsync(object id)
     {
-        var key = id.ToString();
-        if (_cache.TryGetValue(key, out var entry))
+        if (_cacheProvider is null)
         {
-            if (!entry.IsExpired)
-            {
-                // Update last accessed time for LRU tracking
-                entry.LastAccessed = DateTime.UtcNow;
-                return (TEntity?)entry.Value;
-            }
-
-            // Remove expired entry
-            _cache.TryRemove(key, out _);
+            return default;
         }
 
-        return default;
+        var found = await _cacheProvider.TryGetAsync(id, out var entity);
+        return found ? entity : default;
     }
 
     protected virtual async Task<TEntity?> GetByNameFromCacheAsync(string name)
     {
-        // Cache doesn't support name-based lookups efficiently
-        // This could be implemented with a separate name-to-id mapping if needed
+        // Not supported by default provider. Could be implemented with a secondary index provider.
+        await Task.CompletedTask;
         return default;
     }
 
     protected virtual async Task<IEnumerable<TEntity>> GetAllFromCacheAsync()
     {
-        // Getting all cached items is expensive and not typically needed
-        // Return empty for now - cache is for individual item access
-        return Array.Empty<TEntity>();
-    }
-
-    #endregion
-
-    #region Cache Helper Methods
-
-    private async Task SetInCacheAsync(string key, TEntity value, TimeSpan? expiry = null)
-    {
-        var entry = new CacheEntry
+        if (_cacheProvider is null)
         {
-            Value = value,
-            ExpiryTime = expiry.HasValue ? DateTime.UtcNow.Add(expiry.Value) : null,
-            LastAccessed = DateTime.UtcNow
-        };
-
-        // Check if we need to evict entries before adding
-        if (_cache.Count >= _maxSize && !_cache.ContainsKey(key))
-        {
-            EvictOldestEntries(1);
+            return Array.Empty<TEntity>();
         }
 
-        _cache.AddOrUpdate(key, entry, (_, _) => entry);
-        await Task.CompletedTask;
-    }
-
-    private void EvictOldestEntries(int count)
-    {
-        lock (_evictionLock)
-        {
-            // Get all entries sorted by last accessed time (oldest first)
-            var oldestEntries = _cache
-                .OrderBy(kvp => kvp.Value.LastAccessed)
-                .Take(count)
-                .ToList();
-
-            // Remove the oldest entries
-            foreach (var entry in oldestEntries)
-            {
-                _cache.TryRemove(entry.Key, out _);
-            }
-        }
+        return await _cacheProvider.GetAllAsync();
     }
 
     #endregion

@@ -40,10 +40,8 @@ def find_most_recent_simulation_file() -> Optional[str]:
     Returns:
         Path to the most recent simulation file, or None if not found
     """
-    # Look for simulation results in the correct directory
-    simulation_dir = (
-        Path(project_root) / "dev" / "rating_simulator" / "simulation_results"
-    )
+    # Look for simulation results in the simulation_results directory
+    simulation_dir = Path(__file__).parent / "simulation_results"
 
     if not simulation_dir.exists():
         return None
@@ -62,9 +60,7 @@ def find_most_recent_simulation_file() -> Optional[str]:
 
 def list_recent_simulation_files() -> None:
     """List recent simulation files with their timestamps."""
-    simulation_dir = (
-        Path(project_root) / "dev" / "rating_simulator" / "simulation_results"
-    )
+    simulation_dir = Path(__file__).parent / "simulation_results"
 
     if not simulation_dir.exists():
         print("No simulation_results directory found.")

@@ -1,4 +1,4 @@
-using WabbitBot.Common.Models;
+using WabbitBot.Common.Configuration;
 using WabbitBot.Common.Attributes;
 using WabbitBot.Common.Events.EventInterfaces;
 

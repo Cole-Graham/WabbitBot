@@ -1,16 +1,17 @@
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
+using WabbitBot.Common.Configuration;
 using WabbitBot.Common.Models;
 using WabbitBot.Common.Data.Utilities;
 using WabbitBot.Common.Attributes;
-using WabbitBot.Common.Configuration;
 using WabbitBot.Core.Common.Events;
 using WabbitBot.Core.Common.BotCore;
 using WabbitBot.Core.Common.Services;
-using WabbitBot.Core.Common.Models;
+using WabbitBot.Common.ErrorService;
+using WabbitBot.Core.Common.Models.Common;
 using WabbitBot.Common.Events.EventInterfaces;
 
-namespace WabbitBot.Core.Common.Configuration;
+namespace WabbitBot.Core.Common.Commands;
 
 /// <summary>
 /// Pure business logic for configuration commands - no Discord dependencies
@@ -229,7 +230,9 @@ public partial class ConfigurationCommands
             var backupPath = ConfigurationService.Persistence.CreateBackup();
             if (backupPath != null)
             {
-                Console.WriteLine($"Configuration backup created: {backupPath}");
+                await WabbitBot.Core.Common.Services.CoreService.ErrorHandler.HandleAsync(
+                    new ErrorContext($"Configuration backup created: {backupPath}", ErrorSeverity.Information, nameof(SaveConfigurationAsync)),
+                    ErrorComponent.Logging);
             }
 
             // Save configuration using the persistence service

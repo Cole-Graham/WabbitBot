@@ -1,6 +1,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Npgsql;
 
 namespace WabbitBot.Core.Common.Database
 {
@@ -12,6 +13,7 @@ namespace WabbitBot.Core.Common.Database
     public static class WabbitBotDbContextProvider
     {
         private static DbContextOptions<WabbitBotDbContext>? _options;
+        private static NpgsqlDataSource? _dataSource;
         private static string? _connectionString;
 
         /// <summary>
@@ -29,7 +31,11 @@ namespace WabbitBot.Core.Common.Database
 
             if (databaseSettings.Provider.ToLowerInvariant() == "postgresql")
             {
-                optionsBuilder.UseNpgsql(_connectionString, npgsqlOptions =>
+                var dsBuilder = new NpgsqlDataSourceBuilder(_connectionString);
+                dsBuilder.EnableDynamicJson();
+                _dataSource = dsBuilder.Build();
+
+                optionsBuilder.UseNpgsql(_dataSource, npgsqlOptions =>
                 {
                     npgsqlOptions.EnableRetryOnFailure(
                         maxRetryCount: 3,

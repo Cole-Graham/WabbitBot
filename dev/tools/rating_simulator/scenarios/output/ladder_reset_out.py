@@ -54,11 +54,14 @@ def save_ladder_reset_results(
         # Write detailed individual match information
         f.write("## Detailed Individual Match Information\n\n")
 
+        # Create player lookup dictionary
+        players_dict = {player.name: player for player in players}
+
         # Write first 30 matches
         f.write("### First 100 Matches\n\n")
         for i, match in enumerate(results[:100], 1):
             f.write(f"#### Match {i}\n\n")
-            write_simple_match_details(f, match)
+            write_simple_match_details(f, match, players_dict)
             f.write("\n")
 
         # Write last 10 matches
@@ -66,7 +69,7 @@ def save_ladder_reset_results(
             f.write("### Last 10 Matches\n\n")
             for i, match in enumerate(results[-10:], len(results) - 9):
                 f.write(f"#### Match {i}\n\n")
-                write_simple_match_details(f, match)
+                write_simple_match_details(f, match, players_dict)
                 f.write("\n")
 
     print(f"Results saved to {md_filename}")
@@ -144,17 +147,36 @@ def save_structured_data(
         json.dump(simulation_data, f, indent=2, ensure_ascii=False)
 
 
-def write_simple_match_details(f, match: Dict) -> None:
+def write_simple_match_details(f, match: Dict, players: Dict[str, Dict]) -> None:
     """Write simple match details in the new format.
 
     Args:
         f: File object to write to
         match: Match data dictionary
+        players: Dictionary mapping player IDs to player data
     """
     # Get player data from new format
     player_id = match["player_id"]
     opponent_id = match["opponent_id"]
     player_won = match["player_won"]
+
+    # Get player objects
+    challenger_data = players.get(player_id)
+    opponent_data = players.get(opponent_id)
+
+    if challenger_data:
+        challenger_name = challenger_data.name
+        challenger_target = challenger_data.target_rating
+        challenger_name = f"{challenger_name} ({challenger_target})"
+    else:
+        challenger_name = player_id
+
+    if opponent_data:
+        opponent_name = opponent_data.name
+        opponent_target = opponent_data.target_rating
+        opponent_name = f"{opponent_name} ({opponent_target})"
+    else:
+        opponent_name = opponent_id
 
     # Calculate rating changes
     player_change = match["player_rating_after"] - match["player_rating_before"]
@@ -168,8 +190,8 @@ def write_simple_match_details(f, match: Dict) -> None:
 
     # Prepare data for dynamic column width calculation
     table_rows = [
-        {"category": "Challenger", "details": player_id},
-        {"category": "Opponent", "details": opponent_id},
+        {"category": "Challenger", "details": challenger_name},
+        {"category": "Opponent", "details": opponent_name},
         {"category": "Result", "details": "Win" if player_won else "Loss"},
         {
             "category": "Challenger Rating",

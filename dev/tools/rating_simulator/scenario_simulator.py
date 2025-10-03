@@ -15,11 +15,11 @@ project_root = str(Path(__file__).parent.parent.parent)
 if project_root not in sys.path:
     sys.path.append(project_root)
 
-from dev.tools.rating_simulator.scenarios.base_scenario import BaseScenario
-from dev.tools.rating_simulator.rating_calculator import RatingCalculator
-from dev.tools.rating_simulator.scenarios.ladder_reset import LadderResetScenario, Player
-from dev.tools.rating_simulator.scenarios.output import save_ladder_reset_results
-from dev.tools.rating_simulator.simulation_config import LADDER_RESET_CONFIG
+from scenarios.base_scenario import BaseScenario
+from rating_calculator import RatingCalculator
+from scenarios.ladder_reset import LadderResetScenario, Player
+from scenarios.output import save_ladder_reset_results
+from simulation_config import LADDER_RESET_CONFIG
 
 
 class ScenarioSimulator:
@@ -440,7 +440,7 @@ class ScenarioSimulator:
 
     def _generate_late_joiners(self) -> None:
         """Generate late joiners for proven potential testing."""
-        from dev.tools.rating_simulator.simulation_config import LADDER_RESET_CONFIG
+        from simulation_config import LADDER_RESET_CONFIG
 
         if not LADDER_RESET_CONFIG.get("late_joiners", {}).get("enabled", False):
             return
@@ -460,7 +460,7 @@ class ScenarioSimulator:
             target_rating = max(1000, min(2400, int(round(target_rating))))
 
             # Create late joiner player
-            from dev.tools.rating_simulator.scenarios.ladder_reset import Player
+            from scenarios.ladder_reset import Player
 
             late_joiner = Player(
                 name=f"LateJoiner_{i+1}",
@@ -473,7 +473,7 @@ class ScenarioSimulator:
 
     def _check_late_joiners(self, match_num: int) -> None:
         """Check if late joiners should join the ladder."""
-        from dev.tools.rating_simulator.simulation_config import LADDER_RESET_CONFIG
+        from simulation_config import LADDER_RESET_CONFIG
 
         if not LADDER_RESET_CONFIG.get("late_joiners", {}).get("enabled", False):
             return
@@ -529,7 +529,7 @@ class ScenarioSimulator:
         Returns:
             Number of initial players to generate
         """
-        from dev.tools.rating_simulator.simulation_config import LADDER_RESET_CONFIG
+        from simulation_config import LADDER_RESET_CONFIG
 
         if not LADDER_RESET_CONFIG.get("late_joiners", {}).get("enabled", False):
             # If late joiners disabled, use full player count
@@ -599,7 +599,7 @@ class ScenarioSimulator:
 
 def main():
     """Run the simulation."""
-    from dev.tools.rating_simulator.scenarios.ladder_reset import LadderResetScenario
+    from scenarios.ladder_reset import LadderResetScenario
 
     # Create scenario
     scenario = LadderResetScenario()

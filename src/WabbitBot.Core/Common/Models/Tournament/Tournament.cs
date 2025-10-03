@@ -1,15 +1,18 @@
 using System;
 using WabbitBot.Common.Attributes;
 using WabbitBot.Common.Models;
+using WabbitBot.Core.Common.Models.Common;
 
-namespace WabbitBot.Core.Common.Models
+namespace WabbitBot.Core.Common.Models.Tournament
 {
     [EntityMetadata(
         tableName: "tournaments",
         archiveTableName: "tournament_archive",
         maxCacheSize: 50,
         cacheExpiryMinutes: 30,
-        servicePropertyName: "Tournaments"
+        servicePropertyName: "Tournaments",
+        emitCacheRegistration: true,
+        emitArchiveRegistration: true
     )]
     public partial class Tournament : Entity, ITournamentEntity
     {
@@ -47,7 +50,9 @@ namespace WabbitBot.Core.Common.Models
         archiveTableName: "tournament_state_snapshot_archive",
         maxCacheSize: 200,
         cacheExpiryMinutes: 15,
-        servicePropertyName: "TournamentStateSnapshots"
+        servicePropertyName: "TournamentStateSnapshots",
+        emitCacheRegistration: true,
+        emitArchiveRegistration: true
     )]
     public class TournamentStateSnapshot : Entity, ITournamentEntity
     {
@@ -55,8 +60,8 @@ namespace WabbitBot.Core.Common.Models
         // Tournament state properties
         public Guid TournamentId { get; set; }
         public DateTime Timestamp { get; set; }
-        public Guid UserId { get; set; } // Who triggered this state change
-        public string PlayerName { get; set; } = string.Empty; // Player name of the user who triggered this state change
+        public Guid TriggeredByUserId { get; set; } = Guid.Empty; // User who triggered this state change
+        public string TriggeredByUserName { get; set; } = string.Empty; // Username (denormalized for historical completeness)
         public Dictionary<string, object> AdditionalData { get; set; } = new();
 
         // Tournament lifecycle properties

@@ -1,91 +1,51 @@
-using WabbitBot.Core.Common.Models;
-using WabbitBot.Common.Attributes;
 using WabbitBot.Common.Events.EventInterfaces;
 
-namespace WabbitBot.Core.Common.Events
+namespace WabbitBot.Core.Common.Events;
+
+/// <summary>
+/// Core-owned match events that cross project boundaries.
+/// Source generators will copy these to DiscBot in step 6.
+/// </summary>
+
+/// <summary>
+/// Global event requesting match provisioning (threads, containers).
+/// Published by Core to request DiscBot create Discord UI.
+/// Owned by Core; DiscBot will receive generated copy.
+/// Can be auto-generated via [EventTrigger] in step 6 with targets: Both.
+/// </summary>
+public record MatchProvisioningRequested(
+    Guid MatchId,
+    Guid ScrimmageId
+) : IEvent
 {
-    public record MatchCreatedEvent : IEvent
-    {
-        public EventBusType EventBusType { get; init; } = EventBusType.Core;
-        public Guid EventId { get; init; } = Guid.NewGuid();
-        public DateTime Timestamp { get; init; } = DateTime.UtcNow;
-        public Guid MatchId { get; init; } = Guid.Empty;
+    public Guid EventId { get; init; } = Guid.NewGuid();
+    public DateTime Timestamp { get; init; } = DateTime.UtcNow;
+    public EventBusType EventBusType { get; init; } = EventBusType.Global;
+}
 
-        public Guid Team1Id { get; init; } = Guid.Empty;
-        public Guid Team2Id { get; init; } = Guid.Empty;
-        public List<Guid> Team1PlayerIds { get; init; } = new();
-        public List<Guid> Team2PlayerIds { get; init; } = new();
-        public TeamSize TeamSize { get; init; }
-        public int BestOf { get; init; }
-    }
+/// <summary>
+/// Core event indicating a match has started.
+/// Published locally within Core when match begins.
+/// </summary>
+public record MatchStartedEvent(
+    Guid MatchId
+) : IEvent
+{
+    public Guid EventId { get; init; } = Guid.NewGuid();
+    public DateTime Timestamp { get; init; } = DateTime.UtcNow;
+    public EventBusType EventBusType { get; init; } = EventBusType.Core;
+}
 
-    public record MatchStartedEvent : IEvent
-    {
-        public EventBusType EventBusType { get; init; } = EventBusType.Core;
-        public Guid EventId { get; init; } = Guid.NewGuid();
-        public DateTime Timestamp { get; init; } = DateTime.UtcNow;
-        public Guid MatchId { get; init; } = Guid.Empty;
-
-        public DateTime StartedAt { get; init; }
-        public Guid GameId { get; init; } = Guid.Empty;
-    }
-
-    public record MatchCompletedEvent : IEvent
-    {
-        public EventBusType EventBusType { get; init; } = EventBusType.Core;
-        public Guid EventId { get; init; } = Guid.NewGuid();
-        public DateTime Timestamp { get; init; } = DateTime.UtcNow;
-        public Guid MatchId { get; init; } = Guid.Empty;
-
-        public Guid WinnerId { get; init; } = Guid.Empty;
-        public DateTime CompletedAt { get; init; }
-        public Guid GameId { get; init; } = Guid.Empty;
-    }
-
-    public record MatchCancelledEvent : IEvent
-    {
-        public EventBusType EventBusType { get; init; } = EventBusType.Core;
-        public Guid EventId { get; init; } = Guid.NewGuid();
-        public DateTime Timestamp { get; init; } = DateTime.UtcNow;
-        public Guid MatchId { get; init; } = Guid.Empty;
-
-        public string Reason { get; init; } = string.Empty;
-        public Guid CancelledBy { get; init; } = Guid.Empty;
-        public Guid? GameId { get; init; }
-    }
-
-    public record MatchForfeitedEvent : IEvent
-    {
-        public EventBusType EventBusType { get; init; } = EventBusType.Core;
-        public Guid EventId { get; init; } = Guid.NewGuid();
-        public DateTime Timestamp { get; init; } = DateTime.UtcNow;
-        public Guid MatchId { get; init; } = Guid.Empty;
-
-        public Guid ForfeitedTeamId { get; init; } = Guid.Empty;
-        public string Reason { get; init; } = string.Empty;
-        public Guid GameId { get; init; } = Guid.Empty;
-    }
-
-    public record MatchPlayerJoinedEvent : IEvent
-    {
-        public EventBusType EventBusType { get; init; } = EventBusType.Core;
-        public Guid EventId { get; init; } = Guid.NewGuid();
-        public DateTime Timestamp { get; init; } = DateTime.UtcNow;
-        public Guid MatchId { get; init; } = Guid.Empty;
-
-        public Guid PlayerId { get; init; } = Guid.Empty;
-        public int TeamNumber { get; init; }
-    }
-
-    public record MatchPlayerLeftEvent : IEvent
-    {
-        public EventBusType EventBusType { get; init; } = EventBusType.Core;
-        public Guid EventId { get; init; } = Guid.NewGuid();
-        public DateTime Timestamp { get; init; } = DateTime.UtcNow;
-        public Guid MatchId { get; init; } = Guid.Empty;
-
-        public Guid PlayerId { get; init; } = Guid.Empty;
-        public int TeamNumber { get; init; }
-    }
-
+/// <summary>
+/// Core event indicating a match has completed.
+/// Published locally within Core when match finishes.
+/// </summary>
+public record MatchCompletedEvent(
+    Guid MatchId,
+    Guid WinnerTeamId
+) : IEvent
+{
+    public Guid EventId { get; init; } = Guid.NewGuid();
+    public DateTime Timestamp { get; init; } = DateTime.UtcNow;
+    public EventBusType EventBusType { get; init; } = EventBusType.Core;
 }

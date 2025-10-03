@@ -16,7 +16,7 @@ public static class EventAnalyzerDescriptors
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
         description: "EventBoundary attributes work better on classes that can be extended with partial methods.",
-        helpLinkUri: "https://github.com/Cole-Graham/WabbitBot/blob/main/contributors/docs/sourcegenerators/rules/WB001.md",
+        helpLinkUri: "https://github.com/Cole-Graham/WabbitBot/blob/main/contributors/docs/analyzers/rules/WB001.md",
         customTags: new[] { WellKnownDiagnosticTags.Telemetry });
 
     public static readonly DiagnosticDescriptor MissingEventBusInjection = new(
@@ -27,7 +27,7 @@ public static class EventAnalyzerDescriptors
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
         description: "Event boundary classes need access to an event bus for publishing events.",
-        helpLinkUri: "https://github.com/Cole-Graham/WabbitBot/blob/main/contributors/docs/sourcegenerators/rules/WB002.md",
+        helpLinkUri: "https://github.com/Cole-Graham/WabbitBot/blob/main/contributors/docs/analyzers/rules/WB002.md",
         customTags: new[] { WellKnownDiagnosticTags.Telemetry });
 
     public static readonly DiagnosticDescriptor CrudEventDetected = new(
@@ -38,7 +38,7 @@ public static class EventAnalyzerDescriptors
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
         description: "CRUD operations should be handled via repositories, not event buses.",
-        helpLinkUri: "https://github.com/Cole-Graham/WabbitBot/blob/main/contributors/docs/sourcegenerators/rules/WB003.md",
+        helpLinkUri: "https://github.com/Cole-Graham/WabbitBot/blob/main/contributors/docs/analyzers/rules/WB003.md",
         customTags: new[] { WellKnownDiagnosticTags.Telemetry });
 
     public static readonly DiagnosticDescriptor EventWithoutIEvent = new(
@@ -49,7 +49,7 @@ public static class EventAnalyzerDescriptors
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
         description: "All event classes must implement IEvent for proper bus routing.",
-        helpLinkUri: "https://github.com/Cole-Graham/WabbitBot/blob/main/contributors/docs/sourcegenerators/rules/WB004.md",
+        helpLinkUri: "https://github.com/Cole-Graham/WabbitBot/blob/main/contributors/docs/analyzers/rules/WB004.md",
         customTags: new[] { WellKnownDiagnosticTags.Telemetry });
 
     public static readonly DiagnosticDescriptor MissingTableName = new(
@@ -60,7 +60,7 @@ public static class EventAnalyzerDescriptors
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
         description: "EntityMetadata attributes must specify a TableName for database mapping.",
-        helpLinkUri: "https://github.com/Cole-Graham/WabbitBot/blob/main/contributors/docs/sourcegenerators/rules/WB005.md",
+        helpLinkUri: "https://github.com/Cole-Graham/WabbitBot/blob/main/contributors/docs/analyzers/rules/WB005.md",
         customTags: new[] { WellKnownDiagnosticTags.Telemetry });
 
     public static readonly DiagnosticDescriptor InvalidCacheSize = new(
@@ -71,6 +71,6 @@ public static class EventAnalyzerDescriptors
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
         description: "Cache sizes should be positive integers for proper memory management.",
-        helpLinkUri: "https://github.com/Cole-Graham/WabbitBot/blob/main/contributors/docs/sourcegenerators/rules/WB006.md",
+        helpLinkUri: "https://github.com/Cole-Graham/WabbitBot/blob/main/contributors/docs/analyzers/rules/WB006.md",
         customTags: new[] { WellKnownDiagnosticTags.Telemetry });
 }

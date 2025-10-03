@@ -8,10 +8,7 @@ public class AttributeAnalyzerTests
     [Fact]
     public void CommandInfo_ConstructsCorrectly()
     {
-        var info = new CommandInfo(
-            ClassName: "TestCommand",
-            CommandName: "test",
-            Group: "admin");
+        var info = new CommandInfo("TestCommand", "test", "admin");
 
         Assert.Equal("TestCommand", info.ClassName);
         Assert.Equal("test", info.CommandName);

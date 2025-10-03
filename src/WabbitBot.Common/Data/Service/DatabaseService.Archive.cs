@@ -1,46 +1,33 @@
 using System;
-using System.Collections.Generic;
 using System.Threading.Tasks;
-using Npgsql;
-using WabbitBot.Common.Data;
 using WabbitBot.Common.Data.Interfaces;
-using WabbitBot.Common.Data.Utilities;
 using WabbitBot.Common.Models;
 
 namespace WabbitBot.Common.Data.Service;
 
-/// <summary>
-/// Archive operations for DatabaseService using PostgreSQL
-/// Handles archiving of deleted or modified entities for historical tracking
-/// </summary>
 public partial class DatabaseService<TEntity> where TEntity : Entity
 {
-    private DatabaseService<TEntity>? _archiveService; // Nullable as it's initialized later
+    private IArchiveProvider<TEntity>? _archiveProvider;
 
-    /// <summary>
-    /// Initialize archive configuration for the entity type
-    /// </summary>
-    private void InitializeArchive(string archiveTableName, IEnumerable<string> archiveColumns)
+    public void UseArchiveProvider(IArchiveProvider<TEntity> archiveProvider)
     {
-        _archiveService = new DatabaseService<TEntity>(archiveTableName, archiveColumns, archiveTableName, archiveColumns);
+        _archiveProvider = archiveProvider ?? throw new ArgumentNullException(nameof(archiveProvider));
     }
 
-    #region Archive Operations Implementation
-
-    private async Task<Result<TEntity>> CreateInArchiveAsync(TEntity entity)
+    protected virtual async Task<Result> ArchiveOnDeleteAsync(TEntity entity, Guid archivedBy, string? reason)
     {
-        return await (_archiveService?.CreateAsync(entity, DatabaseComponent.Archive) ?? Task.FromResult(Result<TEntity>.Failure("Archive service not initialized.")));
+        if (_archiveProvider is null)
+        {
+            return Result.CreateSuccess();
+        }
+        try
+        {
+            await _archiveProvider.SaveSnapshotAsync(entity, archivedBy, reason);
+            return Result.CreateSuccess();
+        }
+        catch (Exception ex)
+        {
+            return Result.Failure($"Archive snapshot failed: {ex.Message}");
+        }
     }
-
-    private async Task<Result<TEntity>> UpdateInArchiveAsync(TEntity entity)
-    {
-        return await (_archiveService?.UpdateAsync(entity, DatabaseComponent.Archive) ?? Task.FromResult(Result<TEntity>.Failure("Archive service not initialized.")));
-    }
-
-    private async Task<Result<TEntity>> DeleteFromArchiveAsync(object id)
-    {
-        return await (_archiveService?.DeleteAsync(id, DatabaseComponent.Archive) ?? Task.FromResult(Result<TEntity>.Failure("Archive service not initialized.")));
-    }
-
-    #endregion
 }

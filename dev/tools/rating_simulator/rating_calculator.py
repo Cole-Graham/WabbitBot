@@ -433,6 +433,7 @@ class RatingCalculator:
         loser_catchup_bonus = 0.0
 
         if catch_up_bonus_config and catch_up_bonus_config.get("enabled", False):
+            apply_to_loser = catch_up_bonus_config.get("apply_to_loser", False)
             target_rating = catch_up_bonus_config.get("target_rating", 1500)
             threshold = catch_up_bonus_config.get("threshold", 200)
             max_bonus = catch_up_bonus_config.get("max_bonus", 1.0)
@@ -445,6 +446,15 @@ class RatingCalculator:
                     scale = threshold / 2
                     progress = 1 - math.exp(-distance / scale)
                     winner_catchup_bonus = progress * max_bonus
+
+            # Apply catch-up bonus to loser if below target
+            if apply_to_loser and loser_rating < target_rating:
+                distance = target_rating - loser_rating
+                if distance > threshold:
+                    # Use exponential decay for the bonus
+                    scale = threshold / 2
+                    progress = 1 - math.exp(-distance / scale)
+                    loser_catchup_bonus = progress * max_bonus
 
         # Calculate final rating changes with additive catchup bonus
         if winner_rating > loser_rating:

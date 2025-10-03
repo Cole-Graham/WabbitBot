@@ -1,6 +1,7 @@
 using WabbitBot.Common.Data.Service;
 using WabbitBot.Common.Models;
-using WabbitBot.Core.Common.Models;
+using WabbitBot.Core.Common.Models.Common;
+using WabbitBot.Core.Common.Models.Scrimmage;
 
 namespace WabbitBot.Core.Common.Interfaces
 {

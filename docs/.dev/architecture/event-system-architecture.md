@@ -119,6 +119,56 @@ public enum EventBusType
 }
 ```
 
+## Terminology and Roles
+
+### Handler
+- **What it is**: A thin orchestrator that subscribes to events and delegates to business logic.
+- **Responsibilities**:
+  - Subscribe to one or more events on the appropriate bus.
+  - Perform light validation, correlation, and orchestration.
+  - Delegate to commands/services for actual work (write or read paths).
+  - Maintain idempotence and be safe to retry.
+- **Anti-responsibilities**:
+  - No direct database CRUD.
+  - No long-running business workflows or state machines.
+  - No cross-slice coupling beyond publishing/subscribing to events.
+
+### Publisher / Subscriber
+- **Publisher**: Any code that emits an event (often via generated `RaiseXyzAsync` methods).
+- **Subscriber**: A function/method registered with a bus that receives events and typically lives in a Handler.
+
+### Command (Write Path)
+- **What it is**: Business logic that mutates state. Lives in vertical slices (e.g., `ScrimmageCommands`).
+- **Invocation**: Called directly by handlers or feature entry points, not by events performing CRUD.
+- **Rules**: Validate inputs, perform repository operations, raise facts as needed (post-commit), return results/errors.
+
+### Query (Read Path)
+- **What it is**: Business logic that reads data with no side effects.
+- **Invocation**: Called by handlers, Discord layer, or other read surfaces.
+- **Rules**: No mutations; optimized for reads and projection shaping.
+
+### Service / Processor
+- **What it is**: Business logic components that encapsulate reusable domain operations (e.g., leaderboard calculations).
+- **Relationship to Handlers**: Handlers orchestrate; services/processors execute domain work.
+
+### Event Buses
+- **CoreEventBus**: For `WabbitBot.Core` internal events and request/response within Core.
+- **DiscBotEventBus**: For `WabbitBot.DiscBot` internal events.
+- **GlobalEventBus**: Cross-boundary bus. Local buses forward `EventBusType.Global` events.
+
+### Request–Response (Async Queries over Events)
+- **Use**: Cross-boundary queries that need a response, correlated by `EventId`.
+- **Guideline**: Prefer direct method calls inside a boundary; use request–response only when the caller and callee are on different buses.
+
+### Error Handler
+- **What it is**: Boundary-aware error orchestration (e.g., logging, notifications) that may publish error events.
+- **Rule**: Do not bury domain failures; surface them via error contexts and, if cross-boundary, via error events.
+
+### Orchestration vs. Business Logic Boundaries
+- **Handlers orchestrate**; **commands/services execute**.
+- **Events communicate**; **repositories/services perform CRUD**.
+- **Buses route**; **generators wire publishers/subscribers**.
+
 ## Best Practices
 
 ### 1. Event Naming

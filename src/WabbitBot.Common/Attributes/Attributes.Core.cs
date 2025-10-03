@@ -13,7 +13,9 @@ namespace WabbitBot.Common.Attributes
         string[]? explicitColumns = null,
         string[]? explicitJsonbColumns = null,
         string[]? explicitIndexedColumns = null,
-        string? servicePropertyName = null) : Attribute
+        string? servicePropertyName = null,
+        bool emitCacheRegistration = false,
+        bool emitArchiveRegistration = false) : Attribute
     {
         public string? TableName { get; } = tableName;
         public string? ArchiveTableName { get; } = archiveTableName;
@@ -21,6 +23,8 @@ namespace WabbitBot.Common.Attributes
         public int MaxCacheSize { get; } = maxCacheSize;
         public int CacheExpiryMinutes { get; } = cacheExpiryMinutes;
         public string? ServicePropertyName { get; } = servicePropertyName;
+        public bool EmitCacheRegistration { get; } = emitCacheRegistration;
+        public bool EmitArchiveRegistration { get; } = emitArchiveRegistration;
 
         // Optional explicit overrides - generator will auto-detect most things
         public string[]? ExplicitColumns { get; } = explicitColumns;

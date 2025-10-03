@@ -12,6 +12,8 @@ public record EntityMetadataInfo(
     string ArchiveTableName,
     int MaxCacheSize = 1000,
     int CacheExpiryMinutes = 60,
+    bool EmitCacheRegistration = false,
+    bool EmitArchiveRegistration = false,
     string[] ColumnNames = null!,
     INamedTypeSymbol EntityType = null!,
     string? ServicePropertyName = null)

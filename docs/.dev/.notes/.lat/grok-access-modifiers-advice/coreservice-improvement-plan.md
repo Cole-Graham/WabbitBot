@@ -130,7 +130,7 @@
 - [x] MatchCore (`src\WabbitBot.Core\Common\Models\Common\Match\MatchCore.cs`) - Detached from inheritance, implements IMatchCore, static partials, CoreService accessors
 - [x] TeamCore (`src\WabbitBot.Core\Common\Models\Common\Team\TeamCore.cs`) - Detached from inheritance, implements ITeamCore, static partials, CoreService accessors
 
-### ⏳ Remaining
+### ✅ Remaining
 - [x] MapCore (`src\WabbitBot.Core\Common\Models\Common\Map\MapCore.cs`) - Create IMapCore interface, detach from inheritance, implement interface, static partials, CoreService accessors
 - [x] PlayerCore (`src\WabbitBot.Core\Common\Models\Common\Player\PlayerCore.cs`) - Create IPlayerCore interface, detach from inheritance, implement interface, static partials, CoreService accessors
 - [x] UserCore (`src\WabbitBot.Core\Common\Models\Common\User\UserCore.cs`) - Create IUserCore interface, detach from inheritance, implement interface, static partials, CoreService accessors

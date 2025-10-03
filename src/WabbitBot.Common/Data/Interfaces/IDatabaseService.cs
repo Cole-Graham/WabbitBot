@@ -23,7 +23,6 @@ namespace WabbitBot.Common.Data.Interfaces
         Task<Result<TEntity?>> GetByNameAsync(string name, DatabaseComponent component);
         Task<Result<IEnumerable<TEntity>>> GetAllAsync(DatabaseComponent component);
         Task<Result<IEnumerable<TEntity>>> GetByDateRangeAsync(DateTime startDate, DateTime endDate, DatabaseComponent component);
-        Task<Result<IEnumerable<TEntity>>> QueryAsync(string whereClause, object? parameters, DatabaseComponent component);
     }
 
     /// <summary>

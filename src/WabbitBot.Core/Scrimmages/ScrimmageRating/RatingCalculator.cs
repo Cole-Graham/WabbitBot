@@ -2,7 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using WabbitBot.Core.Common.Models;
+using WabbitBot.Core.Common.Models.Common;
+using WabbitBot.Core.Common.Models.Scrimmage;
 using WabbitBot.Common.Data.Service;
 using WabbitBot.Common.Data.Interfaces;
 using WabbitBot.Common.Configuration;
@@ -22,6 +23,7 @@ namespace WabbitBot.Core.Scrimmages
             private static bool UseTimeBasedVarietyFiltering { get; set; } = false;
 
             // Tail scaling constants for variety bonus
+            // TODO: Instead of an arbitrary threshold & multiplier, normalize variety bonus according to # of players in their rating range
             private const double TAIL_SCALING_THRESHOLD = 0.8; // 80% distance from middle
             private const double SIGMOID_GROWTH_RATE = 1.1;
             private const double SIGMOID_MIDPOINT = 8.0;
@@ -46,9 +48,9 @@ namespace WabbitBot.Core.Scrimmages
 
                     foreach (var team in allTeams.Data ?? Enumerable.Empty<Team>())
                     {
-                        if (team.Stats.ContainsKey(TeamSize))
+                        if (team.ScrimmageTeamStats.ContainsKey(TeamSize))
                         {
-                            ratings[team.Id.ToString()] = team.Stats[TeamSize].CurrentRating;
+                            ratings[team.Id.ToString()] = team.ScrimmageTeamStats[TeamSize].CurrentRating;
                         }
                     }
 
@@ -149,12 +151,12 @@ namespace WabbitBot.Core.Scrimmages
                         if (team.VarietyStats.TryGetValue(teamSize, out var varietyStats))
                         {
                             // Use the pre-computed variety score
-                            teamVarietyScores[team.Id] = TeamCore.Stats.GetVarietyScore(varietyStats);
+                            teamVarietyScores[team.Id] = TeamCore.ScrimmageStats.GetVarietyScore(varietyStats);
                         }
                         else
                         {
                             // Fallback: calculate on-demand using recent opponent encounters
-                            var recentEncounters = team.RecentOpponents?
+                            var recentEncounters = team.RecentScrimmageOpponents?
                                 .Where(oe => oe.TeamSize == (int)teamSize)
                                 .OrderByDescending(oe => oe.EncounteredAt)
                                 .Take(50) // Last 50 encounters for performance
@@ -202,7 +204,7 @@ namespace WabbitBot.Core.Scrimmages
                     foreach (var team in allTeams.Data ?? Enumerable.Empty<Team>())
                     {
                         // Count total opponent encounters for this team and team size
-                        var encounterCount = team.RecentOpponents?
+                        var encounterCount = team.RecentScrimmageOpponents?
                             .Where(oe => oe.TeamSize == (int)teamSize)
                             .Count() ?? 0;
                         teamEncounterCounts[team.Id] = encounterCount;
@@ -582,7 +584,7 @@ namespace WabbitBot.Core.Scrimmages
                     startDate = activeSeason?.StartDate ?? DateTime.UtcNow.AddDays(-365);
                 }
 
-                var stats = await CoreService.Stats.GetAllAsync(DatabaseComponent.Repository);
+                var stats = await CoreService.TeamVarietyStats.GetAllAsync(DatabaseComponent.Repository);
                 var varietyEntropies = stats.Data?.Select(t => t.VarietyEntropy).ToList();
                 if (varietyEntropies == null || varietyEntropies.Count == 0)
                     return 0;

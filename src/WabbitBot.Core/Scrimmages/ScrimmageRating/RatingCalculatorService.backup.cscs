@@ -4,7 +4,7 @@
 // using System.Threading.Tasks;
 // using WabbitBot.Common.Events.EventInterfaces;
 // using WabbitBot.Common.ErrorHandling;
-// using WabbitBot.Core.Common.Models;
+// using WabbitBot.Core.Common.Models.Common;
 // using WabbitBot.Core.Scrimmages;
 // using WabbitBot.Common.Configuration;
 // using WabbitBot.Common.Models;

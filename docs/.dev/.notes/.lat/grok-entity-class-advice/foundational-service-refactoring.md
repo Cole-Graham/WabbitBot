@@ -32,21 +32,21 @@ This application is in initial development with no production deployments. Conse
 ## Implementation Plan
 
 1.  **Enhance `CoreService` Thread-Safety and `DbContext` Management:**
-    *   [ ] Modify `CoreService.cs` to implement thread-safe, lazy initialization for `EventBus`, `ErrorHandler`, and `DbContext` using `Lazy<T>` or a `lock` mechanism.
-    *   [ ] Introduce an `IDbContextFactory` (e.g., `WabbitBotDbContextFactory`) to manage `DbContext` instance creation. The `CoreService.DbContext` static property will be removed, and `EntityCore` classes will acquire `DbContext` instances via this factory.
+    *   [✅] Modify `CoreService.cs` to implement thread-safe, lazy initialization for `EventBus`, `ErrorHandler`, and `DbContext` using `Lazy<T>` or a `lock` mechanism.
+    *   [✅] Introduce an `IDbContextFactory` (e.g., `WabbitBotDbContextFactory`) to manage `DbContext` instance creation. The `CoreService.DbContext` static property will be removed, and `EntityCore` classes will acquire `DbContext` instances via this factory.
 
 2.  **Standardize `DatabaseService` Error Handling:**
-    *   [ ] Refactor `IDatabaseService.cs` and `DatabaseService.cs` methods (especially `GetByIdAsync`, `GetByStringIdAsync`, `GetByNameAsync`) to always return `Result<TEntity?>` instead of throwing `ArgumentException` on null results.
-    *   [ ] Update all callers of `DatabaseService` methods to correctly handle the `Result<TEntity?>` return type, checking `Result.Success` and `Result.Data is not null`.
-    *   [ ] Ensure `Result.Failure` messages are sanitized to hide internal exception details.
+    *   [✅] Refactor `IDatabaseService.cs` and `DatabaseService.cs` methods (especially `GetByIdAsync`, `GetByStringIdAsync`, `GetByNameAsync`) to always return `Result<TEntity?>` instead of throwing `ArgumentException` on null results.
+    *   [✅] Update all callers of `DatabaseService` methods to correctly handle the `Result<TEntity?>` return type, checking `Result.Success` and `Result.Data is not null`.
+    *   [✅] Ensure `Result.Failure` messages are sanitized to hide internal exception details.
 
 3.  **Implement Testability Hooks for `CoreService`:**
-    *   [ ] Add `internal set` accessors or a dedicated static `SetTestServices` method to `CoreService` for `EventBus` and `ErrorHandler` properties, allowing unit tests to inject mock implementations.
-    *   [ ] Introduce a static `SetTestDbContextFactory` method in `CoreService` (or a dedicated `DbContextFactory` class) for injecting test `DbContext` factories.
+    *   [✅] Add `internal set` accessors or a dedicated static `SetTestServices` method to `CoreService` for `EventBus` and `ErrorHandler` properties, allowing unit tests to inject mock implementations.
+    *   [✅] Introduce a static `SetTestDbContextFactory` method in `CoreService` (or a dedicated `DbContextFactory` class) for injecting test `DbContext` factories.
 
 4.  **Update `EntityCore` Classes:**
-    *   [ ] Modify all existing `EntityCore` classes (e.g., `MatchCore`, `TeamCore`, `LeaderboardCore`) to retrieve `DbContext` instances from the `IDbContextFactory` instead of relying on the static `CoreService.DbContext` property.
-    *   [ ] Update `EntityCore` logic to handle the new `Result<TEntity?>` return types from `DatabaseService` consistently.
+    *   [✅] Modify all existing `EntityCore` classes (e.g., `MatchCore`, `TeamCore`, `LeaderboardCore`) to retrieve `DbContext` instances from the `IDbContextFactory` instead of relying on the static `CoreService.DbContext` property.
+    *   [✅] Update `EntityCore` logic to handle the new `Result<TEntity?>` return types from `DatabaseService` consistently.
 
 ## Success Metrics
 

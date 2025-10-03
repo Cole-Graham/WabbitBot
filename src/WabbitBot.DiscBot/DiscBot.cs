@@ -4,7 +4,7 @@
 // using DSharpPlus.Commands.Processors.TextCommands;
 // using DSharpPlus.Entities;
 // using WabbitBot.Common.Events;
-// using WabbitBot.Common.Configuration;
+// using WabbitBot.Common;
 // using WabbitBot.DiscBot.DSharpPlus.Interactions;
 // using WabbitBot.DiscBot.DSharpPlus.Commands;
 // using WabbitBot.DiscBot.DiscBot.Events;

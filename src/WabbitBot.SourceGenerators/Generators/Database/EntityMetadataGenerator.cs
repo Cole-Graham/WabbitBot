@@ -98,7 +98,7 @@ namespace WabbitBot.SourceGenerators.Generators.Database
             sourceBuilder.AppendLine("using System;");
             sourceBuilder.AppendLine("using System.Collections.Generic;");
             sourceBuilder.AppendLine("using WabbitBot.Common.Models;");
-            sourceBuilder.AppendLine("using WabbitBot.Core.Common.Models;");
+            sourceBuilder.AppendLine("using WabbitBot.Core.Common.Models.Common;");
             sourceBuilder.AppendLine();
             sourceBuilder.AppendLine("namespace WabbitBot.Core.Common.Metadata");
             sourceBuilder.AppendLine("{");
@@ -132,7 +132,7 @@ namespace WabbitBot.SourceGenerators.Generators.Database
             sb.AppendLine("using System;");
             sb.AppendLine("using WabbitBot.Core.Common.Config;");
             sb.AppendLine("using WabbitBot.Common.Models;");
-            sb.AppendLine("using WabbitBot.Core.Common.Models;");
+            sb.AppendLine("using WabbitBot.Core.Common.Models.Common;");
             sb.AppendLine();
             sb.AppendLine("namespace WabbitBot.Core.Common.Config");
             sb.AppendLine("{");
