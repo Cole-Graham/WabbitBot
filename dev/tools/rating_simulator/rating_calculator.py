@@ -107,56 +107,31 @@ class RatingCalculator:
     ) -> float:
         """Calculate variety bonus based on opponent distribution.
 
-        Matches the C# implementation:
-        - Uses Shannon entropy to measure opponent diversity
-        - Weights opponents based on rating gap
-        - Normalizes entropy to get variety bonus
-        - Scales between MIN_VARIETY_BONUS and MAX_VARIETY_BONUS
+        Calculates variety bonus based on opponent diversity and availability:
+        - Uses Shannon entropy to measure opponent diversity across ALL opponents equally
+        - No distance-based weighting to avoid bias toward middle-rated players
+        - Applies continuous scaling based on opponent availability:
+          - Counts potential opponents within neighbor range (40% of total range / 2)
+          - Compares to player with maximum neighbors in their range
+          - Scales bonuses/penalties based on neighbor ratio (1.0 to 1.5x)
         - Applies quadratic scaling based on games played relative to median
-        - Only counts opponents within MAX_GAP_PERCENT (40%) of player's rating
-        - Gives full weight (1.0) to higher-rated opponents
-        - Uses cosine scaling for lower-rated opponents:
-          - 0% gap: 1.0
-          - 25% gap: 0.9
-          - 50% gap: 0.75
-          - 75% gap: 0.5
-          - 100% gap: 0.0
-
-        Applies distribution scaling for players at extremes:
-        - Top 10%: 90th-99th percentile get boosted variety bonuses
-        - Bottom 10%: 1st-10th percentile get boosted variety bonuses
-        - Scaling formula based on distance from 10th/90th percentile
+        - Scales between MIN_VARIETY_BONUS and MAX_VARIETY_BONUS
         """
         if not opponent_counts:
             return self.max_variety_bonus
 
-        # Calculate weighted opponent distribution
+        # Calculate opponent distribution using ALL opponents equally
+        # Since we normalize by potential opponent availability,
+        # we can measure pure diversity without distance bias
         total_weight = 0
         weighted_counts = {}
-        rating_range = max(o.rating for o in opponents) - min(
-            o.rating for o in opponents
-        )
-        # rating_range = highest elo player - lowest elo player
-        variety_gap = rating_range * 0.4 / 2
 
+        # Give equal weight to all opponents for true diversity measurement
         for name, count in opponent_counts.items():
-            opponent = next(o for o in opponents if o.name == name)
-            # Calculate opponent weight based on rating gap
-            gap = abs(player_rating - opponent.rating)
-
-            # Only count opponents within variety gap
-            if gap <= variety_gap:
-                # For higher-rated opponents, use full weight
-                if opponent.rating >= player_rating:
-                    weight = 1.0
-                else:
-                    # For lower-rated opponents, use cosine scaling
-                    # normalized_gap is gap normalized to 1.0 (0.0 to 1.0)
-                    normalized_gap = gap / variety_gap
-                    weight = (1.0 + math.cos(math.pi * normalized_gap * 0.7)) / 2.0
-
-                weighted_counts[name] = count * weight
-                total_weight += count * weight
+            # All opponents contribute equally to diversity
+            weight = 1.0
+            weighted_counts[name] = count * weight
+            total_weight += count * weight
 
         # If no valid opponents, return max bonus
         if not weighted_counts:
@@ -191,73 +166,50 @@ class RatingCalculator:
         # Calculate base bonus
         base_bonus = scaled_diff * self.max_variety_bonus
 
-        # Apply distribution scaling for players at the extremes
-        # This helps players at the top and bottom 10% who have fewer opponents at their skill level
-        if player_percentile is not None:
-            # Calculate distance from the middle (50th percentile)
-            # 0 = at 50th percentile, 1 = at 0th or 100th percentile
-            distance_from_middle = abs(player_percentile - 50.0) / 50.0
+        # Apply continuous scaling based on opponent availability
+        # Use the same rating range calculation as gap scaling (40% of total range / 2)
+        rating_range = (
+            max(o.rating for o in opponents) - min(o.rating for o in opponents)
+            if opponents
+            else 0
+        )
+        neighbor_range = (
+            rating_range * 0.4 / 2
+        )  # Same formula as max_gap in gap scaling
 
-            # Only apply scaling to top and bottom 10% (distance > 0.8)
-            if distance_from_middle > 0.8:
-                # Use sigmoid-based scaling for smooth curve
-                if player_percentile >= 90:
-                    # Top 10%: use sigmoid curve from 90-100 percentile
-                    bonus_multiplier = self._scaled_bonus_curve_percentile(
-                        int(player_percentile)
-                    )
-                else:
-                    # Bottom 10%: mirror the top 10% scaling
-                    # Map 10th percentile to 90th, 1st to 99th, etc.
-                    mirrored_percentile = 100 - player_percentile
-                    bonus_multiplier = self._scaled_bonus_curve_percentile(
-                        int(mirrored_percentile)
-                    )
+        # Find this player's opponent count within neighbor range
+        player_neighbors = sum(
+            1 for opp in opponents if abs(opp.rating - player_rating) <= neighbor_range
+        )
 
-                # Apply the bonus multiplier
-                # The scaling should always INCREASE variety bonuses for players at extremes
-                # to compensate for naturally lower variety due to fewer opponents
-                # Convert sigmoid output (0.1 to 1.0) to increase factor (1.1 to 2.0)
-                increase_factor = 1.0 + bonus_multiplier
+        # Find maximum neighbors any player has
+        max_neighbors = (
+            max(
+                sum(
+                    1
+                    for other in opponents
+                    if abs(other.rating - opp.rating) <= neighbor_range
+                )
+                for opp in opponents
+            )
+            if opponents
+            else 1
+        )
 
-                # Apply symmetric scaling: both positive and negative get the same relative improvement
-                # e.g., if +5% becomes +10% (100% increase), then -5% should become 0% (100% improvement)
-                if base_bonus >= 0:
-                    # Positive bonus: increase by the increase factor
-                    # e.g., 0.05 (5% bonus) with 100% scaling becomes 0.1 (10% bonus)
-                    base_bonus *= increase_factor
-                else:
-                    # Negative penalty: move toward 0 by the same relative amount
-                    # e.g., -0.05 (5% penalty) with 100% scaling becomes 0.0 (0% penalty)
-                    # This gives the same relative improvement as positive bonuses
-                    base_bonus = base_bonus * (2.0 - increase_factor)
+        # Calculate scaling factor based on neighbor ratio
+        if max_neighbors > 0:
+            neighbor_ratio = player_neighbors / max_neighbors
+            # Scale variety bonus based on opponent availability
+            # Players with more neighbors get standard bonuses
+            # Players with fewer neighbors get amplified bonuses/penalties
+            availability_factor = 1.0 + (1.0 - neighbor_ratio) * 0.5  # 1.0 to 1.5 range
+            base_bonus *= availability_factor
 
         # Calculate final bonus with clamping
         return max(
             self.min_variety_bonus,
             min(self.max_variety_bonus, base_bonus),
         )
-
-    def _scaled_bonus_curve_percentile(self, p: int) -> float:
-        """
-        Input: percentile from 90 to 100
-        Output: bonus multiplier from 0.1 to 1.0 (smooth sigmoid)
-        """
-        if not 90 <= p <= 100:
-            raise ValueError("Percentile must be between 90 and 100")
-
-        # Map percentile to x in range [1, 10]
-        x = p - 89
-
-        k = 1.1  # Growth rate
-        x0 = 8.0  # Midpoint (same as original)
-
-        raw = 1 / (1 + math.exp(-k * (x - x0)))
-        min_raw = 1 / (1 + math.exp(-k * (1 - x0)))
-        max_raw = 1 / (1 + math.exp(-k * (10 - x0)))
-
-        scaled = (raw - min_raw) / (max_raw - min_raw)  # Normalize to [0, 1]
-        return 0.1 + scaled * 0.9  # Scale to [0.1, 1.0]
 
     def calculate_rating_change(
         self,
@@ -398,13 +350,14 @@ class RatingCalculator:
 
         # Calculate rating gap scaling to prevent shadow-boxing
         # rating_range is total leaderboard range, calculate 20% of it (40% / 2)
-        max_gap = rating_range * 0.4 / 2
+        max_gap = rating_range * 0.4 / 2 if rating_range > 0 else 0
         rating_gap = abs(winner_rating - loser_rating)
 
         # Initialize gap scaling (no effect by default)
         gap_scaling = 1.0
 
-        if rating_gap <= max_gap:
+        # Only apply gap scaling if there's a meaningful rating range and gap
+        if rating_range > 0 and rating_gap <= max_gap:
             # normalized_gap is rating_gap normalized to 1.0 (0.0 to 1.0)
             normalized_gap = rating_gap / max_gap
             # Use cosine scaling: (1 + cos(π * normalized_gap * 0.7)) / 2

@@ -19,7 +19,7 @@ from scenarios.base_scenario import BaseScenario
 from rating_calculator import RatingCalculator
 from scenarios.ladder_reset import LadderResetScenario, Player
 from scenarios.output import save_ladder_reset_results
-from simulation_config import LADDER_RESET_CONFIG
+from simulation_config import LADDER_RESET_CONFIG, VARIETY_CONFIG
 
 
 class ScenarioSimulator:
@@ -63,9 +63,7 @@ class ScenarioSimulator:
 
         # Calculate rating range for variety bonus
         ratings = [p.rating for p in self.players]
-        rating_range = (
-            max(ratings) - min(ratings) + 400 if ratings else 400
-        )  # Add buffer to prevent division by zero
+        rating_range = max(ratings) - min(ratings) if ratings else 0
 
         # Calculate median games played
         games_played_list = [p.games_played for p in self.players]
@@ -77,10 +75,8 @@ class ScenarioSimulator:
         if median_games_played == 0:
             median_games_played = 1.0  # Use 1.0 as default to avoid division by zero
 
-        # Calculate simulated average variety score (simplified - could be improved)
-        simulated_avg_variety_score = (
-            2.0  # Default value, could be calculated from all players
-        )
+        # Calculate actual average variety score from all players
+        simulated_avg_variety_score = self._calculate_avg_variety_score()
 
         # Calculate player percentiles in current rating distribution
         # For ladder reset scenario, use target ratings for percentile calculation
@@ -325,6 +321,10 @@ class ScenarioSimulator:
         self._apply_proven_potential_adjustments(current_match)
         self._apply_proven_potential_adjustments(opponent_match)
 
+        # Calculate final rating changes after proven potential adjustments
+        p1_final_change = p1.rating - p1_rating_before
+        p2_final_change = p2.rating - p2_rating_before
+
         # Store match details with original ratings (before proven potential adjustments)
         # Calculate the original ratings after the match but before any proven potential adjustments
         p1_rating_after_match = p1_rating_before + (
@@ -342,6 +342,8 @@ class ScenarioSimulator:
             "opponent_rating_before": p2_rating_before,
             "player_rating_after": p1_rating_after_match,
             "opponent_rating_after": p2_rating_after_match,
+            "player_final_change": p1_final_change,
+            "opponent_final_change": p2_final_change,
             "player_confidence": p1_confidence,
             "opponent_confidence": p2_confidence,
             "player_won": p1_won,
@@ -363,6 +365,51 @@ class ScenarioSimulator:
         }
 
         return match
+
+    def _calculate_avg_variety_score(self) -> float:
+        """Calculate the adjusted average variety entropy score across all players.
+
+        This calculates the actual average entropy of all players' matchup diversity,
+        then applies a difficulty multiplier to make variety bonuses easier or harder
+        to achieve.
+
+        Returns:
+            Adjusted average variety entropy score (lower = easier bonuses)
+        """
+        if not self.players:
+            return 2.0  # Fallback default
+
+        total_entropy = 0.0
+        player_count = 0
+
+        for player in self.players:
+            # Get this player's opponent counts
+            opponent_counts = self._get_opponent_counts(player)
+
+            if opponent_counts:
+                # Calculate entropy for this player
+                total_weight = sum(opponent_counts.values())
+                player_entropy = 0.0
+
+                for count in opponent_counts.values():
+                    if count > 0:
+                        p = count / total_weight
+                        player_entropy -= p * math.log2(p)
+
+                total_entropy += player_entropy
+                player_count += 1
+
+        if player_count == 0:
+            return 2.0  # Fallback if no players have opponent data
+
+        avg_entropy = total_entropy / player_count
+
+        # Apply difficulty multiplier to make variety bonuses easier/harder to achieve
+        # Lower multiplier = easier (players need less entropy for bonuses)
+        difficulty_multiplier = VARIETY_CONFIG["variety_difficulty_multiplier"]
+        adjusted_avg_entropy = avg_entropy * difficulty_multiplier
+
+        return adjusted_avg_entropy
 
     def _apply_proven_potential_adjustments(self, match_data: Dict) -> None:
         """Apply proven potential adjustments to current player ratings.
@@ -569,6 +616,10 @@ class ScenarioSimulator:
         # Run matches
         results = []
         for match_num in range(num_matches):
+            # Progress output every 5000 matches
+            if (match_num + 1) % 2500 == 0:
+                print(f"Completed {match_num + 1}/{num_matches} matches")
+
             # Check if late joiners should join
             self._check_late_joiners(match_num)
 
@@ -579,6 +630,7 @@ class ScenarioSimulator:
             results.append(match)
 
         self.last_results = results  # Store the results
+        print(f"Simulation completed: {num_matches}/{num_matches} matches")
         return results
 
     def save_results(self, output_dir: str = "simulation_results") -> None:

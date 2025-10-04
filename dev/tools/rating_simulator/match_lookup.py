@@ -264,7 +264,7 @@ def format_match_details(
             table_rows.append(
                 {
                     "category": f"PP Detail {i+1}",
-                    "details": f"Match {detail['previous_match_number']} - {original_player_name} gets {detail['player_adjustment']:+.1f} pts, {original_opponent_name} gets {detail['opponent_adjustment']:+.1f} pts compensation: {detail['compensation_percentage']:.1%} ({detail['gap_closure_percent']:.1%} gap closed)",
+                    "details": f"Match {detail['previous_match_number']} - {original_player_name} gets {-detail['player_adjustment']:+.1f} pts, {original_opponent_name} gets {-detail['opponent_adjustment']:+.1f} pts compensation: {detail['compensation_percentage']:.1%} ({detail['gap_closure_percent']:.1%} gap closed)",
                 }
             )
 
@@ -303,7 +303,7 @@ def format_match_details(
             table_rows.append(
                 {
                     "category": f"Opp PP Detail {i+1}",
-                    "details": f"Match {detail['previous_match_number']} - {original_player_name} gets {detail['player_adjustment']:+.1f} pts, {original_opponent_name} gets {detail['opponent_adjustment']:+.1f} pts compensation: {detail['compensation_percentage']:.1%} ({detail['gap_closure_percent']:.1%} gap closed)",
+                    "details": f"Match {detail['previous_match_number']} - {original_player_name} gets {-detail['player_adjustment']:+.1f} pts, {original_opponent_name} gets {-detail['opponent_adjustment']:+.1f} pts compensation: {detail['compensation_percentage']:.1%} ({detail['gap_closure_percent']:.1%} gap closed)",
                 }
             )
 

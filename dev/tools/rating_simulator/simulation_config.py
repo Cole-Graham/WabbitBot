@@ -44,12 +44,19 @@ MATCH_CONFIG = {
     "use_target_elo_for_win_prob": True,
 }
 
+# Variety Bonus Parameters
+VARIETY_CONFIG = {
+    # Multiplier for variety score difficulty (lower = easier to get bonuses)
+    # 1.0 = use actual average, 0.75 = 25% easier (need 25% less entropy)
+    "variety_difficulty_multiplier": 0.75,
+}
+
 # Ladder Reset Scenario Parameters
 LADDER_RESET_CONFIG = {
     # Number of players in the ladder
-    "num_players": 100,
+    "num_players": 2,
     # Number of matches to simulate
-    "num_matches": 8800,
+    "num_matches": 200,
     # Target rating distribution (rating, percentage)
     "target_rating_distribution": [
         (1300, 0.1),  # 10% of players target 1300
@@ -62,7 +69,7 @@ LADDER_RESET_CONFIG = {
     "focus_on_current_ratings": False,
     # Late joiners configuration for proven potential testing
     "late_joiners": {
-        "enabled": True,
+        "enabled": False,
         "late_joiner_percentage": 0.20,  # 20% of total players join later
         "join_after_matches": 3000,  # Join after this many matches
         "join_interval": 150,  # Join every N matches
