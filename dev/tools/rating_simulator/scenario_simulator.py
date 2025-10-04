@@ -16,10 +16,10 @@ if project_root not in sys.path:
     sys.path.append(project_root)
 
 from scenarios.base_scenario import BaseScenario
-from rating_calculator import RatingCalculator
+from rating_calculator import RatingCalculator, RATING_CONFIG
+from simulation_config import LADDER_RESET_CONFIG, VARIETY_CONFIG
 from scenarios.ladder_reset import LadderResetScenario, Player
 from scenarios.output import save_ladder_reset_results
-from simulation_config import LADDER_RESET_CONFIG, VARIETY_CONFIG
 
 
 class ScenarioSimulator:
@@ -37,10 +37,8 @@ class ScenarioSimulator:
         self.match_history = []
         self.rating_calculator = RatingCalculator()
         self.last_results = []  # Store the results from the last simulation run
-
-        # Track which proven potential adjustments have been applied to current ratings
-        # Key: (previous_match_number, opponent_id, threshold_applied)
-        self.applied_proven_potential_adjustments = set()
+        self.pending_pp = defaultdict(list)
+        self.pp_finalizations = []  # Track batch finalization events
 
     def simulate_match(self) -> Dict:
         """Simulate a single match.
@@ -83,7 +81,7 @@ class ScenarioSimulator:
         # since tail scaling should be based on intended skill level
         if (
             hasattr(self.scenario, "get_scenario_name")
-            and self.scenario.get_scenario_name() == "Ladder Reset"
+            and self.scenario.get_scenario_name() == "Ladder Reset (1000 Start)"
         ):
             # Use target ratings for percentile calculation in ladder reset
             current_ratings = [p.target_rating for p in self.players]
@@ -97,7 +95,7 @@ class ScenarioSimulator:
             (
                 p1.rating
                 if not hasattr(self.scenario, "get_scenario_name")
-                or self.scenario.get_scenario_name() != "Ladder Reset"
+                or self.scenario.get_scenario_name() != "Ladder Reset (1000 Start)"
                 else p1.target_rating
             ),
             current_ratings,
@@ -106,7 +104,7 @@ class ScenarioSimulator:
             (
                 p2.rating
                 if not hasattr(self.scenario, "get_scenario_name")
-                or self.scenario.get_scenario_name() != "Ladder Reset"
+                or self.scenario.get_scenario_name() != "Ladder Reset (1000 Start)"
                 else p2.target_rating
             ),
             current_ratings,
@@ -210,6 +208,10 @@ class ScenarioSimulator:
         p1_confidence = self.rating_calculator.calculate_confidence(p1.games_played)
         p2_confidence = self.rating_calculator.calculate_confidence(p2.games_played)
 
+        # Store pre-match games played
+        p1_games_before = p1.games_played
+        p2_games_before = p2.games_played
+
         # Determine winner/loser parameters
         if p1_won:
             winner_rating = p1_rating_before
@@ -218,8 +220,8 @@ class ScenarioSimulator:
             loser_confidence = p2_confidence
             winner_variety_bonus = p1_variety_bonus
             loser_variety_bonus = p2_variety_bonus
-            winner_games_played = p1.games_played
-            loser_games_played = p2.games_played
+            winner_games_played = p1_games_before
+            loser_games_played = p2_games_before
         else:
             winner_rating = p2_rating_before
             loser_rating = p1_rating_before
@@ -227,8 +229,8 @@ class ScenarioSimulator:
             loser_confidence = p1_confidence
             winner_variety_bonus = p2_variety_bonus
             loser_variety_bonus = p1_variety_bonus
-            winner_games_played = p2.games_played
-            loser_games_played = p1.games_played
+            winner_games_played = p2_games_before
+            loser_games_played = p1_games_before
 
         # Get scenario-specific parameters
 
@@ -266,73 +268,78 @@ class ScenarioSimulator:
         p1.games_played += 1
         p2.games_played += 1
 
-        # Create match record for proven potential checking
-        # Use the actual simulation match number (passed from simulate method)
+        # Create match record (without PP)
         match_number = getattr(
             self, "current_match_number", len(self.match_history) // 2 + 1
         )
 
-        # Create match data for proven potential checking
-        current_match = {
-            "match_number": match_number,
-            "player_id": p1.name,
-            "opponent_id": p2.name,
-            "player_rating_before": p1_rating_before,
-            "opponent_rating_before": p2_rating_before,
-            "player_rating_after": p1.rating,
-            "opponent_rating_after": p2.rating,
-            "player_confidence": p1_confidence,
-            "opponent_confidence": p2_confidence,
-            "player_won": p1_won,
-            "rating_change": winner_change if p1_won else loser_change,
-            "player_rating_change": winner_change if p1_won else loser_change,
-            "opponent_rating_change": loser_change if p1_won else winner_change,
-        }
-
-        # Create opponent match record for proven potential
-        opponent_match = {
-            "match_number": match_number,
-            "player_id": p2.name,
-            "opponent_id": p1.name,
-            "player_rating_before": p2_rating_before,
-            "opponent_rating_before": p1_rating_before,
-            "player_rating_after": p2.rating,
-            "opponent_rating_after": p1.rating,
-            "player_confidence": p2_confidence,
-            "opponent_confidence": p1_confidence,
-            "player_won": not p1_won,
-            "rating_change": winner_change if not p1_won else loser_change,
-            "player_rating_change": winner_change if not p1_won else loser_change,
-            "opponent_rating_change": loser_change if not p1_won else winner_change,
-        }
-
-        # Add to match history
-        self.match_history.append(current_match)
-        self.match_history.append(opponent_match)
-
-        # Check proven potential for both players AFTER adding to history
-        # Both players could qualify for proven potential compensation
-        self.rating_calculator.check_proven_potential(current_match, self.match_history)
-        self.rating_calculator.check_proven_potential(
-            opponent_match, self.match_history
-        )
-
-        # Apply proven potential adjustments to current player ratings
-        self._apply_proven_potential_adjustments(current_match)
-        self._apply_proven_potential_adjustments(opponent_match)
-
-        # Calculate final rating changes after proven potential adjustments
-        p1_final_change = p1.rating - p1_rating_before
-        p2_final_change = p2.rating - p2_rating_before
-
-        # Store match details with original ratings (before proven potential adjustments)
-        # Calculate the original ratings after the match but before any proven potential adjustments
+        # Calculate original ratings after the match (before any PP)
         p1_rating_after_match = p1_rating_before + (
             winner_change if p1_won else loser_change
         )
         p2_rating_after_match = p2_rating_before + (
             loser_change if p1_won else winner_change
         )
+
+        # Check for PP trigger
+        gap = abs(p1_rating_before - p2_rating_before)
+        min_games = LADDER_RESET_CONFIG["min_established_games_for_pp"]
+        new_player = None
+        est_player = None
+        est_change = 0.0
+        new_change = 0.0
+        est_won = False
+        initial_new_after = 0.0
+        if gap > 0 and (
+            (
+                p1_confidence >= 1.0
+                and p2_confidence < 1.0
+                and p1_games_before >= min_games
+            )
+            or (
+                p2_confidence >= 1.0
+                and p1_confidence < 1.0
+                and p2_games_before >= min_games
+            )
+        ):
+            if (
+                p1_confidence >= 1.0
+                and p2_confidence < 1.0
+                and p1_games_before >= min_games
+            ):
+                new_player = p2
+                est_player = p1
+                new_before = p2_rating_before
+                est_before = p1_rating_before
+                new_change = winner_change if not p1_won else loser_change
+                est_change = winner_change if p1_won else loser_change
+                est_won = p1_won
+            else:
+                new_player = p1
+                est_player = p2
+                new_before = p1_rating_before
+                est_before = p2_rating_before
+                new_change = winner_change if p1_won else loser_change
+                est_change = loser_change if p1_won else winner_change
+                est_won = not p1_won
+            initial_new_after = new_player.rating
+            trigger = {
+                "match_number": match_number,
+                "est_player_name": est_player.name,
+                "est_before": est_before,
+                "new_before": new_before,
+                "initial_new_after": initial_new_after,
+                "est_change": est_change,
+                "new_change": new_change,
+                "est_won": est_won,
+                "tracking_end": match_number
+                + RATING_CONFIG["max_matches_for_proven_potential"],
+                "subsequent_afters": [],
+                "applied": False,
+            }
+            if new_player.name not in self.pending_pp:
+                self.pending_pp[new_player.name] = []
+            self.pending_pp[new_player.name].append(trigger)
 
         match = {
             "match_number": match_number,
@@ -342,8 +349,8 @@ class ScenarioSimulator:
             "opponent_rating_before": p2_rating_before,
             "player_rating_after": p1_rating_after_match,
             "opponent_rating_after": p2_rating_after_match,
-            "player_final_change": p1_final_change,
-            "opponent_final_change": p2_final_change,
+            "player_games_played_before": p1_games_before,
+            "opponent_games_played_before": p2_games_before,
             "player_confidence": p1_confidence,
             "opponent_confidence": p2_confidence,
             "player_won": p1_won,
@@ -356,15 +363,329 @@ class ScenarioSimulator:
             "p2_multiplier": p2_multiplier,
             "challenger_selection": challenger_selection,
             "potential_opponents": potential_opponents,
-            "proven_potential_details": current_match.get(
-                "proven_potential_details", []
-            ),
-            "opponent_proven_potential_details": opponent_match.get(
-                "proven_potential_details", []
-            ),
         }
 
+        # Add to match history (both perspectives, without PP details)
+        current_match = match.copy()
+        current_match.update(
+            {
+                "match_number": match_number,
+                "player_id": p1.name,
+                "opponent_id": p2.name,
+                "player_rating_before": p1_rating_before,
+                "opponent_rating_before": p2_rating_before,
+                "player_rating_after": p1_rating_after_match,
+                "opponent_rating_after": p2_rating_after_match,
+                "player_games_played_before": p1_games_before,
+                "opponent_games_played_before": p2_games_before,
+                "player_confidence": p1_confidence,
+                "opponent_confidence": p2_confidence,
+                "player_won": p1_won,
+                "rating_change": winner_change if p1_won else loser_change,
+                "player_rating_change": winner_change if p1_won else loser_change,
+                "opponent_rating_change": loser_change if p1_won else winner_change,
+            }
+        )
+        self.match_history.append(current_match)
+
+        opponent_match = match.copy()
+        opponent_match.update(
+            {
+                "match_number": match_number,
+                "player_id": p2.name,
+                "opponent_id": p1.name,
+                "player_rating_before": p2_rating_before,
+                "opponent_rating_before": p1_rating_before,
+                "player_rating_after": p2_rating_after_match,
+                "opponent_rating_after": p1_rating_after_match,
+                "player_games_played_before": p2_games_before,
+                "opponent_games_played_before": p1_games_before,
+                "player_confidence": p2_confidence,
+                "opponent_confidence": p1_confidence,
+                "player_won": not p1_won,
+                "rating_change": winner_change if not p1_won else loser_change,
+                "player_rating_change": winner_change if not p1_won else loser_change,
+                "opponent_rating_change": loser_change if not p1_won else winner_change,
+            }
+        )
+        self.match_history.append(opponent_match)
+
         return match
+
+    def post_process_proven_potential(self):
+        """Post-process all matches to calculate deferred Proven Potential adjustments."""
+        for match in self.last_results:
+            p1_won = match["player_won"]
+            player_change = match["player_rating_after"] - match["player_rating_before"]
+            opponent_change = (
+                match["opponent_rating_after"] - match["opponent_rating_before"]
+            )
+            player_conf = match["player_confidence"]
+            opponent_conf = match["opponent_confidence"]
+            player_before = match["player_rating_before"]
+            opponent_before = match["opponent_rating_before"]
+
+            # Identify winner and loser for original changes
+            if p1_won:
+                winner_original_change = player_change
+                loser_original_change = opponent_change
+            else:
+                winner_original_change = opponent_change
+                loser_original_change = player_change
+
+            match["original_winner_change"] = winner_original_change
+            match["original_loser_change"] = loser_original_change
+
+            # Default: no PP
+            match["pp_applicable"] = False
+            match["pp_scaling"] = 1.0
+            match["pp_crossed_thresholds"] = 0
+            match["player_adjusted_change"] = player_change
+            match["opponent_adjusted_change"] = opponent_change
+
+            # Check for PP applicability based on confidence difference
+            if player_conf >= 1.0 and opponent_conf < 1.0:
+                est_change = player_change
+                new_change = opponent_change
+                est_before = player_before
+                new_before = opponent_before
+                est_name = match["player_id"]
+                new_name = match["opponent_id"]
+                est_is_p1 = True
+                est_games = match["player_games_played_before"]
+            elif opponent_conf >= 1.0 and player_conf < 1.0:
+                est_change = opponent_change
+                new_change = player_change
+                est_before = opponent_before
+                new_before = player_before
+                est_name = match["opponent_id"]
+                new_name = match["player_id"]
+                est_is_p1 = False
+                est_games = match["opponent_games_played_before"]
+            else:
+                # Both same confidence level: no PP
+                continue
+
+            # Check minimum games for established player
+            if est_games < LADDER_RESET_CONFIG["min_established_games_for_pp"]:
+                continue
+
+            # Compute gap; skip if no meaningful gap
+            gap = abs(est_before - new_before)
+            if gap == 0:
+                continue
+
+            # PP applicable
+            match["pp_applicable"] = True
+
+            threshold_increment = gap * RATING_CONFIG["proven_potential_gap_threshold"]
+            initial_new_after = new_before + new_change
+
+            # Find new player's next 16 participations (where new is player_id)
+            subsequent_match_nums = set(
+                m["match_number"]
+                for m in self.match_history
+                if m["match_number"] > match["match_number"]
+                and m["player_id"] == new_name
+            )
+            sorted_sub_nums = sorted(list(subsequent_match_nums))[
+                : RATING_CONFIG["max_matches_for_proven_potential"]
+            ]
+
+            next_16_afters = []
+            for num in sorted_sub_nums:
+                sub_entry = next(
+                    (
+                        m
+                        for m in self.match_history
+                        if m["match_number"] == num and m["player_id"] == new_name
+                    ),
+                    None,
+                )
+                if sub_entry:
+                    next_16_afters.append(sub_entry["player_rating_after"])
+
+            # Compute max_reached
+            all_new_afters = [initial_new_after] + next_16_afters
+            max_reached = max(all_new_afters) if all_new_afters else initial_new_after
+
+            # Count crossed thresholds
+            crossed_count = 0
+            for i in range(1, 11):  # Up to 100%
+                th = initial_new_after + i * threshold_increment
+                if th <= max_reached:
+                    crossed_count += 1
+                else:
+                    break
+
+            closure_fraction = (
+                crossed_count * RATING_CONFIG["proven_potential_gap_threshold"]
+            )
+
+            # Determine if established won
+            est_won = p1_won if est_is_p1 else not p1_won
+
+            # Compute adjusted changes
+            if est_won:
+                adjusted_est = est_change * (1 + closure_fraction)
+                adjusted_new = new_change * (1 + closure_fraction)
+                pp_scaling = 1 + closure_fraction
+            else:
+                adjusted_est = est_change * (1 - closure_fraction)
+                adjusted_new = new_change * (1 - closure_fraction)
+                pp_scaling = 1 - closure_fraction
+
+            match["pp_scaling"] = pp_scaling
+            match["pp_crossed_thresholds"] = crossed_count
+
+            # Store adjusted changes based on p1/p2
+            if est_is_p1:
+                match["player_adjusted_change"] = adjusted_est
+                match["opponent_adjusted_change"] = adjusted_new
+            else:
+                match["player_adjusted_change"] = adjusted_new
+                match["opponent_adjusted_change"] = adjusted_est
+
+            # For output: compute adjusted winner/loser changes
+            if p1_won:
+                match["adjusted_winner_change"] = match["player_adjusted_change"]
+                match["adjusted_loser_change"] = match["opponent_adjusted_change"]
+            else:
+                match["adjusted_winner_change"] = match["opponent_adjusted_change"]
+                match["adjusted_loser_change"] = match["player_adjusted_change"]
+
+    def _update_pp_tracking(self, current_match: int, match: dict):
+        """Update PP tracking after a match."""
+        p1_name = match["player_id"]
+        p2_name = match["opponent_id"]
+        p1_obj = next((p for p in self.players if p.name == p1_name), None)
+        p2_obj = next((p for p in self.players if p.name == p2_name), None)
+        for player_name, player_obj in [(p1_name, p1_obj), (p2_name, p2_obj)]:
+            if player_obj is None or player_name not in self.pending_pp:
+                continue
+            for trigger in self.pending_pp[player_name]:
+                if (
+                    not trigger.get("applied", False)
+                    and current_match > trigger["match_number"]
+                    and len(trigger["subsequent_afters"])
+                    < RATING_CONFIG["max_matches_for_proven_potential"]
+                ):
+                    trigger["subsequent_afters"].append(player_obj.rating)
+            # Check for finalization
+            pending_triggers = [
+                t for t in self.pending_pp[player_name] if not t.get("applied", False)
+            ]
+            if pending_triggers:
+                max_end = max(t["tracking_end"] for t in pending_triggers)
+                player_conf = self.rating_calculator.calculate_confidence(
+                    player_obj.games_played
+                )
+                if current_match >= max_end and player_conf >= 1.0:
+                    # LOGGING: Trace mid-simulation PP application
+                    trigger_matches = [t["match_number"] for t in pending_triggers]
+                    print(
+                        f"MID-SIM APPLYING PP for {player_name} after match {current_match}: scaling for triggers {trigger_matches}"
+                    )
+                    # Track batch finalization BEFORE applying
+                    before_rating = player_obj.rating
+                    for trigger in pending_triggers:
+                        self._finalize_pp_trigger(trigger, player_obj)
+                    # Now sum after adjustments are calculated/applied
+                    total_adj_new = sum(
+                        trigger.get("adj_new", 0.0) for trigger in pending_triggers
+                    )
+                    after_rating = player_obj.rating  # Updated in finalizer
+                    est_adjustments = {}
+                    for trigger in pending_triggers:
+                        est_name = trigger["est_player_name"]
+                        adj_est = trigger.get("adj_est", 0.0)
+                        if est_name not in est_adjustments:
+                            est_adjustments[est_name] = 0.0
+                        est_adjustments[est_name] += adj_est
+                    self.pp_finalizations.append(
+                        {
+                            "new_player": player_name,
+                            "before_rating": before_rating,
+                            "total_adj_new": total_adj_new,
+                            "after_rating": after_rating,
+                            "applied_at_match": current_match,
+                            "num_triggers": len(pending_triggers),
+                            "trigger_matches": trigger_matches,
+                            "est_adjustments": est_adjustments,
+                        }
+                    )
+                    self.pending_pp[player_name] = [
+                        t
+                        for t in self.pending_pp[player_name]
+                        if not t.get("applied", False)
+                    ]
+                    if not self.pending_pp[player_name]:
+                        del self.pending_pp[player_name]
+
+    def _finalize_pp_trigger(self, trigger: dict, new_player_obj):
+        """Finalize and apply a single PP trigger adjustment."""
+        all_new_afters = [trigger["initial_new_after"]] + trigger["subsequent_afters"]
+        max_reached = (
+            max(all_new_afters) if all_new_afters else trigger["initial_new_after"]
+        )
+        gap = abs(trigger["est_before"] - trigger["new_before"])
+        if gap == 0:
+            trigger["applied"] = True
+            return
+        threshold_increment = gap * RATING_CONFIG["proven_potential_gap_threshold"]
+        initial_after = trigger["initial_new_after"]
+        crossed_count = 0
+        for i in range(1, 11):
+            th = initial_after + i * threshold_increment
+            if th <= max_reached:
+                crossed_count += 1
+            else:
+                break
+        closure_fraction = (
+            crossed_count * RATING_CONFIG["proven_potential_gap_threshold"]
+        )
+        est_won = trigger["est_won"]
+        if est_won:
+            scaling = 1 + closure_fraction
+        else:
+            scaling = 1 - closure_fraction
+        new_change = trigger["new_change"]
+        est_change = trigger["est_change"]
+        adj_new = (scaling - 1) * new_change
+        adj_est = (scaling - 1) * est_change
+        new_player_obj.rating += adj_new
+        try:
+            est_player_obj = next(
+                p for p in self.players if p.name == trigger["est_player_name"]
+            )
+            est_player_obj.rating += adj_est
+        except StopIteration:
+            pass  # Est player no longer in simulation
+        trigger["applied"] = True
+        trigger["scaling"] = scaling
+        trigger["closure_fraction"] = closure_fraction
+        trigger["crossed_count"] = crossed_count
+        trigger["adj_new"] = adj_new
+        trigger["adj_est"] = adj_est
+        # Update the corresponding match record
+        for m in self.match_history:
+            if (
+                m["match_number"] == trigger["match_number"]
+                and m["player_id"] == new_player_obj.name
+                and m["opponent_id"] == trigger["est_player_name"]
+            ):
+                m["pp_applicable"] = True
+                m["pp_scaling"] = scaling
+                m["pp_crossed_thresholds"] = crossed_count
+                m["player_adjusted_change"] = new_change * scaling
+                m["opponent_adjusted_change"] = est_change * scaling
+                m["adjusted_winner_change"] = (
+                    new_change * scaling if new_change > 0 else est_change * scaling
+                )
+                m["adjusted_loser_change"] = (
+                    est_change * scaling if new_change > 0 else new_change * scaling
+                )
+                break
 
     def _calculate_avg_variety_score(self) -> float:
         """Calculate the adjusted average variety entropy score across all players.
@@ -411,65 +732,6 @@ class ScenarioSimulator:
 
         return adjusted_avg_entropy
 
-    def _apply_proven_potential_adjustments(self, match_data: Dict) -> None:
-        """Apply proven potential adjustments to current player ratings.
-
-        Args:
-            match_data: The match data containing proven potential details
-        """
-        if "proven_potential_details" not in match_data:
-            return
-
-        for detail in match_data["proven_potential_details"]:
-            # Find the original match first
-            original_match = next(
-                m
-                for m in self.match_history
-                if m["match_number"] == detail["previous_match_number"]
-            )
-
-            # Create a unique key for this adjustment
-            # Use the highest threshold applied to ensure uniqueness
-            highest_threshold = (
-                max(detail["thresholds_applied"]) if detail["thresholds_applied"] else 0
-            )
-            adjustment_key = (
-                detail["previous_match_number"],
-                original_match["opponent_id"],
-                highest_threshold,
-            )
-
-            # Skip if we've already applied this adjustment
-            if adjustment_key in self.applied_proven_potential_adjustments:
-                continue
-
-            # Get the opponent from the original match (this is the key fix!)
-            original_opponent_name = original_match["opponent_id"]
-
-            # Find the opponent player object from the original match
-            opponent_player = next(
-                (p for p in self.players if p.name == original_opponent_name), None
-            )
-
-            if opponent_player is None:
-                continue
-
-            # Get the original player from the match
-            original_player_name = original_match["player_id"]
-            original_player = next(
-                (p for p in self.players if p.name == original_player_name), None
-            )
-
-            if original_player is not None:
-                # Apply adjustment to the original player (who proved their potential)
-                original_player.rating += detail["player_adjustment"]
-
-            # Apply adjustment to the opponent from the original match
-            opponent_player.rating += detail["opponent_adjustment"]
-
-            # Mark this adjustment as applied
-            self.applied_proven_potential_adjustments.add(adjustment_key)
-
     def _get_opponent_counts(self, player) -> Dict[str, int]:
         """Get opponent counts for a player from match history.
 
@@ -494,29 +756,72 @@ class ScenarioSimulator:
 
         late_joiner_config = LADDER_RESET_CONFIG["late_joiners"]
         late_joiner_percentage = late_joiner_config["late_joiner_percentage"]
-        num_late_joiners = int(
-            LADDER_RESET_CONFIG["num_players"] * late_joiner_percentage
-        )
+        total_players = LADDER_RESET_CONFIG["num_players"]
 
-        # Generate late joiners with similar logic to regular players
-        for i in range(num_late_joiners):
-            # Generate target rating using normal distribution
-            mean_rating = 1700
-            std_dev = 300
-            target_rating = random.gauss(mean_rating, std_dev)
-            target_rating = max(1000, min(2400, int(round(target_rating))))
+        # Override num_late_joiners based on clamped initial count to respect disabling
+        num_late_joiners = max(0, total_players - self.initial_player_count)
 
-            # Create late joiner player
-            from scenarios.ladder_reset import Player
+        if num_late_joiners == 0:
+            print("No late joiners to generate (disabled due to small player count).")
+            return
 
-            late_joiner = Player(
-                name=f"LateJoiner_{i+1}",
-                rating=1000,  # Start at 1000 like everyone else
-                target_rating=target_rating,
-                games_played=0,  # Start with 0 games (low confidence)
-                activity_multiplier=1.0,
-            )
-            self.late_joiners.append(late_joiner)
+        curved_join = late_joiner_config.get("curved_join", False)
+
+        if curved_join:
+            total_matches = LADDER_RESET_CONFIG["num_matches"]
+            buffer_end = (
+                total_matches * 0.9
+            )  # 10% buffer: all join by 90% of simulation
+            lambda_val = (
+                3.0 / buffer_end if buffer_end > 0 else 1.0
+            )  # Mean join ~ buffer_end/3
+            joiners = []
+            for i in range(num_late_joiners):
+                # Generate target rating using normal distribution
+                mean_rating = 1700
+                std_dev = 300
+                target_rating = random.gauss(mean_rating, std_dev)
+                target_rating = max(1000, min(2400, int(round(target_rating))))
+
+                # Create late joiner player
+                from scenarios.ladder_reset import Player
+
+                late_joiner = Player(
+                    name=f"LateJoiner_{i+1}",
+                    rating=1000,  # Start at 1000 like everyone else
+                    target_rating=target_rating,
+                    games_played=0,  # Start with 0 games (low confidence)
+                    activity_multiplier=1.0,
+                )
+
+                # Generate exponential join time
+                u = random.random()
+                join_time = -math.log(1 - u) / lambda_val if lambda_val > 0 else 0
+                join_time = min(join_time, buffer_end)  # Cap at buffer end (90% point)
+
+                joiners.append((late_joiner, join_time))
+            # Sort by join_time for sequential addition
+            self.late_joiners = sorted(joiners, key=lambda x: x[1])
+        else:
+            # Original linear generation
+            for i in range(num_late_joiners):
+                # Generate target rating using normal distribution
+                mean_rating = 1700
+                std_dev = 300
+                target_rating = random.gauss(mean_rating, std_dev)
+                target_rating = max(1000, min(2400, int(round(target_rating))))
+
+                # Create late joiner player
+                from scenarios.ladder_reset import Player
+
+                late_joiner = Player(
+                    name=f"LateJoiner_{i+1}",
+                    rating=1000,  # Start at 1000 like everyone else
+                    target_rating=target_rating,
+                    games_played=0,  # Start with 0 games (low confidence)
+                    activity_multiplier=1.0,
+                )
+                self.late_joiners.append(late_joiner)
 
     def _check_late_joiners(self, match_num: int) -> None:
         """Check if late joiners should join the ladder."""
@@ -526,19 +831,31 @@ class ScenarioSimulator:
             return
 
         late_joiner_config = LADDER_RESET_CONFIG["late_joiners"]
-        join_after_matches = late_joiner_config["join_after_matches"]
-        join_interval = late_joiner_config["join_interval"]
+        curved_join = late_joiner_config.get("curved_join", False)
 
-        # Check if it's time for late joiners to join
-        if (
-            match_num >= join_after_matches
-            and (match_num - join_after_matches) % join_interval == 0
-        ):
-            # Add a late joiner to the active players
-            if self.late_joiners:
-                late_joiner = self.late_joiners.pop(0)
+        if curved_join:
+            while self.late_joiners and self.late_joiners[0][1] <= match_num:
+                late_joiner, join_time = self.late_joiners.pop(0)
                 self.players.append(late_joiner)
-                print(f"Late joiner {late_joiner.name} joined at match {match_num}")
+                print(
+                    f"Curved late joiner {late_joiner.name} joined at match {match_num} (planned: {int(join_time)})"
+                )
+        else:
+            join_after_matches = late_joiner_config["join_after_matches"]
+            join_interval = late_joiner_config["join_interval"]
+
+            # Check if it's time for late joiners to join
+            if (
+                match_num >= join_after_matches
+                and (match_num - join_after_matches) % join_interval == 0
+            ):
+                # Add a late joiner to the active players
+                if self.late_joiners:
+                    late_joiner = self.late_joiners.pop(0)
+                    self.players.append(late_joiner)
+                    print(
+                        f"Linear late joiner {late_joiner.name} joined at match {match_num}"
+                    )
 
     def _calculate_percentile(self, rating: float, ratings: List[float]) -> float:
         """Calculate the percentile of a player's rating in the current rating distribution.
@@ -586,8 +903,15 @@ class ScenarioSimulator:
         late_joiner_percentage = late_joiner_config["late_joiner_percentage"]
         total_players = LADDER_RESET_CONFIG["num_players"]
 
-        # Calculate initial players: total - late joiners
-        initial_players = int(total_players * (1 - late_joiner_percentage))
+        # Calculate initial players: total - late joiners, but ensure at least 2 starters
+        naive_initial = int(total_players * (1 - late_joiner_percentage))
+        initial_players = max(2, naive_initial)
+
+        if initial_players >= total_players:
+            # Can't have late joiners with small total; will disable in _generate_late_joiners
+            print(
+                f"Warning: Small total_players ({total_players}). Late joiners will be disabled to ensure at least 2 initial players."
+            )
 
         return initial_players
 
@@ -602,6 +926,7 @@ class ScenarioSimulator:
         """
         # Calculate initial players based on late joiner percentage
         initial_players = self._calculate_initial_players()
+        self.initial_player_count = initial_players  # Store for late joiner calculation
 
         # Generate initial players
         self.players = self.scenario.generate_players(initial_players)
@@ -609,9 +934,8 @@ class ScenarioSimulator:
         # Generate late joiners if enabled
         self._generate_late_joiners()
 
-        # Reset match history and applied adjustments
+        # Reset match history
         self.match_history = []
-        self.applied_proven_potential_adjustments = set()
 
         # Run matches
         results = []
@@ -623,15 +947,70 @@ class ScenarioSimulator:
             # Check if late joiners should join
             self._check_late_joiners(match_num)
 
-            # Set the current match number for proven potential tracking
+            # Set the current match number for tracking
             self.current_match_number = match_num + 1
 
             match = self.simulate_match()
             results.append(match)
+            self._update_pp_tracking(self.current_match_number, match)
 
         self.last_results = results  # Store the results
+        # Finalize any remaining PP adjustments at simulation end
+        self._finalize_pending_pp_at_end()
+        self.post_process_proven_potential()
         print(f"Simulation completed: {num_matches}/{num_matches} matches")
         return results
+
+    def _finalize_pending_pp_at_end(self):
+        """Apply remaining PP adjustments for players who have reached max confidence at simulation end."""
+        for player_name, triggers in list(self.pending_pp.items()):
+            player_obj = next((p for p in self.players if p.name == player_name), None)
+            if player_obj is None:
+                continue
+            player_conf = self.rating_calculator.calculate_confidence(
+                player_obj.games_played
+            )
+            if player_conf >= 1.0:
+                # LOGGING: Trace end-of-simulation PP application
+                pending_triggers = [t for t in triggers if not t.get("applied", False)]
+                trigger_matches = [t["match_number"] for t in pending_triggers]
+                print(
+                    f"END-OF-SIM APPLYING PP for {player_name}: {len(pending_triggers)} triggers at matches {trigger_matches}"
+                )
+                # Track batch finalization BEFORE applying
+                before_rating = player_obj.rating
+                for trigger in pending_triggers:
+                    self._finalize_pp_trigger(trigger, player_obj)
+                # Now sum after adjustments are calculated/applied
+                total_adj_new = sum(
+                    trigger.get("adj_new", 0.0) for trigger in pending_triggers
+                )
+                after_rating = player_obj.rating  # Updated
+                est_adjustments = {}
+                for trigger in pending_triggers:
+                    est_name = trigger["est_player_name"]
+                    adj_est = trigger.get("adj_est", 0.0)
+                    if est_name not in est_adjustments:
+                        est_adjustments[est_name] = 0.0
+                    est_adjustments[est_name] += adj_est
+                self.pp_finalizations.append(
+                    {
+                        "new_player": player_name,
+                        "before_rating": before_rating,
+                        "total_adj_new": total_adj_new,
+                        "after_rating": after_rating,
+                        "applied_at_match": "END",
+                        "num_triggers": len(pending_triggers),
+                        "trigger_matches": trigger_matches,
+                        "est_adjustments": est_adjustments,
+                    }
+                )
+                # Remove applied triggers
+                self.pending_pp[player_name] = [
+                    t for t in triggers if not t.get("applied", False)
+                ]
+                if not self.pending_pp[player_name]:
+                    del self.pending_pp[player_name]
 
     def save_results(self, output_dir: str = "simulation_results") -> None:
         """Save simulation results.
@@ -643,8 +1022,10 @@ class ScenarioSimulator:
         results = self.last_results
 
         # Save results based on scenario type
-        if isinstance(self.scenario, self.scenario.__class__):
-            save_ladder_reset_results(self.players, results, output_dir)
+        if isinstance(self.scenario, LadderResetScenario):
+            save_ladder_reset_results(
+                self.players, results, self.pp_finalizations, output_dir
+            )
         else:
             raise ValueError(f"Unknown scenario type: {type(self.scenario)}")
 

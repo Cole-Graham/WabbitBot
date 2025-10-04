@@ -12,6 +12,7 @@ from .overall_stats import write_overall_stats
 def save_ladder_reset_results(
     players: List,
     results: List[Dict],
+    pp_finalizations: List[Dict] = None,
     output_dir: str = "simulation_results",
 ) -> None:
     """Save ladder reset simulation results.
@@ -19,6 +20,7 @@ def save_ladder_reset_results(
     Args:
         players: List of player objects
         results: List of match results
+        pp_finalizations: List of PP batch finalization events
         output_dir: Directory to save output files (relative to dev/rating_simulator/)
     """
     # Get the dev/tools/rating_simulator directory (3 levels up from this file)
@@ -45,7 +47,7 @@ def save_ladder_reset_results(
         # Write header
         f.write("# Ladder Reset Simulation Results\n\n")
         f.write(
-            "Simulates a ladder reset where all players start at 1500 rating. Players have target ratings they will tend towards over time, with matchmaking favoring closer matches and players who have played fewer games.\n\n"
+            "Simulates a ladder reset where all players start at 1000 rating. Players have target ratings they will tend towards over time, with matchmaking favoring closer matches and players who have played fewer games.\n\n"
         )
 
         # Create player lookup dictionary
@@ -54,8 +56,8 @@ def save_ladder_reset_results(
         # Write overall statistics first (like the old format)
         write_overall_stats(f, players, results)
 
-        # Write matches with largest PP impact
-        write_largest_pp_impact_matches(f, results, players_dict)
+        # Write largest PP batch adjustments
+        write_largest_pp_batch_adjustments(f, pp_finalizations, players_dict)
 
         # Write detailed individual match information
         f.write("## Detailed Individual Match Information\n\n")
@@ -79,88 +81,77 @@ def save_ladder_reset_results(
     print(f"Structured data saved to {json_filename}")
 
 
-def write_largest_pp_impact_matches(
-    f, results: List[Dict], players_dict: Dict[str, Dict]
+def write_largest_pp_batch_adjustments(
+    f, pp_finalizations: List[Dict], players_dict: Dict[str, Dict]
 ) -> None:
-    """Write matches with the largest proven potential impact.
+    """Write the 10 largest batched Proven Potential adjustments for new players.
+
+    Ranks by absolute total adjustment across all triggers in each batch.
 
     Args:
         f: File object to write to
-        results: List of match results
-        players_dict: Dictionary mapping player IDs to player data
+        pp_finalizations: List of PP batch events
+        players_dict: Dictionary mapping player names to player data
     """
-    f.write("## Matches with Largest Proven Potential Impact\n\n")
+    f.write("## 10 Largest Batched Proven Potential Adjustments for New Players\n\n")
     f.write(
-        "These matches show the biggest differences between initial rating changes and final changes after proven potential adjustments.\n\n"
+        "These show the total PP adjustments applied in batches (sum across multiple triggers for the same new player, "
+        "applied all at once after final tracking). Includes rating before/after the entire batch at application time.\n\n"
     )
 
-    # Calculate PP impact for each match
-    match_impacts = []
-    for match in results:
-        # Calculate initial rating changes (before PP)
-        player_initial_change = (
-            match["player_rating_after"] - match["player_rating_before"]
-        )
-        opponent_initial_change = (
-            match["opponent_rating_after"] - match["opponent_rating_before"]
-        )
-
-        # Get final changes (after PP)
-        player_final_change = match.get("player_final_change", player_initial_change)
-        opponent_final_change = match.get(
-            "opponent_final_change", opponent_initial_change
-        )
-
-        # Calculate impact (absolute difference)
-        player_impact = abs(player_final_change - player_initial_change)
-        opponent_impact = abs(opponent_final_change - opponent_initial_change)
-        total_impact = player_impact + opponent_impact
-
-        if total_impact > 0.01:  # Only include matches with meaningful PP impact
-            match_impacts.append(
-                {
-                    "match": match,
-                    "total_impact": total_impact,
-                    "player_impact": player_impact,
-                    "opponent_impact": opponent_impact,
-                    "player_initial": player_initial_change,
-                    "player_final": player_final_change,
-                    "opponent_initial": opponent_initial_change,
-                    "opponent_final": opponent_final_change,
-                }
-            )
-
-    # Sort by total impact (descending)
-    match_impacts.sort(key=lambda x: x["total_impact"], reverse=True)
-
-    # Take top 10 matches
-    top_matches = match_impacts[:10]
-
-    if not top_matches:
-        f.write("No matches with significant proven potential impact found.\n\n")
+    if not pp_finalizations:
+        f.write("No PP finalizations occurred.\n\n")
         return
 
-    f.write(f"Showing top {len(top_matches)} matches with largest PP impact:\n\n")
+    # Sort by |total_adj_new|, descending, filter non-zero
+    batches = [b for b in pp_finalizations if abs(b["total_adj_new"]) > 0.01]
+    batches.sort(key=lambda x: abs(x["total_adj_new"]), reverse=True)
 
-    for i, impact_data in enumerate(top_matches, 1):
-        match = impact_data["match"]
+    # Take top 10
+    top_batches = batches[:10]
+
+    if not top_batches:
+        f.write("No significant batched PP adjustments found.\n\n")
+        return
+
+    f.write(f"Top {len(top_batches)} largest batched PP adjustments:\n\n")
+
+    for i, batch in enumerate(top_batches, 1):
+        new_player = batch["new_player"]
+        total_adj_new = batch["total_adj_new"]
+        before = batch["before_rating"]
+        after = batch["after_rating"]
+        applied_at = batch["applied_at_match"]
+        num_triggers = batch["num_triggers"]
+        trigger_matches = batch["trigger_matches"]
+        est_adjustments = batch["est_adjustments"]  # dict est_name: total_adj
+
         f.write(
-            f"### Match {match['match_number']} (Impact: {impact_data['total_impact']:.1f})\n\n"
+            f"### #{i}: New Player {new_player} (Batch Applied at Match {applied_at}, Total Impact: {abs(total_adj_new):.1f})\n\n"
         )
-        write_simple_match_details(f, match, players_dict)
-        f.write("\n")
 
-        # Add impact details
-        f.write("**PP Impact Details:**\n")
-        if impact_data["player_impact"] > 0.01:
-            f.write(
-                f"- {match['player_id']}: {impact_data['player_initial']:.1f} → {impact_data['player_final']:.1f} (Δ{impact_data['player_final'] - impact_data['player_initial']:+.1f})\n"
-            )
-        if impact_data["opponent_impact"] > 0.01:
-            f.write(
-                f"- {match['opponent_id']}: {impact_data['opponent_initial']:.1f} → {impact_data['opponent_final']:.1f} (Δ{impact_data['opponent_final'] - impact_data['opponent_initial']:+.1f})\n"
-            )
-        f.write("\n")
+        # Total batch adjustment for new player
+        f.write(
+            f"**New Player Total Batch Adjustment:** Δ{total_adj_new:+.1f} (from {num_triggers} triggers at matches {trigger_matches})\n"
+        )
+        f.write(
+            f"**New Player Ratings:** Before Batch: {before:.1f} → After Batch: {after:.1f} (Δ{total_adj_new:+.1f})\n"
+        )
+
+        # Est adjustments (summed per est if multiple)
+        f.write("**Established Players Total Adjustments:**\n")
+        for est_name, adj_est in est_adjustments.items():
+            if abs(adj_est) > 0.01:  # Only show meaningful
+                est_player = players_dict.get(est_name)
+                est_true = est_player.target_rating if est_player else "N/A"
+                f.write(f"- {est_name} (True Skill: {est_true}): Δ{adj_est:+.1f}\n")
+
+        # New player true skill
+        new_player_obj = players_dict.get(new_player)
+        new_true = new_player_obj.target_rating if new_player_obj else "N/A"
+        f.write(f"**New Player True Skill:** {new_true}\n\n")
+
+    f.write("\n")
 
 
 def save_structured_data(
@@ -201,16 +192,8 @@ def save_structured_data(
             "player_won": match["player_won"],
             "player_rating_before": match["player_rating_before"],
             "player_rating_after": match["player_rating_after"],
-            "player_final_change": match.get(
-                "player_final_change",
-                match["player_rating_after"] - match["player_rating_before"],
-            ),
             "opponent_rating_before": match["opponent_rating_before"],
             "opponent_rating_after": match["opponent_rating_after"],
-            "opponent_final_change": match.get(
-                "opponent_final_change",
-                match["opponent_rating_after"] - match["opponent_rating_before"],
-            ),
             "win_probability": match["win_probability"],
             "player_confidence": match["player_confidence"],
             "opponent_confidence": match["opponent_confidence"],
@@ -218,10 +201,11 @@ def save_structured_data(
             "p2_variety_bonus": match.get("p2_variety_bonus", 0.0),
             "p1_multiplier": match["p1_multiplier"],
             "p2_multiplier": match["p2_multiplier"],
-            "proven_potential_details": match.get("proven_potential_details", []),
-            "opponent_proven_potential_details": match.get(
-                "opponent_proven_potential_details", []
-            ),
+            "pp_applicable": match.get("pp_applicable", False),
+            "pp_scaling": match.get("pp_scaling", 1.0),
+            "pp_crossed_thresholds": match.get("pp_crossed_thresholds", 0),
+            "adjusted_player_change": match.get("player_adjusted_change"),
+            "adjusted_opponent_change": match.get("opponent_adjusted_change"),
         }
         matches_data.append(match_data)
 
@@ -254,6 +238,8 @@ def write_simple_match_details(f, match: Dict, players: Dict[str, Dict]) -> None
     player_id = match["player_id"]
     opponent_id = match["opponent_id"]
     player_won = match["player_won"]
+    player_games_before = match["player_games_played_before"]
+    opponent_games_before = match["opponent_games_played_before"]
 
     # Get player objects
     challenger_data = players.get(player_id)
@@ -262,37 +248,43 @@ def write_simple_match_details(f, match: Dict, players: Dict[str, Dict]) -> None
     if challenger_data:
         challenger_name = challenger_data.name
         challenger_target = challenger_data.target_rating
-        challenger_name = f"{challenger_name} ({challenger_target})"
+        challenger_details = f"{challenger_name} ({challenger_target})"
     else:
-        challenger_name = player_id
+        challenger_details = player_id
 
     if opponent_data:
         opponent_name = opponent_data.name
         opponent_target = opponent_data.target_rating
-        opponent_name = f"{opponent_name} ({opponent_target})"
+        opponent_details = f"{opponent_name} ({opponent_target})"
     else:
-        opponent_name = opponent_id
+        opponent_details = opponent_id
 
-    # Calculate rating changes (original, before proven potential)
+    # Calculate original rating changes (before PP)
     player_change = match["player_rating_after"] - match["player_rating_before"]
     opponent_change = match["opponent_rating_after"] - match["opponent_rating_before"]
 
-    # Calculate final rating changes (after proven potential adjustments)
-    player_final_change = match.get("player_final_change", player_change)
-    opponent_final_change = match.get("opponent_final_change", opponent_change)
+    # Get adjusted rating changes (after PP)
+    player_adjusted_change = match.get("player_adjusted_change", player_change)
+    opponent_adjusted_change = match.get("opponent_adjusted_change", opponent_change)
 
-    # Determine winner and loser
-    winner = player_id if player_won else opponent_id
-    loser = opponent_id if player_won else player_id
-    winner_change = player_change if player_won else opponent_change
-    loser_change = opponent_change if player_won else player_change
-    winner_final_change = player_final_change if player_won else opponent_final_change
-    loser_final_change = opponent_final_change if player_won else player_final_change
+    # Determine winner and loser for adjusted changes
+    if player_won:
+        winner_adjusted = player_adjusted_change
+        loser_adjusted = opponent_adjusted_change
+    else:
+        winner_adjusted = opponent_adjusted_change
+        loser_adjusted = player_adjusted_change
 
     # Prepare data for dynamic column width calculation
     table_rows = [
-        {"category": "Challenger", "details": challenger_name},
-        {"category": "Opponent", "details": opponent_name},
+        {
+            "category": f"Challenger ({player_games_before} Games)",
+            "details": challenger_details,
+        },
+        {
+            "category": f"Opponent ({opponent_games_before} Games)",
+            "details": opponent_details,
+        },
         {"category": "Result", "details": "Win" if player_won else "Loss"},
         {
             "category": "Challenger Rating",
@@ -336,11 +328,11 @@ def write_simple_match_details(f, match: Dict, players: Dict[str, Dict]) -> None
         [
             {
                 "category": "Rating Changes",
-                "details": f"Winner: {winner_change:.1f}, Loser: {loser_change:.1f}",
+                "details": f"Winner: {player_change if player_won else opponent_change:.1f}, Loser: {opponent_change if player_won else player_change:.1f}",
             },
             {
                 "category": "Rating Changes after PP",
-                "details": f"Winner: {winner_final_change:.1f}, Loser: {loser_final_change:.1f}",
+                "details": f"Winner: {match.get('adjusted_winner_change', winner_adjusted):.1f}, Loser: {match.get('adjusted_loser_change', loser_adjusted):.1f}",
             },
             {
                 "category": "Multipliers",

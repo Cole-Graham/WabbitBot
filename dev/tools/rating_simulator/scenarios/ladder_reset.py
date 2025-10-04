@@ -33,20 +33,23 @@ class LadderResetScenario(BaseScenario):
         }
         self.rating_calculator = RatingCalculator()
 
-        # Catch-up bonus configuration for ladder reset
-        self.convergence_threshold = 200  # Rating difference threshold for convergence
-        self.intended_average = (
-            1500  # The average rating we want players to converge to
-        )
+        # Load from config
+        from simulation_config import LADDER_RESET_CONFIG
 
-        # Scenario-specific rating parameters
-        self.catch_up_bonus_config = {
-            "enabled": False,
-            "apply_to_loser": False,
-            "target_rating": self.intended_average,
-            "threshold": self.convergence_threshold,
-            "max_bonus": 1.0,
-        }
+        self.convergence_threshold = LADDER_RESET_CONFIG.get(
+            "convergence_threshold", 200
+        )
+        self.intended_average = LADDER_RESET_CONFIG.get("intended_average", 1500)
+        self.catch_up_bonus_config = LADDER_RESET_CONFIG.get(
+            "catch_up_bonus_config",
+            {
+                "enabled": False,
+                "apply_to_loser": False,
+                "target_rating": self.intended_average,
+                "convergence_threshold": self.convergence_threshold,
+                "max_bonus": 1.0,
+            },
+        ).copy()  # Copy to avoid mutating global config
 
     def get_scenario_name(self) -> str:
         """Get the name of the scenario.
@@ -289,15 +292,3 @@ class Player:
         self.target_rating = target_rating
         self.games_played = games_played
         self.activity_multiplier = activity_multiplier
-
-    def get_scenario_name(self) -> str:
-        return "Ladder Reset (1000 Start)"
-
-    def get_scenario_description(self) -> str:
-        return (
-            "Simulates a ladder reset where all players start at 1000 rating. "
-            "Players have target ratings they will tend towards over time, "
-            "with matchmaking favoring closer matches and players who have "
-            "played fewer games. Uses catch-up bonus to accelerate convergence "
-            "to intended average of 1500."
-        )

@@ -33,8 +33,12 @@ Solution: "Proven Potential" tracker.
 and retroactively adjusts the rating loss for established players who accepted a match from them.
 - Adjustments would be triggered as the "new" player gains Elo, using 10% breakpoints over a range
 between both player's ratings at the start of the match. 
-- Retroactive adjustments only apply to matches where the new player was below 1.0 confidence.
+- Retroactive adjustments only apply to matches with "new players", i.e. players below 1.0 confidence.
 - Track and display the potential Elo adjustments for players who might have their rating retroactively adjusted.
+- `NEW:` To avoid cascade effects of one PP adjustment effecting another, PP adjuments are applied all at once
+  after the new player has reached 1.0 confidence
+- Eligible matches being tracked for PP adjustments have a limited number of matches for which they can be
+  tracked. Currently its set to track PP adjustments for `16 matches` (played by the New Player). 
 
 # Problem 3: Players might form leaderboard "cliques", i.e groups of high elo players who only challenge each other.
 
