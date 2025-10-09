@@ -1,9 +1,54 @@
+using System;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using WabbitBot.Generator.Shared.Metadata;
 
 namespace WabbitBot.Generator.Shared.Analyzers;
 
+
+/// <summary>
+/// Defines the target projects for event generation.
+/// </summary>
+[Flags]
+public enum GenerationTargets
+{
+    /// <summary>
+    /// Publish to the Common project.
+    /// </summary>
+    Common = 1,
+
+    /// <summary>
+    /// Publish to the Core project.
+    /// </summary>
+    Core = 2,
+
+    /// <summary>
+    /// Publish to the DiscBot project.
+    /// </summary>
+    DiscBot = 4,
+}
+/// <summary>
+/// Defines the target event buses for event publishing.
+/// Used with EventTrigger to specify where events should be published.
+/// </summary>
+[Flags]
+public enum EventTargets
+{
+    /// <summary>
+    /// Publish to the local/default event bus only.
+    /// </summary>
+    Local = 1,
+
+    /// <summary>
+    /// Publish to the Global event bus only.
+    /// </summary>
+    Global = 2,
+
+    /// <summary>
+    /// Publish to both local and Global event buses (dual-publish).
+    /// </summary>
+    Both = Local | Global
+}
 /// <summary>
 /// Utility class for analyzing attributes on symbols.
 /// </summary>
@@ -50,42 +95,14 @@ public static class AttributeAnalyzer
     }
 
     /// <summary>
-    /// Extracts EventBoundaryInfo from a class symbol with EventBoundary attribute.
-    /// </summary>
-    public static EventBoundaryInfo? ExtractEventBoundaryInfo(INamedTypeSymbol classSymbol)
-    {
-        var attribute = classSymbol.GetAttributes()
-            .FirstOrDefault(attr => attr.AttributeClass?.ToDisplayString() == AttributeNames.EventBoundary);
-
-        if (attribute == null)
-            return null;
-
-        var generateRequestResponse = attribute.NamedArguments
-            .FirstOrDefault(kvp => kvp.Key == "GenerateRequestResponse")
-            .Value.Value as bool? ?? false;
-
-        var targetProjects = attribute.NamedArguments
-            .FirstOrDefault(kvp => kvp.Key == "TargetProjects")
-            .Value.Value as string;
-
-        // Infer BusType from EventType attribute or namespace
-        var busType = InferenceHelpers.InferBusType(classSymbol);
-
-        return new EventBoundaryInfo(
-            ClassName: classSymbol.Name,
-            GenerateRequestResponse: generateRequestResponse,
-            BusType: busType,
-            TargetProjects: targetProjects);
-    }
-
-    /// <summary>
     /// Extracts all metadata from the compilation.
     /// </summary>
     public static CompilationAnalysisResult ExtractAll(Compilation compilation)
     {
         var entities = ExtractEntityMetadata(compilation);
+        var eventGenerators = ExtractEventGeneratorMetadata(compilation);
         // Add other extractions here as needed
-        return new CompilationAnalysisResult(entities);
+        return new CompilationAnalysisResult(entities, eventGenerators);
     }
 
     /// <summary>
@@ -197,6 +214,128 @@ public static class AttributeAnalyzer
             return null;
         }
     }
+
+    /// <summary>
+    /// Extracts event generator metadata from all classes/methods with [EventGenerator] attributes.
+    /// </summary>
+    private static IEnumerable<EventGeneratorInfo> ExtractEventGeneratorMetadata(Compilation compilation)
+    {
+        var eventGenerators = new List<EventGeneratorInfo>();
+
+        foreach (var syntaxTree in compilation.SyntaxTrees)
+        {
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var classDeclarations = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<ClassDeclarationSyntax>();
+
+            foreach (var classDecl in classDeclarations)
+            {
+                var classSymbol = semanticModel.GetDeclaredSymbol(classDecl) as INamedTypeSymbol;
+                if (classSymbol == null) continue;
+
+                // Check classes and their methods
+                var eventGenAttrOnClass = classSymbol.GetAttributes()
+                    .FirstOrDefault(attr => attr.AttributeClass?.ToDisplayString() == AttributeNames.EventGenerator);
+                if (eventGenAttrOnClass != null)
+                {
+                    var metadata = ExtractEventGeneratorInfo(classSymbol, eventGenAttrOnClass, isMethod: false);
+                    if (metadata != null) eventGenerators.Add(metadata);
+                }
+
+                foreach (var method in classSymbol.GetMembers().OfType<IMethodSymbol>()
+                    .Where(m => m.DeclaredAccessibility == Accessibility.Public && !m.IsStatic))
+                {
+                    var eventGenAttrOnMethod = method.GetAttributes()
+                        .FirstOrDefault(attr => attr.AttributeClass?.ToDisplayString() == AttributeNames.EventGenerator);
+                    if (eventGenAttrOnMethod != null)
+                    {
+                        var metadata = ExtractEventGeneratorInfo(classSymbol, eventGenAttrOnMethod, isMethod: true, methodSymbol: method);
+                        if (metadata != null) eventGenerators.Add(metadata);
+                    }
+                }
+            }
+        }
+
+        return eventGenerators;
+    }
+
+    /// <summary>
+    /// Extracts event generator info from a single attribute (on class or method).
+    /// </summary>
+    public static EventGeneratorInfo? ExtractEventGeneratorInfo(
+        INamedTypeSymbol classSymbol,
+        AttributeData attribute,
+        bool isMethod,
+        IMethodSymbol? methodSymbol = null)
+    {
+        try
+        {
+            // Parse generationTargets: string[] to List<GenerationTargets> via Enum.Parse
+            var genTargetsArg = attribute.ConstructorArguments
+                .FirstOrDefault().Value as string[] ?? Array.Empty<string>();
+            var generationTargets = genTargetsArg.Length > 0
+                ? genTargetsArg.Select(gt => (GenerationTargets)Enum
+                    .Parse(typeof(GenerationTargets), gt, ignoreCase: true))
+                    .ToList() : new List<GenerationTargets>();
+
+            // Parse eventTargets: string[] to EventTargets (combine with | for Flags)
+            var evtTargetsArg = attribute.ConstructorArguments
+                .Skip(1).FirstOrDefault().Value as string[] ?? new[] { "Global" }; // Default
+            var eventTargets = evtTargetsArg.Length > 0
+                ? evtTargetsArg.Select(et => (EventTargets)Enum
+                    .Parse(typeof(EventTargets), et, ignoreCase: true))
+                    .Aggregate((a, b) => a | b) : EventTargets.Global;
+
+            // Bool flags from named args or constructor (order: generateEvents, generatePublishers, etc.)
+            var generateEvents = (bool)(attribute.ConstructorArguments.ElementAtOrDefault(2).Value ?? false);
+            var generatePublishers = (bool)(attribute.ConstructorArguments.ElementAtOrDefault(3).Value ?? false);
+            var generateSubscribers = (bool)(attribute.ConstructorArguments.ElementAtOrDefault(4).Value ?? false);
+
+            // Fallback to named args for bools
+            generateEvents = generateEvents || (bool)(attribute.NamedArguments
+                .FirstOrDefault(kvp => kvp.Key == "GenerateEvents").Value.Value ?? false);
+            generatePublishers = generatePublishers || (bool)(attribute.NamedArguments
+                .FirstOrDefault(kvp => kvp.Key == "GeneratePublishers").Value.Value ?? false);
+            generateSubscribers = generateSubscribers || (bool)(attribute.NamedArguments
+                .FirstOrDefault(kvp => kvp.Key == "GenerateSubscribers").Value.Value ?? false);
+
+            var enableMetrics = (bool)(attribute.NamedArguments
+                .FirstOrDefault(kvp => kvp.Key == "EnableMetrics").Value.Value ?? true);
+            var enableErrorHandling = (bool)(attribute.NamedArguments
+                .FirstOrDefault(kvp => kvp.Key == "EnableErrorHandling").Value.Value ?? true);
+            var enableLogging = (bool)(attribute.NamedArguments
+                .FirstOrDefault(kvp => kvp.Key == "EnableLogging").Value.Value ?? true);
+
+            // Get custom event name if provided
+            var customEventName = attribute.NamedArguments
+                .FirstOrDefault(kvp => kvp.Key == "EventName").Value.Value as string;
+
+            // Get namespace
+            var namespaceName = classSymbol.ContainingNamespace?.ToDisplayString() ?? "Generated";
+
+            return new EventGeneratorInfo(
+                className: classSymbol.Name,
+                @namespace: namespaceName,
+                isMethod: isMethod,
+                methodName: methodSymbol?.Name,
+                methodSymbol: methodSymbol,
+                classSymbol: classSymbol,
+                generationTargets: generationTargets,
+                eventTargets: eventTargets,
+                generateEvents: generateEvents,
+                generatePublishers: generatePublishers,
+                generateSubscribers: generateSubscribers,
+                enableMetrics: enableMetrics,
+                enableErrorHandling: enableErrorHandling,
+                enableLogging: enableLogging,
+                customEventName: customEventName);
+        }
+        catch
+        {
+            return null; // Fail silently if parsing fails
+        }
+    }
 }
 
 /// <summary>
@@ -217,14 +356,71 @@ public class CommandInfo
 }
 
 /// <summary>
+/// Information extracted from an [EventGenerator] attribute.
+/// </summary>
+public class EventGeneratorInfo
+{
+    public string ClassName { get; }
+    public string Namespace { get; }
+    public bool IsMethod { get; }
+    public string? MethodName { get; }
+    public IMethodSymbol? MethodSymbol { get; }
+    public INamedTypeSymbol ClassSymbol { get; }
+    public List<GenerationTargets> GenerationTargets { get; }
+    public EventTargets EventTargets { get; }
+    public bool GenerateEvents { get; }
+    public bool GeneratePublishers { get; }
+    public bool GenerateSubscribers { get; }
+    public bool EnableMetrics { get; }
+    public bool EnableErrorHandling { get; }
+    public bool EnableLogging { get; }
+    public string? CustomEventName { get; }
+
+    public EventGeneratorInfo(
+        string className,
+        string @namespace,
+        bool isMethod,
+        string? methodName,
+        IMethodSymbol? methodSymbol,
+        INamedTypeSymbol classSymbol,
+        List<GenerationTargets> generationTargets,
+        EventTargets eventTargets,
+        bool generateEvents,
+        bool generatePublishers,
+        bool generateSubscribers,
+        bool enableMetrics,
+        bool enableErrorHandling,
+        bool enableLogging,
+        string? customEventName = null)
+    {
+        ClassName = className;
+        Namespace = @namespace;
+        IsMethod = isMethod;
+        MethodName = methodName;
+        MethodSymbol = methodSymbol;
+        ClassSymbol = classSymbol;
+        GenerationTargets = generationTargets;
+        EventTargets = eventTargets;
+        GenerateEvents = generateEvents;
+        GeneratePublishers = generatePublishers;
+        GenerateSubscribers = generateSubscribers;
+        EnableMetrics = enableMetrics;
+        EnableErrorHandling = enableErrorHandling;
+        EnableLogging = enableLogging;
+        CustomEventName = customEventName;
+    }
+}
+
+/// <summary>
 /// Result of analyzing the entire compilation.
 /// </summary>
 public class CompilationAnalysisResult
 {
     public IEnumerable<EntityMetadataInfo> Entities { get; }
-
-    public CompilationAnalysisResult(IEnumerable<EntityMetadataInfo> entities)
+    public IEnumerable<EventGeneratorInfo> EventGenerators { get; }
+    public CompilationAnalysisResult(IEnumerable<EntityMetadataInfo> entities, IEnumerable<EventGeneratorInfo> eventGenerators)
     {
         Entities = entities;
+        EventGenerators = eventGenerators;
     }
 }

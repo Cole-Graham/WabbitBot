@@ -1,0 +1,12 @@
+📁 Users
+│
+  📁 coleg
+  │
+    📁 Projects
+    │
+      📁 WabbitBot
+      │
+        📁 src
+          📁 WabbitBot.Common.Tests
+            ├── 📄 EventRecordTests.cs
+            └── 📄 WabbitBot.Common.Tests.csproj

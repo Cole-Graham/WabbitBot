@@ -37,7 +37,7 @@ namespace WabbitBot.Core.Common.Database.Tests
                 .HasColumnType("jsonb");
 
             entity
-                .Property(p => p.PreviousUserIds)
+                .Property(p => p.PreviousPlatformIds)
                 .HasColumnType("jsonb");
         }
     }

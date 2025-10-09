@@ -1,0 +1,25 @@
+📁 Users
+│
+  📁 coleg
+  │
+    📁 Projects
+    │
+      📁 WabbitBot
+      │
+        📁 src
+          📁 WabbitBot.Core.Tests
+            ├── 📁 Common
+            │   ├── 📁 Config
+            │   │   └── 📄 EntityConfigTests.cs
+            │   ├── 📁 Database
+            │   │   ├── 📄 DbContextIntegrationTest.cs
+            │   │   ├── 📄 PgSqlCrudTests.cs
+            │   │   ├── 📄 PgSqlFixture.cs
+            │   │   ├── 📄 TestPlayerDbContext.cs
+            │   │   └── 📄 WabbitBotDbContextPostgresTests.cs
+            │   ├── 📁 Events
+            │   │   └── 📄 EventBusIntegrationTests.cs
+            │   └── 📁 Utilities
+            │       └── 📄 VersionCompatibilityTests.cs
+            ├── 📄 UnitTest1.cs
+            └── 📄 WabbitBot.Core.Tests.csproj

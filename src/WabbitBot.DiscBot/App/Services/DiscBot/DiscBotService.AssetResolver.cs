@@ -1,5 +1,5 @@
 using WabbitBot.Common.Events;
-using WabbitBot.DiscBot.DSharpPlus.ComponentModels;
+using WabbitBot.DiscBot.App.Utilities;
 
 namespace WabbitBot.DiscBot.App.Services.DiscBot
 {

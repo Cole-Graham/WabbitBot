@@ -11,6 +11,11 @@ namespace WabbitBot.Generator.Shared;
 public enum EventBusType
 {
     /// <summary>
+    /// Global event bus for cross-boundary events.
+    /// </summary>
+    Global,
+
+    /// <summary>
     /// Core event bus for business logic events.
     /// </summary>
     Core,
@@ -18,12 +23,7 @@ public enum EventBusType
     /// <summary>
     /// Discord event bus for UI/interaction events.
     /// </summary>
-    DiscBot,
-
-    /// <summary>
-    /// Global event bus for cross-boundary events.
-    /// </summary>
-    Global
+    DiscBot
 }
 
 /// <summary>
@@ -31,6 +31,12 @@ public enum EventBusType
 /// </summary>
 public interface IEvent
 {
+    /// <summary>
+    /// The event bus type this event should be routed to.
+    /// This replaces the need for marker interfaces like ICoreEvent, IGlobalEvent, etc.
+    /// </summary>
+    EventBusType EventBusType { get; }
+
     /// <summary>
     /// Unique identifier for this event instance.
     /// </summary>
@@ -40,9 +46,4 @@ public interface IEvent
     /// Timestamp when the event was created.
     /// </summary>
     DateTime Timestamp { get; }
-
-    /// <summary>
-    /// The event bus type this event should be routed to.
-    /// </summary>
-    EventBusType EventBusType { get; }
 }

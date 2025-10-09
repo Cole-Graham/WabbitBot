@@ -1,0 +1,23 @@
+📁 Users
+│
+  📁 coleg
+  │
+    📁 Projects
+    │
+      📁 WabbitBot
+      │
+        📁 src
+          📁 WabbitBot.Generator.Shared
+            ├── 📁 Analyzers
+            │   ├── 📄 AttributeAnalyzer.cs
+            │   └── 📄 InferenceHelpers.cs
+            ├── 📁 Metadata
+            │   ├── 📄 EntityMetadataInfo.cs
+            │   ├── 📄 EventBoundaryInfo.cs
+            │   └── 📄 EventGeneratorInfo.cs
+            ├── 📁 Utils
+            │   └── 📄 AttributeExtractor.cs
+            ├── 📄 AttributeNames.cs
+            ├── 📄 EventTypes.cs
+            ├── 📄 IsExternalInit.cs
+            └── 📄 WabbitBot.Generator.Shared.csproj

@@ -14,12 +14,13 @@ namespace WabbitBot.Core.Common.Interfaces
         /// Creates a new scrimmage challenge
         /// </summary>
         Task<Result<Scrimmage>> CreateScrimmageAsync(
-            Guid challengerTeamId,
-            Guid opponentTeamId,
-            List<Guid> challengerRosterIds,
-            List<Guid> opponentRosterIds,
-            TeamSize teamSize,
-            int bestOf = 1);
+            Guid ChallengeId,
+            Team ChallengerTeam,
+            Team OpponentTeam,
+            List<Player> Team1Players,
+            List<Player> Team2Players,
+            Player IssuedByPlayer,
+            Player AcceptedByPlayer);
 
         /// <summary>
         /// Accepts a scrimmage challenge

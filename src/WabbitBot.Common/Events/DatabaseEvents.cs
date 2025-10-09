@@ -1,5 +1,5 @@
 using System;
-using WabbitBot.Common.Events.EventInterfaces;
+using WabbitBot.Common.Events.Interfaces;
 
 namespace WabbitBot.Common.Events
 {

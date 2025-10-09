@@ -18,7 +18,7 @@ namespace WabbitBot.Common.Data.Schema.Migrations
             const string createUsersTable = @"
                 CREATE TABLE IF NOT EXISTS Users (
                     Id TEXT PRIMARY KEY,
-                    DiscordId TEXT UNIQUE NOT NULL,
+                    DiscordUserId TEXT UNIQUE NOT NULL,
                     Username TEXT NOT NULL,
                     Nickname TEXT,
                     AvatarUrl TEXT,
@@ -68,7 +68,7 @@ namespace WabbitBot.Common.Data.Schema.Migrations
 
             // Create indexes
             const string createIndexes = @"
-                CREATE INDEX IF NOT EXISTS idx_users_discord_id ON Users(DiscordId);
+                CREATE INDEX IF NOT EXISTS idx_users_discord_id ON Users(DiscordUserId);
                 CREATE INDEX IF NOT EXISTS idx_users_current_player ON Users(CurrentPlayerId);
                 CREATE INDEX IF NOT EXISTS idx_players_name ON Players(Name);
                 CREATE INDEX IF NOT EXISTS idx_players_last_active ON Players(LastActive);

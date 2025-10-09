@@ -21,6 +21,8 @@ namespace WabbitBot.Core.Common.Models.Common
     )]
     public class Player : Entity, IPlayerEntity
     {
+        public Guid MashinaUserId { get; set; }
+        public MashinaUser MashinaUser { get; set; } = null!;
         public string Name { get; set; } = string.Empty;
         public DateTime LastActive { get; set; }
 
@@ -30,7 +32,7 @@ namespace WabbitBot.Core.Common.Models.Common
         /// <summary>
         /// Key: Platform name (e.g., "Discord", "Steam"), Value: List of user IDs from that platform.
         /// </summary>
-        public Dictionary<string, List<string>> PreviousUserIds { get; set; } = new();
+        public Dictionary<string, List<string>> PreviousPlatformIds { get; set; } = new();
 
         // Game usernames parsed from submitted replay data
         public string? GameUsername { get; set; }

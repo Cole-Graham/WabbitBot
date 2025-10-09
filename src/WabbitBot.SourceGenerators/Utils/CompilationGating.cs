@@ -4,6 +4,7 @@ namespace WabbitBot.SourceGenerators.Utils
 {
     internal static class ProjectNames
     {
+        internal const string Common = "WabbitBot.Common";
         internal const string Core = "WabbitBot.Core";
         internal const string DiscBot = "WabbitBot.DiscBot";
     }
@@ -14,6 +15,9 @@ namespace WabbitBot.SourceGenerators.Utils
         {
             return provider.Select((comp, _) => string.Equals(comp.AssemblyName, assemblyName, System.StringComparison.OrdinalIgnoreCase));
         }
+
+        public static IncrementalValueProvider<bool> IsCommon(this IncrementalValueProvider<Compilation> provider)
+            => provider.IsAssembly(ProjectNames.Common);
 
         public static IncrementalValueProvider<bool> IsCore(this IncrementalValueProvider<Compilation> provider)
             => provider.IsAssembly(ProjectNames.Core);

@@ -20,8 +20,11 @@ namespace WabbitBot.Core.Common.Models.Leaderboard
         // Navigation properties
         public Guid SeasonId { get; set; }
         public Season Season { get; set; } = new();
-        public TeamSize TeamSize { get; set; }
         public virtual ICollection<ScrimmageLeaderboardItem> LeaderboardItems { get; set; } = new List<ScrimmageLeaderboardItem>();
+
+        // Data properties
+        public string Name { get; set; } = string.Empty; // For Season names like "Fall 2024", "Season 1", "Preseason 2", etc.
+        public TeamSize TeamSize { get; set; }
         public override Domain Domain => Domain.Leaderboard;
 
     }

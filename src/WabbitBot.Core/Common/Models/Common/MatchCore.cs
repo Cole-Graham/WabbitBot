@@ -1,5 +1,5 @@
 using WabbitBot.Core.Common.Services;
-using WabbitBot.Common.Events.EventInterfaces;
+using WabbitBot.Common.Events.Interfaces;
 using WabbitBot.Common.Data.Service;
 using WabbitBot.Common.Models;
 using WabbitBot.Common.Data.Interfaces;
@@ -24,12 +24,16 @@ namespace WabbitBot.Core.Common.Models.Common
             // ------------------------ Factory & Initialization ---------------------------
             public static Match CreateMatch(
                 TeamSize teamSize,
+                Guid parentId,
+                MatchParentType parentType,
                 int bestOf = 1,
                 bool playToCompletion = false)
             {
                 var match = new Match
                 {
                     TeamSize = teamSize,
+                    ParentId = parentId,
+                    ParentType = parentType,
                     BestOf = bestOf,
                     PlayToCompletion = playToCompletion,
                 };
@@ -44,7 +48,7 @@ namespace WabbitBot.Core.Common.Models.Common
                 return new MatchStateSnapshot
                 {
                     MatchId = matchId,
-                    Timestamp = DateTime.UtcNow,
+                    StartedAt = DateTime.UtcNow,
                 };
             }
 
@@ -54,7 +58,6 @@ namespace WabbitBot.Core.Common.Models.Common
                 return new MatchStateSnapshot
                 {
                     MatchId = other.MatchId,
-                    Timestamp = DateTime.UtcNow,
                     TriggeredByUserId = other.TriggeredByUserId,
                     TriggeredByUserName = other.TriggeredByUserName,
                     AdditionalData = new Dictionary<string, object>(other.AdditionalData),
@@ -152,13 +155,192 @@ namespace WabbitBot.Core.Common.Models.Common
         #region Validation
         public static partial class Validation
         {
-            // ------------------------ Validation Logic -----------------------------------
-            // No validation needed for TeamSize as it's a simple enum
-            // Future: Add business rule validations here
+            public static Task<Result> ValidateMatch(Match? match)
+            {
+                if (match is null)
+                {
+                    return Task.FromResult(Result.Failure("Match is null"));
+                }
+
+                var missingFields = new List<string>();
+                if (match.StartedAt is null)
+                {
+                    missingFields.Add("StartedAt");
+                }
+                if (match.CompletedAt is null)
+                {
+                    missingFields.Add("CompletedAt");
+                }
+                if (match.WinnerId is null)
+                {
+                    missingFields.Add("WinnerId");
+                }
+                if (match.ParentId is null)
+                {
+                    missingFields.Add("ParentId");
+                }
+                if (match.ParentType is null)
+                {
+                    missingFields.Add("ParentType");
+                }
+                if (match.Team1MapBansConfirmedAt is null)
+                {
+                    missingFields.Add("Team1MapBansConfirmedAt");
+                }
+                if (match.Team2MapBansConfirmedAt is null)
+                {
+                    missingFields.Add("Team2MapBansConfirmedAt");
+                }
+                if (match.ChannelId is null)
+                {
+                    missingFields.Add("ChannelId");
+                }
+                if (match.Team1ThreadId is null)
+                {
+                    missingFields.Add("Team1ThreadId");
+                }
+                if (match.Team2ThreadId is null)
+                {
+                    missingFields.Add("Team2ThreadId");
+                }
+
+                if (missingFields.Count == 0)
+                {
+                    return Task.FromResult(Result.CreateSuccess("Match is valid"));
+                }
+
+                var missing = string.Join(", ", missingFields);
+                return Task.FromResult(Result.Failure($"Match is missing fields: {missing}"));
+            }
         }
         #endregion
 
         #region CoreLogic
+        /// <summary>
+        /// Creates a match from a scrimmage
+        /// </summary>
+        /// <param name="scrimmageId"></param>
+        /// <param name="scrimmageChannelId"></param>
+        /// <returns></returns>
+        public async Task<Result<Match>> CreateScrimmageMatchAsync(
+            Guid scrimmageId,
+            ulong scrimmageChannelId)
+        {
+            try
+            {
+                // 1) Load scrimmage
+                var scrimmageResult = await CoreService.Scrimmages.GetByIdAsync(
+                    scrimmageId, DatabaseComponent.Repository);
+                if (!scrimmageResult.Success || scrimmageResult.Data is null)
+                    return Result<Match>.Failure("Scrimmage not found");
+
+                var scrimmage = scrimmageResult.Data;
+
+                // 2) Build match (parent linkage + initial state),
+                //    then set teams/players from the scrimmage
+                var match = Factory.CreateMatch(
+                    scrimmage.TeamSize,
+                    scrimmage.Id,
+                    MatchParentType.Scrimmage,
+                    scrimmage.BestOf);
+
+                match.ChannelId = scrimmageChannelId;
+
+                match.Team1Id = scrimmage.Team1Id;
+                match.Team2Id = scrimmage.Team2Id;
+                match.Team1PlayerIds = [.. scrimmage.Team1PlayerIds];
+                match.Team2PlayerIds = [.. scrimmage.Team2PlayerIds];
+                var team1Result = await CoreService.Teams.GetByIdAsync(scrimmage.Team1Id, DatabaseComponent.Repository);
+                if (!team1Result.Success || team1Result.Data is null)
+                    return Result<Match>.Failure("Team 1 not found");
+                var team1 = team1Result.Data;
+                var team2Result = await CoreService.Teams.GetByIdAsync(scrimmage.Team2Id, DatabaseComponent.Repository);
+                if (!team2Result.Success || team2Result.Data is null)
+                    return Result<Match>.Failure("Team 2 not found");
+                var team2 = team2Result.Data;
+                match.Team1 = team1;
+                match.Team2 = team2;
+
+                // Build Match Participants
+                var team1Players = new List<Player>();
+                var team2Players = new List<Player>();
+                foreach (var playerId in scrimmage.Team1PlayerIds)
+                {
+                    var playerResult = await CoreService.Players.GetByIdAsync(playerId, DatabaseComponent.Repository);
+                    if (!playerResult.Success || playerResult.Data is null)
+                        return Result<Match>.Failure("Player not found");
+                    team1Players.Add(playerResult.Data);
+                }
+                foreach (var playerId in scrimmage.Team2PlayerIds)
+                {
+                    var playerResult = await CoreService.Players.GetByIdAsync(playerId, DatabaseComponent.Repository);
+                    if (!playerResult.Success || playerResult.Data is null)
+                        return Result<Match>.Failure("Player not found");
+                    team2Players.Add(playerResult.Data);
+                }
+                match.Participants.Add(new MatchParticipant
+                {
+                    MatchId = match.Id,
+                    Match = match,
+                    TeamId = team1.Id,
+                    Team = team1,
+                    PlayerIds = [.. scrimmage.Team1PlayerIds],
+                    Players = team1Players,
+                    TeamNumber = 1,
+                });
+                match.Participants.Add(new MatchParticipant
+                {
+                    MatchId = match.Id,
+                    Match = match,
+                    TeamId = team2.Id,
+                    Team = team2,
+                    PlayerIds = [.. scrimmage.Team2PlayerIds],
+                    Players = team2Players,
+                    TeamNumber = 2,
+                });
+
+                // 3) Persist
+                var createResult = await CoreService.Matches.CreateAsync(
+                    match, DatabaseComponent.Repository);
+                if (!createResult.Success || createResult.Data is null)
+                    return Result<Match>.Failure("Failed to create match");
+
+                match = createResult.Data;
+
+                // Optional: link back to scrimmage entity and persist if needed
+                scrimmage.Match = match;
+                await CoreService.Scrimmages.UpdateAsync(scrimmage, DatabaseComponent.Repository);
+
+                // Commented out pending generator publishers
+                var pubResult = await PublishScrimmageMatchCreatedAsync(scrimmageChannelId, match.Id);
+                if (!pubResult.Success)
+                {
+                    return Result<Match>.Failure("Failed to publish scrimmage match created");
+                }
+
+                return Result<Match>.CreateSuccess(match);
+            }
+            catch (Exception ex)
+            {
+                await CoreService.ErrorHandler.CaptureAsync(
+                    ex, "Failed to create match", nameof(CreateScrimmageMatchAsync));
+                return Result<Match>.Failure($"An unexpected error occurred while creating the match: {ex.Message}");
+            }
+        }
+
+        public async Task<Result<Match>> BuildOpponentEncountersAsync(Match match)
+        {
+            try
+            {
+                return Result<Match>.CreateSuccess(match);
+            }
+            catch (Exception ex)
+            {
+                await CoreService.ErrorHandler.CaptureAsync(
+                    ex, "Failed to build opponent encounters", nameof(BuildOpponentEncountersAsync));
+                return Result<Match>.Failure($"An unexpected error occurred while building the opponent encounters: {ex.Message}");
+            }
+        }
         /// <summary>
         /// Starts a match with full business logic orchestration
         /// </summary>
@@ -219,7 +401,7 @@ namespace WabbitBot.Core.Common.Models.Common
                     TeamId = team1Id,
                     OpponentId = team2Id,
                     MatchId = matchId,
-                    TeamSize = (int)match.TeamSize,
+                    TeamSize = match.TeamSize,
                     EncounteredAt = DateTime.UtcNow,
                     Won = false, // Will be updated when match completes
                 };
@@ -229,7 +411,7 @@ namespace WabbitBot.Core.Common.Models.Common
                     TeamId = team2Id,
                     OpponentId = team1Id,
                     MatchId = matchId,
-                    TeamSize = (int)match.TeamSize,
+                    TeamSize = match.TeamSize,
                     EncounteredAt = DateTime.UtcNow,
                     Won = false, // Will be updated when match completes
                 };
@@ -275,7 +457,7 @@ namespace WabbitBot.Core.Common.Models.Common
                 }
 
                 // Publish Core-local event for match start
-                await CoreService.PublishAsync(new MatchStartedEvent(match.Id));
+                // await CoreService.PublishAsync(new ScrimmageMatchStartedEvent(match.Id));
 
                 return Result.CreateSuccess();
             }
@@ -301,7 +483,9 @@ namespace WabbitBot.Core.Common.Models.Common
         /// </summary>
         public static List<TeamOpponentEncounter> GetOpponentEncountersForTeam(Match match, Guid teamId)
         {
-            return match.OpponentEncounters.Where(oe => oe.TeamId == teamId).ToList();
+            var team1stats = match.Team1.ScrimmageTeamStats[match.TeamSize];
+            var team2stats = match.Team2.ScrimmageTeamStats[match.TeamSize];
+            return [.. team1stats.OpponentEncounters, .. team2stats.OpponentEncounters];
         }
 
         /// <summary>
@@ -318,7 +502,7 @@ namespace WabbitBot.Core.Common.Models.Common
         public static List<(Guid TeamId, Guid OpponentId)> GetAllOpponentPairs(Match match)
         {
             var pairs = new List<(Guid, Guid)>();
-            foreach (var encounter in match.OpponentEncounters)
+            foreach (var encounter in GetOpponentEncountersForTeam(match, match.Team1Id))
             {
                 pairs.Add((encounter.TeamId, encounter.OpponentId));
             }
@@ -421,7 +605,7 @@ namespace WabbitBot.Core.Common.Models.Common
                 }
 
                 // Update opponent encounters with winner information
-                foreach (var encounter in match.OpponentEncounters)
+                foreach (var encounter in GetOpponentEncountersForTeam(match, match.Team1Id))
                 {
                     encounter.Won = encounter.TeamId == winnerId;
                     encounter.UpdatedAt = DateTime.UtcNow;
@@ -457,7 +641,7 @@ namespace WabbitBot.Core.Common.Models.Common
                 await UpdateTeamVarietyStatsAsync(match);
 
                 // Publish Core-local event for match completion
-                await CoreService.PublishAsync(new MatchCompletedEvent(match.Id, winnerId));
+                // await CoreService.PublishAsync(new ScrimmageMatchCompletedEvent(match.Id, winnerId));
 
                 return Result.CreateSuccess();
             }
@@ -503,13 +687,13 @@ namespace WabbitBot.Core.Common.Models.Common
                     }
 
                     // Get or create variety stats for this team and team size
-                    var varietyStats = team.VarietyStats.GetValueOrDefault((TeamSize)match.TeamSize);
+                    var varietyStats = team.VarietyStats.FirstOrDefault(vs => vs.TeamSize == match.TeamSize);
                     if (varietyStats == null)
                     {
                         varietyStats = new TeamVarietyStats
                         {
                             TeamId = team.Id,
-                            TeamSize = (TeamSize)match.TeamSize,
+                            TeamSize = match.TeamSize,
                             VarietyEntropy = 0.0,
                             VarietyBonus = 0.0,
                             TotalOpponents = 0,
@@ -523,7 +707,7 @@ namespace WabbitBot.Core.Common.Models.Common
                             DatabaseComponent.Repository);
                         if (createResult.Success)
                         {
-                            team.VarietyStats[(TeamSize)match.TeamSize] = varietyStats;
+                            team.VarietyStats.Add(varietyStats);
                         }
                         else
                         {
@@ -541,8 +725,8 @@ namespace WabbitBot.Core.Common.Models.Common
                     // Update variety stats using recent encounters
                     // Note: This still assumes team.RecentOpponents is available.
                     // The relational-refactoring plan will address this data structure.
-                    var recentEncounters = team.RecentScrimmageOpponents?
-                        .Where(oe => oe.TeamSize == (int)match.TeamSize)
+                    var recentEncounters = GetOpponentEncountersForTeam(match, team.Id)
+                        .Where(oe => oe.TeamSize == match.TeamSize)
                         .OrderByDescending(oe => oe.EncounteredAt)
                         .Take(100) // Use last 100 encounters for stats calculation
                         .ToList() ?? new List<TeamOpponentEncounter>();

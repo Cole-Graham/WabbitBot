@@ -8,7 +8,7 @@ namespace WabbitBot.Common.Models
     public interface IScrimmageEntity { }
     public interface ITournamentEntity { }
     public interface IPlayerEntity { }
-    public interface IUserEntity { }
+    public interface IMashinaUserEntity { }
     public interface IMapEntity { }
     public interface IDivisionEntity { }
 

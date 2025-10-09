@@ -9,7 +9,7 @@ using WabbitBot.Common.Data.Interfaces;
 using WabbitBot.Common.Configuration;
 using WabbitBot.Common.Models;
 using WabbitBot.Core.Common.Services;
-using WabbitBot.Common.Events.EventInterfaces;
+using WabbitBot.Common.Events.Interfaces;
 using Microsoft.Extensions.Caching.Distributed;
 
 namespace WabbitBot.Core.Scrimmages
@@ -148,7 +148,7 @@ namespace WabbitBot.Core.Scrimmages
                     foreach (var team in allTeams.Data ?? Enumerable.Empty<Team>())
                     {
                         // Try to get pre-computed variety stats for this team and team size
-                        if (team.VarietyStats.TryGetValue(teamSize, out var varietyStats))
+                        if (team.VarietyStats.FirstOrDefault(vs => vs.TeamSize == teamSize) is { } varietyStats)
                         {
                             // Use the pre-computed variety score
                             teamVarietyScores[team.Id] = TeamCore.ScrimmageStats.GetVarietyScore(varietyStats);
@@ -156,8 +156,8 @@ namespace WabbitBot.Core.Scrimmages
                         else
                         {
                             // Fallback: calculate on-demand using recent opponent encounters
-                            var recentEncounters = team.RecentScrimmageOpponents?
-                                .Where(oe => oe.TeamSize == (int)teamSize)
+                            var recentEncounters = team.ScrimmageTeamStats[teamSize].OpponentEncounters?
+                                .Where(oe => oe.TeamSize == teamSize)
                                 .OrderByDescending(oe => oe.EncounteredAt)
                                 .Take(50) // Last 50 encounters for performance
                                 .ToList() ?? new List<TeamOpponentEncounter>();
@@ -204,8 +204,8 @@ namespace WabbitBot.Core.Scrimmages
                     foreach (var team in allTeams.Data ?? Enumerable.Empty<Team>())
                     {
                         // Count total opponent encounters for this team and team size
-                        var encounterCount = team.RecentScrimmageOpponents?
-                            .Where(oe => oe.TeamSize == (int)teamSize)
+                        var encounterCount = team.ScrimmageTeamStats[teamSize].OpponentEncounters?
+                            .Where(oe => oe.TeamSize == teamSize)
                             .Count() ?? 0;
                         teamEncounterCounts[team.Id] = encounterCount;
                     }

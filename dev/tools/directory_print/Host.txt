@@ -1,0 +1,16 @@
+📁 Users
+│
+  📁 coleg
+  │
+    📁 Projects
+    │
+      📁 WabbitBot
+      │
+        📁 src
+          📁 WabbitBot.Host
+            ├── 📄 CONFIGURATION.md
+            ├── 📄 Program.cs
+            ├── 📄 WabbitBot.Host.csproj
+            ├── 📄 appsettings.Development.json
+            ├── 📄 appsettings.Production.json
+            └── 📄 appsettings.json

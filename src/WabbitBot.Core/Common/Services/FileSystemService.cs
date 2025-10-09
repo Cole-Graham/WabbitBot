@@ -2,7 +2,7 @@ using System.IO;
 using WabbitBot.Common.Models;
 using WabbitBot.Core.Common.Events;
 using WabbitBot.Core.Common.BotCore;
-using WabbitBot.Common.Events.EventInterfaces;
+using WabbitBot.Common.Events.Interfaces;
 using WabbitBot.Common.ErrorService;
 using WabbitBot.Common.Events;
 

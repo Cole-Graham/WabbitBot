@@ -15,9 +15,9 @@ namespace WabbitBot.Core.Common.Interfaces
         Task UpdateLastActive(Guid teamId);
 
         /// <summary>
-        /// Adds a player to a team with the specified role
+        /// Adds a player to a team with the specified role and roster group
         /// </summary>
-        Task AddPlayer(Guid teamId, Guid playerId, TeamRole role = TeamRole.Core);
+        Task AddPlayer(Guid teamId, Guid playerId, TeamSizeRosterGroup rosterGroup, TeamRole role = TeamRole.Core);
 
         /// <summary>
         /// Removes a player from a team

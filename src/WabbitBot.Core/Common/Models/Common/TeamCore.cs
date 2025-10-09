@@ -22,23 +22,94 @@ namespace WabbitBot.Core.Common.Models.Common
                 Guid id,
                 string name,
                 Guid teamCaptainId,
-                TeamSize teamSize,
-                List<TeamMember> teamMembers,
+                TeamType teamType,
                 DateTime createdAt,
-                DateTime lastActive,
-                bool isArchived)
+                DateTime lastActive)
             {
-                var scrimmageConfig = ConfigurationProvider.GetSection<ScrimmageOptions>(
-                    ScrimmageOptions.SectionName);
-
                 return new Team
                 {
                     Id = id,
                     Name = name,
                     TeamCaptainId = teamCaptainId,
-                    TeamSize = teamSize,
-                    MaxRosterSize = scrimmageConfig.MaxRosterSize,
-                    TeamMembers = teamMembers,
+                    TeamType = teamType,
+                    LastActive = lastActive,
+                    CreatedAt = createdAt,
+                    Rosters = new List<TeamRoster>(),
+                };
+            }
+
+            public static TeamRoster CreateRoster(
+                Guid teamId,
+                TeamSizeRosterGroup rosterGroup,
+                Guid? rosterCaptainId = null)
+            {
+                var scrimmageConfig = ConfigurationProvider.GetSection<ScrimmageOptions>(
+                    ScrimmageOptions.SectionName);
+
+                var rosterRange = GetRosterSizeRange(rosterGroup, scrimmageConfig.RosterSizeRanges);
+
+                return new TeamRoster
+                {
+                    Id = Guid.NewGuid(),
+                    TeamId = teamId,
+                    RosterGroup = rosterGroup,
+                    MaxRosterSize = rosterRange.Max,
+                    RosterCaptainId = rosterCaptainId,
+                    LastActive = DateTime.UtcNow,
+                    CreatedAt = DateTime.UtcNow,
+                    RosterMembers = new List<TeamMember>(),
+                };
+            }
+
+            private static (int Min, int Max) GetRosterSizeRange(TeamSizeRosterGroup group, RosterSizeRanges ranges)
+            {
+                return group switch
+                {
+                    TeamSizeRosterGroup.Solo => (ranges.Solo.Min, ranges.Solo.Max),
+                    TeamSizeRosterGroup.Duo => (ranges.Duo.Min, ranges.Duo.Max),
+                    TeamSizeRosterGroup.Squad => (ranges.Squad.Min, ranges.Squad.Max),
+                    _ => (ranges.Solo.Min, ranges.Solo.Max),
+                };
+            }
+        }
+
+        public static class TeamSizeRosterGrouping
+        {
+            public static TeamSizeRosterGroup GetRosterGroup(TeamSize teamSize)
+            {
+                return teamSize switch
+                {
+                    TeamSize.OneVOne => TeamSizeRosterGroup.Solo,
+                    TeamSize.TwoVTwo => TeamSizeRosterGroup.Duo,
+                    TeamSize.ThreeVThree => TeamSizeRosterGroup.Squad,
+                    TeamSize.FourVFour => TeamSizeRosterGroup.Squad,
+                    _ => TeamSizeRosterGroup.Solo,
+                };
+            }
+
+            public static (int Min, int Max) GetDefaultRosterSizeRange(TeamSizeRosterGroup group)
+            {
+                var scrimmageConfig = ConfigurationProvider.GetSection<ScrimmageOptions>(
+                    ScrimmageOptions.SectionName);
+
+                return group switch
+                {
+                    TeamSizeRosterGroup.Solo =>
+                    (
+                        scrimmageConfig.RosterSizeRanges.Solo.Min,
+                        scrimmageConfig.RosterSizeRanges.Solo.Max
+                    ),
+                    TeamSizeRosterGroup.Duo =>
+                    (
+                        scrimmageConfig.RosterSizeRanges.Duo.Min,
+                        scrimmageConfig.RosterSizeRanges.Duo.Max
+                    ),
+                    TeamSizeRosterGroup.Squad =>
+                    (
+                        scrimmageConfig.RosterSizeRanges.Squad.Min,
+                        scrimmageConfig.RosterSizeRanges.Squad.Max
+                    ),
+                    _ => (scrimmageConfig.RosterSizeRanges.Solo.Min, scrimmageConfig.RosterSizeRanges.Solo.Max),
                 };
             }
         }
@@ -89,7 +160,7 @@ namespace WabbitBot.Core.Common.Models.Common
                 );
             }
         }
-        public async Task AddPlayer(Guid teamId, Guid playerId, TeamRole role = TeamRole.Core)
+        public async Task AddPlayer(Guid teamId, Guid playerId, TeamSizeRosterGroup rosterGroup, TeamRole role = TeamRole.Core)
         {
             var teamResult = await CoreService.Teams.GetByIdAsync(teamId,
                 DatabaseComponent.Repository);
@@ -104,17 +175,32 @@ namespace WabbitBot.Core.Common.Models.Common
                 throw new InvalidOperationException($"Team with ID {teamId} not found.");
             }
 
-            if (team.TeamMembers.Count >= team.MaxRosterSize)
+            // Validate roster group is allowed for this team type
+            var validationResult = Validation.ValidateRosterGroupForTeamType(team.TeamType, rosterGroup);
+            if (!validationResult.Success)
             {
-                throw new InvalidOperationException($"Team roster is full (max size: {team.MaxRosterSize})");
+                throw new InvalidOperationException(validationResult.ErrorMessage);
             }
 
-            if (team.TeamMembers.Any(m => m.PlayerId == playerId))
+            // Get or create the roster for this group
+            var roster = Accessors.GetRosterForGroup(team, rosterGroup);
+            if (roster == null)
             {
-                throw new InvalidOperationException("Player is already on the team");
+                roster = Factory.CreateRoster(teamId, rosterGroup);
+                team.Rosters.Add(roster);
             }
 
-            team.TeamMembers.Add(new TeamMember
+            if (roster.RosterMembers.Count >= roster.MaxRosterSize)
+            {
+                throw new InvalidOperationException($"Roster is full (max size: {roster.MaxRosterSize})");
+            }
+
+            if (roster.RosterMembers.Any(m => m.PlayerId == playerId))
+            {
+                throw new InvalidOperationException("Player is already on this roster");
+            }
+
+            roster.RosterMembers.Add(new TeamMember
             {
                 PlayerId = playerId,
                 Role = role,
@@ -139,6 +225,12 @@ namespace WabbitBot.Core.Common.Models.Common
                     nameof(AddPlayer)
                 );
             }
+        }
+
+        // Legacy method for backward compatibility - routes to Squad roster by default
+        public async Task AddPlayer(Guid teamId, Guid playerId, TeamRole role = TeamRole.Core)
+        {
+            await AddPlayer(teamId, playerId, TeamSizeRosterGroup.Squad, role);
         }
 
         public async Task RemovePlayer(Guid teamId, Guid playerId)
@@ -169,10 +261,15 @@ namespace WabbitBot.Core.Common.Models.Common
                 return; // Exit if team not found
             }
 
-            var member = team.TeamMembers.FirstOrDefault(m => m.PlayerId == playerId);
+            // Find the member across all rosters
+            var member = team.Rosters
+                .SelectMany(r => r.RosterMembers)
+                .FirstOrDefault(m => m.PlayerId == playerId);
             if (member != null)
             {
-                team.TeamMembers.Remove(member);
+                // Remove from the specific roster
+                var roster = team.Rosters.First(r => r.RosterMembers.Contains(member));
+                roster.RosterMembers.Remove(member);
                 var updateTeamResult = await CoreService.Teams.UpdateAsync(team,
                     DatabaseComponent.Repository);
                 var updateTeamCacheResult = await CoreService.Teams.UpdateAsync(team,
@@ -220,7 +317,9 @@ namespace WabbitBot.Core.Common.Models.Common
                 return; // Exit if team not found
             }
 
-            var member = team.TeamMembers.FirstOrDefault(m => m.PlayerId == playerId);
+            var member = team.Rosters
+                .SelectMany(r => r.RosterMembers)
+                .FirstOrDefault(m => m.PlayerId == playerId);
             if (member != null)
             {
                 member.Role = newRole;
@@ -276,8 +375,10 @@ namespace WabbitBot.Core.Common.Models.Common
                 return; // Exit if team not found
             }
 
-            // Find current captain
-            var currentCaptain = team.TeamMembers.FirstOrDefault(m => m.Role == TeamRole.Captain);
+            // Find current captain across all rosters
+            var currentCaptain = team.Rosters
+                .SelectMany(r => r.RosterMembers)
+                .FirstOrDefault(m => m.Role == TeamRole.Captain);
             if (currentCaptain != null)
             {
                 // Demote current captain to Core
@@ -286,8 +387,10 @@ namespace WabbitBot.Core.Common.Models.Common
                 currentCaptain.IsTeamManager = false;
             }
 
-            // Find new captain
-            var newCaptain = team.TeamMembers.FirstOrDefault(m => m.PlayerId == newCaptainId);
+            // Find new captain across all rosters
+            var newCaptain = team.Rosters
+                .SelectMany(r => r.RosterMembers)
+                .FirstOrDefault(m => m.PlayerId == newCaptainId);
             if (newCaptain != null)
             {
                 // Promote new captain
@@ -343,7 +446,9 @@ namespace WabbitBot.Core.Common.Models.Common
                 return; // Exit if team not found
             }
 
-            var member = team.TeamMembers.FirstOrDefault(m => m.PlayerId == playerId);
+            var member = team.Rosters
+                .SelectMany(r => r.RosterMembers)
+                .FirstOrDefault(m => m.PlayerId == playerId);
             if (member != null)
             {
                 // Captains are always team managers and cannot be demoted
@@ -400,7 +505,9 @@ namespace WabbitBot.Core.Common.Models.Common
                 return; // Exit if team not found
             }
 
-            var member = team.TeamMembers.FirstOrDefault(m => m.PlayerId == playerId);
+            var member = team.Rosters
+                .SelectMany(r => r.RosterMembers)
+                .FirstOrDefault(m => m.PlayerId == playerId);
             if (member != null)
             {
                 member.IsActive = false;
@@ -453,7 +560,9 @@ namespace WabbitBot.Core.Common.Models.Common
                 return; // Exit if team not found
             }
 
-            var member = team.TeamMembers.FirstOrDefault(m => m.PlayerId == playerId);
+            var member = team.Rosters
+                .SelectMany(r => r.RosterMembers)
+                .FirstOrDefault(m => m.PlayerId == playerId);
             if (member != null)
             {
                 member.IsActive = true;
@@ -584,6 +693,7 @@ namespace WabbitBot.Core.Common.Models.Common
         public async Task<Result> UpdateTournamentStats(Guid teamId, TeamSize teamSize, bool isWin)
         {
             // TODO: Implement Tournament stats update
+            await Task.CompletedTask;
             return Result.CreateSuccess();
         }
 
@@ -593,6 +703,7 @@ namespace WabbitBot.Core.Common.Models.Common
         public async Task<Result> UpdateTournamentRating(Guid teamId, TeamSize teamSize, double newRating)
         {
             // TODO: Implement Tournament rating update
+            await Task.CompletedTask;
             return Result.CreateSuccess();
         }
 
@@ -600,57 +711,127 @@ namespace WabbitBot.Core.Common.Models.Common
         {
             public static List<Guid> GetTeamManagerIds(Team team)
             {
-                return team.TeamMembers.Where(m => m.IsActive && m.IsTeamManager).Select(m => m.PlayerId).ToList();
+                return team.Rosters
+                    .SelectMany(r => r.RosterMembers)
+                    .Where(m => m.IsActive && m.IsTeamManager)
+                    .Select(m => m.PlayerId)
+                    .Distinct()
+                    .ToList();
             }
 
             public static List<TeamMember> GetActiveMembers(Team team)
             {
-                return team.TeamMembers.Where(m => m.IsActive).ToList();
+                return team.Rosters
+                    .SelectMany(r => r.RosterMembers)
+                    .Where(m => m.IsActive)
+                    .ToList();
+            }
+
+            public static List<TeamMember> GetActiveMembersForRosterGroup(Team team, TeamSizeRosterGroup rosterGroup)
+            {
+                return team.Rosters
+                    .Where(r => r.RosterGroup == rosterGroup)
+                    .SelectMany(r => r.RosterMembers)
+                    .Where(m => m.IsActive)
+                    .ToList();
             }
 
             public static TeamMember? GetMember(Team team, Guid playerId)
             {
-                return team.TeamMembers.FirstOrDefault(m => m.PlayerId == playerId);
+                return team.Rosters
+                    .SelectMany(r => r.RosterMembers)
+                    .FirstOrDefault(m => m.PlayerId == playerId);
             }
 
             public static bool HasPlayer(Team team, Guid playerId)
             {
-                return team.TeamMembers.Any(m => m.PlayerId == playerId);
+                return team.Rosters
+                    .SelectMany(r => r.RosterMembers)
+                    .Any(m => m.PlayerId == playerId);
             }
 
             public static bool HasActivePlayer(Team team, Guid playerId)
             {
-                return team.TeamMembers.Any(m => m.PlayerId == playerId && m.IsActive);
+                return team.Rosters
+                    .SelectMany(r => r.RosterMembers)
+                    .Any(m => m.PlayerId == playerId && m.IsActive);
+            }
+
+            public static bool HasActivePlayerInRosterGroup(Team team, Guid playerId, TeamSizeRosterGroup rosterGroup)
+            {
+                return team.Rosters
+                    .Where(r => r.RosterGroup == rosterGroup)
+                    .SelectMany(r => r.RosterMembers)
+                    .Any(m => m.PlayerId == playerId && m.IsActive);
             }
 
             public static int GetActivePlayerCount(Team team)
             {
-                return team.TeamMembers.Count(m => m.IsActive);
+                return team.Rosters
+                    .SelectMany(r => r.RosterMembers)
+                    .Count(m => m.IsActive);
+            }
+
+            public static int GetActivePlayerCountForRosterGroup(Team team, TeamSizeRosterGroup rosterGroup)
+            {
+                return team.Rosters
+                    .Where(r => r.RosterGroup == rosterGroup)
+                    .SelectMany(r => r.RosterMembers)
+                    .Count(m => m.IsActive);
             }
 
             public static List<Guid> GetActivePlayerIds(Team team)
             {
-                return team.TeamMembers.Where(m => m.IsActive).Select(m => m.PlayerId).ToList();
+                return team.Rosters
+                    .SelectMany(r => r.RosterMembers)
+                    .Where(m => m.IsActive)
+                    .Select(m => m.PlayerId)
+                    .Distinct()
+                    .ToList();
+            }
+
+            public static List<Guid> GetActivePlayerIdsForRosterGroup(Team team, TeamSizeRosterGroup rosterGroup)
+            {
+                return team.Rosters
+                    .Where(r => r.RosterGroup == rosterGroup)
+                    .SelectMany(r => r.RosterMembers)
+                    .Where(m => m.IsActive)
+                    .Select(m => m.PlayerId)
+                    .ToList();
             }
 
             public static List<Guid> GetCorePlayerIds(Team team)
             {
-                return team.TeamMembers.Where(m => m.IsActive && (m.Role == TeamRole.Core || m.Role == TeamRole.Captain)).Select(m => m.PlayerId).ToList();
+                return team.Rosters
+                    .SelectMany(r => r.RosterMembers)
+                    .Where(m => m.IsActive && (m.Role == TeamRole.Core || m.Role == TeamRole.Captain))
+                    .Select(m => m.PlayerId)
+                    .Distinct()
+                    .ToList();
             }
 
             public static List<Guid> GetCaptainIds(Team team)
             {
-                return team.TeamMembers.Where(m => m.IsActive && m.Role == TeamRole.Captain).Select(m => m.PlayerId).ToList();
+                return team.Rosters
+                    .SelectMany(r => r.RosterMembers)
+                    .Where(m => m.IsActive && m.Role == TeamRole.Captain)
+                    .Select(m => m.PlayerId)
+                    .Distinct()
+                    .ToList();
             }
 
             public static bool IsCaptain(Team team, Guid playerId)
             {
-                return team.TeamMembers.Any(m => m.PlayerId == playerId && m.IsActive && m.Role == TeamRole.Captain);
+                return team.Rosters
+                    .SelectMany(r => r.RosterMembers)
+                    .Any(m => m.PlayerId == playerId && m.IsActive && m.Role == TeamRole.Captain);
             }
 
             public static bool IsTeamManager(Team team, Guid playerId)
             {
-                return team.TeamMembers.Any(m => m.PlayerId == playerId && m.IsActive && m.IsTeamManager);
+                return team.Rosters
+                    .SelectMany(r => r.RosterMembers)
+                    .Any(m => m.PlayerId == playerId && m.IsActive && m.IsTeamManager);
             }
 
             public static bool IsValidForTeamSize(Team team, TeamSize teamSize)
@@ -659,6 +840,8 @@ namespace WabbitBot.Core.Common.Models.Common
                 {
                     return false;
                 }
+
+                var rosterGroup = TeamSizeRosterGrouping.GetRosterGroup(teamSize);
                 var requiredPlayers = teamSize switch
                 {
                     TeamSize.TwoVTwo => 2,
@@ -667,14 +850,106 @@ namespace WabbitBot.Core.Common.Models.Common
                     _ => 1
                 };
 
-                return GetActivePlayerCount(team) >= requiredPlayers;
+                return GetActivePlayerCountForRosterGroup(team, rosterGroup) >= requiredPlayers;
+            }
+
+            public static TeamRoster? GetRosterForGroup(Team team, TeamSizeRosterGroup rosterGroup)
+            {
+                return team.Rosters.FirstOrDefault(r => r.RosterGroup == rosterGroup);
+            }
+
+            public static bool HasRosterForGroup(Team team, TeamSizeRosterGroup rosterGroup)
+            {
+                return team.Rosters.Any(r => r.RosterGroup == rosterGroup);
             }
         }
 
         public static class Validation
         {
-            // ------------------------ Validation Logic -----------------------------------
-            // Future: Add business rule validations here
+            // ------------------------ Team Type and Roster Validation -----------------------------------
+
+            /// <summary>
+            /// Validates that a team's roster configuration matches its team type.
+            /// Solo teams can only have Solo rosters.
+            /// Team-type teams can only have Duo and/or Squad rosters (no Solo).
+            /// </summary>
+            public static Result ValidateTeamRosterConfiguration(Team team)
+            {
+                if (team.Rosters?.Any() != true)
+                {
+                    return Result.CreateSuccess(); // Empty rosters are valid during creation
+                }
+
+                var rosterGroups = team.Rosters.Select(r => r.RosterGroup).Distinct().ToList();
+
+                return team.TeamType switch
+                {
+                    TeamType.Solo => ValidateSoloTeamRosters(rosterGroups),
+                    TeamType.Team => ValidateTeamTypeRosters(rosterGroups),
+                    _ => Result.Failure($"Invalid team type: {team.TeamType}")
+                };
+            }
+
+            private static Result ValidateSoloTeamRosters(List<TeamSizeRosterGroup> rosterGroups)
+            {
+                if (rosterGroups.Count != 1)
+                {
+                    return Result.Failure("Solo teams must have exactly one roster");
+                }
+
+                if (rosterGroups[0] != TeamSizeRosterGroup.Solo)
+                {
+                    return Result.Failure("Solo teams can only have Solo rosters");
+                }
+
+                return Result.CreateSuccess();
+            }
+
+            private static Result ValidateTeamTypeRosters(List<TeamSizeRosterGroup> rosterGroups)
+            {
+                if (rosterGroups.Contains(TeamSizeRosterGroup.Solo))
+                {
+                    return Result.Failure("Team-type teams cannot have Solo rosters");
+                }
+
+                var validGroups = new[] { TeamSizeRosterGroup.Duo, TeamSizeRosterGroup.Squad };
+                if (rosterGroups.Any(g => !validGroups.Contains(g)))
+                {
+                    return Result.Failure("Team-type teams can only have Duo and/or Squad rosters");
+                }
+
+                return Result.CreateSuccess();
+            }
+
+            /// <summary>
+            /// Validates that a roster group can be added to a team based on its team type.
+            /// </summary>
+            public static Result ValidateRosterGroupForTeamType(TeamType teamType, TeamSizeRosterGroup rosterGroup)
+            {
+                return teamType switch
+                {
+                    TeamType.Solo when rosterGroup != TeamSizeRosterGroup.Solo =>
+                        Result.Failure("Solo teams can only have Solo rosters"),
+                    TeamType.Team when rosterGroup == TeamSizeRosterGroup.Solo =>
+                        Result.Failure("Team-type teams cannot have Solo rosters"),
+                    _ => Result.CreateSuccess()
+                };
+            }
+
+            /// <summary>
+            /// Determines the appropriate team type based on the intended roster groups.
+            /// </summary>
+            public static TeamType GetTeamTypeForRosterGroups(IEnumerable<TeamSizeRosterGroup> intendedRosterGroups)
+            {
+                var groups = intendedRosterGroups.ToList();
+
+                if (groups.Contains(TeamSizeRosterGroup.Solo))
+                {
+                    return TeamType.Solo;
+                }
+
+                return TeamType.Team;
+            }
         }
 
         // Stats moved to TeamCore.Stats partial

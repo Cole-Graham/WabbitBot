@@ -1,0 +1,14 @@
+📁 Users
+│
+  📁 coleg
+  │
+    📁 Projects
+    │
+      📁 WabbitBot
+      │
+        📁 src
+          📁 WabbitBot.Generator.Shared.Tests
+            ├── 📁 Analyzers
+            │   └── 📄 AttributeAnalyzerTests.cs
+            ├── 📁 Metadata
+            └── 📄 WabbitBot.Generator.Shared.Tests.csproj

@@ -1,5 +1,6 @@
 using System;
 
+
 namespace WabbitBot.Common.Attributes
 {
     #region Database/Entity

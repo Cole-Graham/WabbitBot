@@ -3,12 +3,18 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using WabbitBot.Generator.Shared;
-using WabbitBot.SourceGenerators.Generators.Event; // For MethodInfo
 using WabbitBot.SourceGenerators.Templates; // For CommonTemplates
 using WabbitBot.SourceGenerators.Utils; // For SourceEmitter, InferenceHelpers
 using WabbitBot.Generator.Shared.Analyzers;
 
 namespace WabbitBot.SourceGenerators.Templates;
+
+/// <summary>
+/// Represents a method that triggers event generation.
+/// </summary>
+/// <param name="Name">The method name</param>
+/// <param name="Parameters">The method parameters as (type, name) tuples</param>
+public record MethodInfo(string Name, List<(string type, string name)> Parameters);
 
 /// <summary>
 /// Templates for generating event-related code.
@@ -80,7 +86,7 @@ public static class EventTemplates
 
         var content = $$"""
             {{CommonTemplates.CreateFileHeader("EventSubscriptionGenerator")}}
-            using WabbitBot.Common.Events.EventInterfaces;
+            using WabbitBot.Common.Events.Interfaces;
 
             namespace WabbitBot.Core.Common.Events;
 
@@ -106,7 +112,7 @@ public static class EventTemplates
     /// <summary>
     /// Generates event publisher code for boundary classes.
     /// </summary>
-    public static SourceText GeneratePublisher(string className, List<EventBoundaryGenerator.MethodInfo> methods, EventBusType busType)
+    public static SourceText GeneratePublisher(string className, List<MethodInfo> methods, EventBusType busType)
     {
         var publishers = new StringBuilder();
         var dependencies = new[] { ("WabbitBot.Common.Events.EventInterfaces.ICoreEventBus", "_eventBus") };

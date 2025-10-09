@@ -21,25 +21,25 @@ namespace WabbitBot.Core.Common.Models.Common
     )]
     public class Team : Entity, ITeamEntity
     {
-        // Core team data
-        public string Name { get; set; } = string.Empty;
-        public Guid TeamCaptainId { get; set; }
-        public TeamSize TeamSize { get; set; }
-        public int MaxRosterSize { get; set; }
-        public DateTime LastActive { get; set; }
-
-        public string? Tag { get; set; }
-        public virtual ICollection<TeamMember> TeamMembers { get; set; } = new List<TeamMember>();
-
         // Navigation properties
         public Dictionary<TeamSize, ScrimmageTeamStats> ScrimmageTeamStats { get; set; } = new();
         public Dictionary<TeamSize, TournamentTeamStats> TournamentTeamStats { get; set; } = new();
+        public virtual ICollection<Match> Matches { get; set; } = new List<Match>();
+
+        // Core team data (no roster-specific properties here)
+        public string Name { get; set; } = string.Empty;
+        public Guid TeamCaptainId { get; set; }
+        public DateTime LastActive { get; set; }
+        public string? Tag { get; set; }
+
+        // Team type determines roster constraints
+        public TeamType TeamType { get; set; }
+
+        // Navigation to rosters - each team can have multiple rosters for different game sizes
+        public virtual ICollection<TeamRoster> Rosters { get; set; } = new List<TeamRoster>();
+
         // VarietyStats are for the scrimmage rating system
-        public Dictionary<TeamSize, TeamVarietyStats> VarietyStats { get; set; } = new();
-        public virtual ICollection<TeamOpponentEncounter> RecentScrimmageOpponents {
-             get; set; } = new List<TeamOpponentEncounter>(); // Top 10 most recent
-        public virtual ICollection<MatchParticipant> RecentScrimmageParticipations {
-             get; set; } = new List<MatchParticipant>(); // Recent matches
+        public virtual ICollection<TeamVarietyStats> VarietyStats { get; set; } = new List<TeamVarietyStats>();
 
         public override Domain Domain => Domain.Common;
     }
@@ -50,6 +50,43 @@ namespace WabbitBot.Core.Common.Models.Common
         Captain,
         Core,
         Substitute
+    }
+    #endregion
+
+    #region TeamType
+    public enum TeamType
+    {
+        Solo = 0,  // 1v1 teams - can only have Solo roster
+        Team = 1   // Team games - can have Duo and/or Squad rosters (but not Solo)
+    }
+    #endregion
+
+    #region TeamRoster
+    [EntityMetadata(
+        tableName: "team_rosters",
+        archiveTableName: "team_roster_archive",
+        maxCacheSize: 1000,
+        cacheExpiryMinutes: 30,
+        servicePropertyName: "TeamRosters",
+        emitCacheRegistration: true,
+        emitArchiveRegistration: true
+    )]
+    public class TeamRoster : Entity, ITeamEntity
+    {
+        // Navigation properties
+        public Guid TeamId { get; set; }
+        public virtual Team Team { get; set; } = null!;
+
+        // Roster-specific properties
+        public TeamSizeRosterGroup RosterGroup { get; set; }
+        public int MaxRosterSize { get; set; }
+        public DateTime LastActive { get; set; }
+        public Guid? RosterCaptainId { get; set; } // Roster-specific captain (optional)
+
+        // Navigation to members
+        public virtual ICollection<TeamMember> RosterMembers { get; set; } = new List<TeamMember>();
+
+        public override Domain Domain => Domain.Common;
     }
     #endregion
 
@@ -65,8 +102,15 @@ namespace WabbitBot.Core.Common.Models.Common
     )]
     public class TeamMember : Entity, ITeamEntity
     {
-        public Guid TeamId { get; set; }
+        // Navigation properties
+        public Guid TeamRosterId { get; set; }
+        public virtual TeamRoster TeamRoster { get; set; } = null!;
+        public Guid MashinaUserId { get; set; }
+        public MashinaUser? MashinaUser { get; set; }
         public Guid PlayerId { get; set; }
+        public string DiscordUserId { get; set; } = string.Empty;
+
+        // Member-specific properties
         public TeamRole Role { get; set; }
         public DateTime JoinedAt { get; set; }
         public bool IsActive { get; set; }
@@ -94,15 +138,18 @@ namespace WabbitBot.Core.Common.Models.Common
         // Team identification (for team stats)
         public Guid TeamId { get; set; }
         public TeamSize TeamSize { get; set; }
+        public virtual ICollection<TeamOpponentEncounter> OpponentEncounters { get; set; } = new List<TeamOpponentEncounter>();
 
         // Basic stats
         public int Wins { get; set; }
         public int Losses { get; set; }
 
         // Rating system (using double for precision as per user preference)
-        public double InitialRating { get; set; } = 1000.0;
-        public double CurrentRating { get; set; } = 1000.0;
-        public double HighestRating { get; set; } = 1000.0;
+        public double InitialRating { get; set; }
+        public double CurrentRating { get; set; }
+        public double HighestRating { get; set; }
+        public double RecentRatingChange { get; set; }
+        public double Confidence { get; set; }
 
         // Streak tracking
         public int CurrentStreak { get; set; }
@@ -111,9 +158,6 @@ namespace WabbitBot.Core.Common.Models.Common
         // Timing
         public DateTime LastMatchAt { get; set; }
         public DateTime LastUpdated { get; set; }
-
-        // Variety statistics (replaces OpponentDistributionScore)
-        public ICollection<TeamVarietyStats> VarietyStats { get; set; } = new List<TeamVarietyStats>();
 
         // Navigation property
         public Team Team { get; set; } = null!;
@@ -147,9 +191,11 @@ namespace WabbitBot.Core.Common.Models.Common
         public int GamesDrawn { get; set; }
         public int MatchesWon { get; set; }
         public int MatchesLost { get; set; }
-        public double InitialRating { get; set; } = 1000.0;
-        public double CurrentRating { get; set; } = 1000.0;
-        public double HighestRating { get; set; } = 1000.0;
+        public double InitialRating { get; set; }
+        public double CurrentRating { get; set; }
+        public double HighestRating { get; set; }
+        public double RecentRatingChange { get; set; }
+        public double Confidence { get; set; }
         public DateTime LastMatchAt { get; set; }
         public DateTime LastUpdated { get; set; }
 
@@ -171,17 +217,58 @@ namespace WabbitBot.Core.Common.Models.Common
     )]
     public class TeamVarietyStats : Entity, ITeamEntity
     {
+        // Navigation
+        public Team Team { get; set; } = null!;
         public Guid TeamId { get; set; }
+
+        // Data
         public TeamSize TeamSize { get; set; }
-        public double VarietyEntropy { get; set; } = 0.0;
-        public double VarietyBonus { get; set; } = 0.0;
-        public int TotalOpponents { get; set; } = 0;
-        public int UniqueOpponents { get; set; } = 0;
+        public double VarietyEntropy { get; set; }
+        public double VarietyBonus { get; set; }
+        public int TotalOpponents { get; set; }
+        public int UniqueOpponents { get; set; }
         public DateTime LastCalculated { get; set; }
         public DateTime LastUpdated { get; set; }
 
-        // Navigation property
-        public Team Team { get; set; } = null!;
+        // Calculation context
+        public double AverageVarietyEntropyAtCalc { get; set; }
+        public double MedianGamesAtCalc { get; set; }
+        public double RatingRangeAtCalc { get; set; }
+        public double NeighborRangeAtCalc { get; set; }
+        public int PlayerNeighborsAtCalc { get; set; }
+        public int MaxNeighborsObservedAtCalc { get; set; }
+        public double AvailabilityFactorUsed { get; set; }
+
+        public override Domain Domain => Domain.Common;
+    }
+    #endregion
+
+    #region TeamOpponentEncounter
+    [EntityMetadata(
+        tableName: "team_opponent_encounters",
+        archiveTableName: "team_opponent_encounter_archive",
+        maxCacheSize: 2000,
+        cacheExpiryMinutes: 60,
+        servicePropertyName: "TeamOpponentEncounters",
+        emitCacheRegistration: true,
+        emitArchiveRegistration: true
+    )]
+    public class TeamOpponentEncounter : Entity, IMatchEntity
+    {
+        // Navigation properties
+        public Guid MatchId { get; set; }
+        public virtual Match Match { get; set; } = null!;
+
+        public Guid TeamId { get; set; }
+        public virtual Team Team { get; set; } = null!;
+
+        public Guid OpponentId { get; set; }
+        public virtual Team Opponent { get; set; } = null!;
+
+        // State properties
+        public TeamSize TeamSize { get; set; }
+        public DateTime EncounteredAt { get; set; }
+        public bool Won { get; set; }
 
         public override Domain Domain => Domain.Common;
     }

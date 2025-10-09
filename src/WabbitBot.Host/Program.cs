@@ -3,7 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using WabbitBot.Common.Configuration;
 using WabbitBot.Common.Events;
-using WabbitBot.Common.Events.EventInterfaces;
+using WabbitBot.Common.Events.Interfaces;
 using WabbitBot.Common.ErrorService;
 using WabbitBot.Common.Utilities;
 using WabbitBot.Core.Common.BotCore;
@@ -199,10 +199,10 @@ public static class Program
             var discBotEventBus = new WabbitBot.DiscBot.DiscBotEventBus(GlobalEventBus);
 
             // Initialize DiscBot services first
-            await WabbitBot.DiscBot.DSharpPlus.DiscBotBootstrap.InitializeServicesAsync(discBotEventBus, ErrorService);
+            await WabbitBot.DiscBot.App.DiscBotBootstrap.InitializeServicesAsync(discBotEventBus, ErrorService);
 
             // Start the Discord client
-            await WabbitBot.DiscBot.DSharpPlus.DiscBotBootstrap.StartDiscordClientAsync(config);
+            await WabbitBot.DiscBot.App.DiscBotBootstrap.StartDiscordClientAsync(config);
         }
         catch (Exception ex)
         {

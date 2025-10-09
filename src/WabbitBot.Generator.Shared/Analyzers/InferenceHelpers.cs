@@ -7,29 +7,15 @@ namespace WabbitBot.Generator.Shared.Analyzers;
 /// </summary>
 public static class InferenceHelpers
 {
-    /// <summary>
-    /// Infers the event bus type from a symbol's namespace or attributes.
-    /// </summary>
-    public static EventBusType InferBusType(ISymbol symbol)
-    {
-        // Check for EventType attribute
-        var eventTypeAttr = symbol.GetAttributes()
-            .FirstOrDefault(attr => attr.AttributeClass?.ToDisplayString() == AttributeNames.EventType);
-
-        if (eventTypeAttr != null)
-        {
-            return (EventBusType)eventTypeAttr.ConstructorArguments.FirstOrDefault().Value!;
-        }
-
-        // Infer from namespace
-        var ns = symbol.ContainingNamespace?.ToDisplayString();
-        if (ns?.Contains("DiscBot") == true)
-            return EventBusType.DiscBot;
-        if (ns?.Contains("Core") == true)
-            return EventBusType.Core;
-
-        return EventBusType.Global; // Default
-    }
+    // /// <summary>
+    // /// Infers the event bus type from a symbol's namespace or attributes.
+    // /// </summary>
+    // public static EventBusType InferBusType(ISymbol symbol)
+    // {
+    //     // TODO: Remove this after implementing EventGeneratorAttribute, if
+    //     // still not needed.
+    //     return EventBusType.Global; // Default
+    // }
 
     /// <summary>
     /// Infers an event name from a method name.

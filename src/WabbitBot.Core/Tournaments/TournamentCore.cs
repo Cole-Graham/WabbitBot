@@ -4,7 +4,7 @@ using WabbitBot.Core.Common.BotCore;
 using WabbitBot.Core.Common.Models.Common;
 using WabbitBot.Core.Common.Models.Tournament;
 using WabbitBot.Core.Common.Services;
-using WabbitBot.Common.Events.EventInterfaces;
+using WabbitBot.Common.Events.Interfaces;
 using WabbitBot.Common.Data.Service;
 using WabbitBot.Common.ErrorService;
 using WabbitBot.Common.Models;

@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
 using WabbitBot.Common.Events;
-using WabbitBot.Common.Events.EventInterfaces;
+using WabbitBot.Common.Events.Interfaces;
 
 namespace WabbitBot.DiscBot;
 

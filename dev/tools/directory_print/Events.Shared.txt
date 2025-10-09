@@ -1,0 +1,13 @@
+📁 Users
+│
+  📁 coleg
+  │
+    📁 Projects
+    │
+      📁 WabbitBot
+      │
+        📁 src
+          📁 WabbitBot.Events.Shared
+            ├── 📄 Class1.cs
+            ├── 📄 ScrimmageEvents.cs
+            └── 📄 WabbitBot.Events.Shared.csproj

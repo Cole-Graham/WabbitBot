@@ -1,4 +1,5 @@
-using WabbitBot.Common.Events.EventInterfaces;
+using WabbitBot.Common.Events.Interfaces;
+using WabbitBot.Common.Attributes;
 
 namespace WabbitBot.Core.Common.Events;
 
@@ -8,14 +9,15 @@ namespace WabbitBot.Core.Common.Events;
 /// </summary>
 
 /// <summary>
-/// Global event requesting match provisioning (threads, containers).
-/// Published by Core to request DiscBot create Discord UI.
-/// Owned by Core; DiscBot will receive generated copy.
-/// Can be auto-generated via [EventTrigger] in step 6 with targets: Both.
+/// Core event indicating a match has been created.
+/// Published locally within Core when match is created.
 /// </summary>
-public record MatchProvisioningRequested(
-    Guid MatchId,
-    Guid ScrimmageId
+[EventGenerator(
+    pubTargetClass: "WabbitBot.Core.Common.Models.Common.MatchCore",
+    subTargetClasses: ["WabbitBot.DiscBot.App.Handlers.MatchHandler"])]
+public record ScrimmageMatchCreated(
+    ulong ScrimmageChannelId,
+    Guid MatchId
 ) : IEvent
 {
     public Guid EventId { get; init; } = Guid.NewGuid();
@@ -27,7 +29,10 @@ public record MatchProvisioningRequested(
 /// Core event indicating a match has started.
 /// Published locally within Core when match begins.
 /// </summary>
-public record MatchStartedEvent(
+public record ScrimmageMatchStartedEvent(
+    ulong ScrimmageChannelId,
+    ulong team1ThreadId,
+    ulong team2ThreadId,
     Guid MatchId
 ) : IEvent
 {
@@ -40,7 +45,10 @@ public record MatchStartedEvent(
 /// Core event indicating a match has completed.
 /// Published locally within Core when match finishes.
 /// </summary>
-public record MatchCompletedEvent(
+public record ScrimmageMatchCompletedEvent(
+    ulong ScrimmageChannelId,
+    ulong team1ThreadId,
+    ulong team2ThreadId,
     Guid MatchId,
     Guid WinnerTeamId
 ) : IEvent

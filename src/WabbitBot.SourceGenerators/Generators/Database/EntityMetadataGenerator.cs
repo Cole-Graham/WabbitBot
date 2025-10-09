@@ -193,9 +193,16 @@ namespace WabbitBot.SourceGenerators.Generators.Database
             sb.AppendLine("        /// </summary>");
             sb.AppendLine("        public static IEnumerable<IEntityConfig> GetAllConfigurations()");
             sb.AppendLine("        {");
-            foreach (var m in entityMetadata)
+            if (entityMetadata.Any())
             {
-                sb.AppendLine($"            yield return {m.ClassName};");
+                foreach (var m in entityMetadata)
+                {
+                    sb.AppendLine($"            yield return {m.ClassName};");
+                }
+            }
+            else
+            {
+                sb.AppendLine("            yield break;");
             }
             sb.AppendLine("        }");
 

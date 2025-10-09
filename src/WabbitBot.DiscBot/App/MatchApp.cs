@@ -1,85 +1,80 @@
+using System.Security.Cryptography.X509Certificates;
+using DSharpPlus.Commands.ArgumentModifiers;
+using DSharpPlus.Entities;
 using WabbitBot.Common.Attributes;
-using WabbitBot.Common.Events.EventInterfaces;
+using WabbitBot.Common.Data.Interfaces;
+using WabbitBot.Common.Events.Interfaces;
+using WabbitBot.Common.Models;
+using WabbitBot.Core.Common.Models.Common;
+using WabbitBot.Core.Common.Services;
 using WabbitBot.DiscBot.App.Events;
+using WabbitBot.DiscBot.App.Interfaces;
 using WabbitBot.DiscBot.App.Services.DiscBot;
 
-namespace WabbitBot.DiscBot.App;
-
-/// <summary>
-/// This app is library-agnostic and communicates only via events.
-/// </summary>
-[EventGenerator(GenerateSubscribers = true, DefaultBus = EventBusType.DiscBot, TriggerMode = "OptIn")]
-public partial class MatchApp : IMatchApp
+namespace WabbitBot.DiscBot.App
 {
-    /// <summary>
-    /// Initializes the app by subscribing to relevant events.
-    /// This will be replaced by generated code once EventGenerator is implemented.
-    /// </summary>
-    public void Initialize()
+    public partial class MatchApp : IMatchApp
     {
-        DiscBotService.EventBus.Subscribe<MatchThreadCreated>(OnMatchThreadCreatedAsync);
-    }
+        // Create Match threads
+        public static async Task<Result> CreateMatchThreadsAsync(ulong scrimmageChannelId, Guid matchId)
+        {
+            var client = DiscordClientProvider.GetClient();
+            var scrimmageChannel = await client.GetChannelAsync(scrimmageChannelId);
+            var matchResult = await CoreService.Matches.GetByIdAsync(matchId, DatabaseComponent.Repository);
+            if (!matchResult.Success)
+            {
+                return Result.Failure("Match not found");
+            }
+            if (matchResult.Data == null)
+            {
+                return Result.Failure("Match not found");
+            }
+            var match = matchResult.Data!;
 
-    /// <summary>
-    /// Handles match provisioning requests from Core.
-    /// Publishes DiscBot-local events to create threads and containers.
-    /// NOTE: This will be auto-subscribed to MatchProvisioningRequested (Global) once EventGenerator is implemented in step 6.
-    /// The MatchProvisioningRequested event is owned by Core and will be generated/copied to DiscBot by source generators.
-    /// </summary>
-    public async Task HandleMatchProvisioningRequestedAsync(Guid matchId, Guid scrimmageId)
-    {
-        // App layer requests thread creation; Renderer will perform the actual Discord API call
-        await DiscBotService.PublishAsync(new MatchThreadCreateRequested(matchId, scrimmageId));
-    }
+            // Query to get all MashinaUsers for match.Team1PlayerIds and match.Team2PlayerIds
+            // Figure out how complex queries are supposed to work, for now just do it in memory.
+            var team1Mentions = new List<string>();
+            foreach (var playerId in match.Team1PlayerIds)
+            {
+                var playerResult = await CoreService.Players.GetByIdAsync(playerId, DatabaseComponent.Repository);
+                if (playerResult.Success && playerResult.Data?.MashinaUser?.DiscordMention is not null)
+                {
+                    team1Mentions.Add(playerResult.Data.MashinaUser.DiscordMention);
+                }
+            }
+            var team2Mentions = new List<string>();
+            foreach (var playerId in match.Team2PlayerIds)
+            {
+                var playerResult = await CoreService.Players.GetByIdAsync(playerId, DatabaseComponent.Repository);
+                if (playerResult.Success && playerResult.Data?.MashinaUser?.DiscordMention is not null)
+                {
+                    team2Mentions.Add(playerResult.Data.MashinaUser.DiscordMention);
+                }
+            }
 
-    /// <summary>
-    /// Handles thread creation confirmation to request container creation.
-    /// </summary>
-    public async Task OnMatchThreadCreatedAsync(MatchThreadCreated evt)
-    {
-        // Request match container creation now that thread exists
-        await DiscBotService.PublishAsync(new MatchContainerRequested(evt.MatchId, evt.ThreadId));
-    }
+            // Create standalone threads without starter messages
+            var team1Thread = await scrimmageChannel.CreateThreadAsync(
+                $"{match.Team1.Name} vs. {match.Team2.Name}",
+                DiscordAutoArchiveDuration.Day,
+                DiscordChannelType.PrivateThread);
 
-    #region Map Ban
-    public async Task StartMapBanDMsAsync(Guid matchId, ulong team1DiscordId, ulong team2DiscordId)
-    {
-        await DiscBotService.PublishAsync(new MapBanDmStartRequested(matchId, team1DiscordId));
-        await DiscBotService.PublishAsync(new MapBanDmStartRequested(matchId, team2DiscordId));
-    }
+            var team2Thread = await scrimmageChannel.CreateThreadAsync(
+                $"{match.Team2.Name} vs. {match.Team1.Name}",
+                DiscordAutoArchiveDuration.Day,
+                DiscordChannelType.PrivateThread);
 
-    public async Task OnTeamMapBanSelectedAsync(Guid matchId, ulong teamId, string[] selections)
-    {
-        await DiscBotService.PublishAsync(new MapBanDmUpdateRequested(matchId, teamId, selections));
-    }
+            // Build messages
+            var team1Message = new DiscordMessageBuilder()
+                .WithContent($"{match.Team1.Name}: " + string.Join(", ", team1Mentions));
+            var team2Message = new DiscordMessageBuilder()
+                .WithContent($"{match.Team2.Name}: " + string.Join(", ", team2Mentions));
 
-    public async Task OnTeamMapBanConfirmedAsync(Guid matchId, ulong teamId, string[] selections)
-    {
-        await DiscBotService.PublishAsync(new MapBanDmConfirmRequested(matchId, teamId, selections));
-    }
+            // Send messages to threads
+            await team1Thread.SendMessageAsync(team1Message);
+            await team2Thread.SendMessageAsync(team2Message);
 
-    /// <summary>
-    /// Handles player map ban selection (provisional).
-    /// Updates the DM preview with the selected bans.
-    /// </summary>
-    public async Task OnPlayerMapBanSelectedAsync(Guid matchId, ulong playerId, string[] selections)
-    {
-        // Publish event to update DM preview; Renderer will update the Discord message
-        await DiscBotService.PublishAsync(new MapBanDmUpdateRequested(matchId, playerId, selections));
-    }
+            return Result.CreateSuccess();
+        }
 
-    /// <summary>
-    /// Handles player map ban confirmation (final).
-    /// Locks the DM UI and prepares for next phase.
-    /// </summary>
-    public async Task OnPlayerMapBanConfirmedAsync(Guid matchId, ulong playerId, string[] selections)
-    {
-        // Publish event to lock DM UI; Renderer will disable components
-        await DiscBotService.PublishAsync(new MapBanDmConfirmRequested(matchId, playerId, selections));
-
-        // TODO: Check if both players have confirmed, then trigger next phase (deck submission)
-        // This will be coordinated via a flow orchestrator or match state tracker
     }
-    #endregion
 }
-

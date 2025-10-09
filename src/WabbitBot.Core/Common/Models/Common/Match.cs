@@ -6,12 +6,20 @@ namespace WabbitBot.Core.Common.Models.Common
     #region TeamSize
     public enum TeamSize
     {
-        OneVOne,
-        TwoVTwo,
-        ThreeVThree,
-        FourVFour
+        OneVOne = 0,
+        TwoVTwo = 1,
+        ThreeVThree = 2,
+        FourVFour = 3
+    }
+
+    public enum TeamSizeRosterGroup
+    {
+        Solo = 0,  // 1v1
+        Duo = 1,  // 2v2
+        Squad = 2,  // 3v3 and 4v4
     }
     #endregion
+
     #region MatchParticipant
     [EntityMetadata(
         tableName: "match_participants",
@@ -31,44 +39,13 @@ namespace WabbitBot.Core.Common.Models.Common
         public Guid TeamId { get; set; }
         public virtual Team Team { get; set; } = null!;
 
-        public List<Guid> PlayerIds { get; set; } = new();
-        public virtual ICollection<Player> Players { get; set; } = new List<Player>();
+        public List<Guid> PlayerIds { get; set; } = [];
+        public virtual ICollection<Player> Players { get; set; } = [];
 
         // State properties
         public bool IsWinner { get; set; }
         public int TeamNumber { get; set; } // 1 or 2
-        public DateTime JoinedAt { get; set; }
-
-        public override Domain Domain => Domain.Common;
-    }
-    #endregion
-
-    #region TeamOpponentEncounter
-    [EntityMetadata(
-        tableName: "team_opponent_encounters",
-        archiveTableName: "team_opponent_encounter_archive",
-        maxCacheSize: 2000,
-        cacheExpiryMinutes: 60,
-        servicePropertyName: "TeamOpponentEncounters",
-        emitCacheRegistration: true,
-        emitArchiveRegistration: true
-    )]
-    public class TeamOpponentEncounter : Entity, IMatchEntity
-    {
-        // Navigation properties
-        public Guid MatchId { get; set; }
-        public virtual Match Match { get; set; } = null!;
-
-        public Guid TeamId { get; set; }
-        public virtual Team Team { get; set; } = null!;
-
-        public Guid OpponentId { get; set; }
-        public virtual Team Opponent { get; set; } = null!;
-
-        // State properties
-        public int TeamSize { get; set; } // Using int instead of enum for DB compatibility
-        public DateTime EncounteredAt { get; set; }
-        public bool Won { get; set; }
+        public DateTime? JoinedAt { get; set; }
 
         public override Domain Domain => Domain.Common;
     }
@@ -87,16 +64,15 @@ namespace WabbitBot.Core.Common.Models.Common
     public class Match : Entity, IMatchEntity
     {
         // Navigation properties
-        public virtual ICollection<Game> Games { get; set; } = new List<Game>();
-        public virtual ICollection<MatchParticipant> Participants { get; set; } = new List<MatchParticipant>();
-        public virtual ICollection<TeamOpponentEncounter> OpponentEncounters { get; set; } = new List<TeamOpponentEncounter>();
-        public ICollection<MatchStateSnapshot> StateHistory { get; set; } = new List<MatchStateSnapshot>();
-
         public Guid Team1Id { get; set; }
-        public virtual Team Team1 { get; set; } = null!;
-
         public Guid Team2Id { get; set; }
+        public List<Guid> Team1PlayerIds { get; set; } = []; // Selected players for challenger team
+        public List<Guid> Team2PlayerIds { get; set; } = []; // Selected players for opponent team
+        public virtual Team Team1 { get; set; } = null!;
         public virtual Team Team2 { get; set; } = null!;
+        public virtual ICollection<MatchParticipant> Participants { get; set; } = [];
+        public ICollection<MatchStateSnapshot> StateHistory { get; set; } = [];
+        public virtual ICollection<Game> Games { get; set; } = [];
 
         // Core match data
         public TeamSize TeamSize { get; set; }
@@ -106,17 +82,15 @@ namespace WabbitBot.Core.Common.Models.Common
         public Guid? ParentId { get; set; } // ID of parent Scrimmage, Tournament, or Casual match
         public MatchParentType? ParentType { get; set; } // Type of parent (Scrimmage, Tournament, or Casual)
         public int BestOf { get; set; } = 1; // Number of games to win the match
-        public bool PlayToCompletion { get; set; } // Whether all games must be played even after winner is determined
-
-        public List<Guid> Team1PlayerIds { get; set; } = new();
-        public List<Guid> Team2PlayerIds { get; set; } = new();
+        public bool PlayToCompletion { get; set; } // Used for tournament matches.
 
         // Map ban properties
-        public List<string> AvailableMaps { get; set; } = new(); // Maps available for the match
-        public List<string> Team1MapBans { get; set; } = new(); // Maps banned by team 1
-        public List<string> Team2MapBans { get; set; } = new(); // Maps banned by team 2
-        public DateTime? Team1MapBansSubmittedAt { get; set; }
-        public DateTime? Team2MapBansSubmittedAt { get; set; }
+        public List<string> AvailableMaps { get; set; } = []; // Maps available for the match
+        public List<string> FinalMapPool { get; set; } = []; // Maps used in the match
+        public List<string> Team1MapBans { get; set; } = []; // Maps banned by team 1
+        public List<string> Team2MapBans { get; set; } = []; // Maps banned by team 2
+        public DateTime? Team1MapBansConfirmedAt { get; set; }
+        public DateTime? Team2MapBansConfirmedAt { get; set; }
 
         // Discord Thread Management
         public ulong? ChannelId { get; set; } // Discord channel ID where the match threads are created
@@ -164,10 +138,9 @@ namespace WabbitBot.Core.Common.Models.Common
         public virtual Match Match { get; set; } = null!;
 
         // Snapshot metadata
-        public DateTime Timestamp { get; set; }
         public Guid TriggeredByUserId { get; set; } = Guid.Empty; // User who triggered this state change
         public string TriggeredByUserName { get; set; } = string.Empty; // Username (denormalized for historical completeness)
-        public Dictionary<string, object> AdditionalData { get; set; } = new();
+        public Dictionary<string, object> AdditionalData { get; set; } = [];
 
         // Match lifecycle properties
         public DateTime? StartedAt { get; set; }
@@ -191,14 +164,15 @@ namespace WabbitBot.Core.Common.Models.Common
         public string? FinalScore { get; set; }
 
         // Map ban state properties
-        public List<string> AvailableMaps { get; set; } = new();
-        public List<string> Team1MapBans { get; set; } = new();
-        public List<string> Team2MapBans { get; set; } = new();
+        public List<string> AvailableMaps { get; set; } = [];
+        public List<string> FinalMapPool { get; set; } = [];
+        public List<string> Team1MapBans { get; set; } = [];
+        public List<string> Team2MapBans { get; set; } = [];
         public bool Team1BansSubmitted { get; set; }
         public bool Team2BansSubmitted { get; set; }
         public bool Team1BansConfirmed { get; set; }
         public bool Team2BansConfirmed { get; set; }
-        public List<string> FinalMapPool { get; set; } = new();
+
 
         public override Domain Domain => Domain.Common;
     }
@@ -258,13 +232,13 @@ namespace WabbitBot.Core.Common.Models.Common
         public Guid? Team2DivisionId { get; set; }
         public virtual Division? Team2Division { get; set; }
 
-        public ICollection<GameStateSnapshot> StateHistory { get; set; } = new List<GameStateSnapshot>();
+        public ICollection<GameStateSnapshot> StateHistory { get; set; } = [];
 
         // Game data
         public TeamSize TeamSize { get; set; }
         public int GameNumber { get; set; } // Position in the match (1-based)
-        public List<Guid> Team1PlayerIds { get; set; } = new();
-        public List<Guid> Team2PlayerIds { get; set; } = new();
+        public List<Guid> Team1PlayerIds { get; set; } = [];
+        public List<Guid> Team2PlayerIds { get; set; } = [];
 
         public override Domain Domain => Domain.Common;
     }
@@ -328,7 +302,7 @@ namespace WabbitBot.Core.Common.Models.Common
         public DateTime Timestamp { get; set; }
         public Guid TriggeredByUserId { get; set; } = Guid.Empty; // User who triggered this state change
         public string TriggeredByUserName { get; set; } = string.Empty; // Username (denormalized for historical completeness)
-        public Dictionary<string, object> AdditionalData { get; set; } = new();
+        public Dictionary<string, object> AdditionalData { get; set; } = [];
 
         // Game lifecycle properties
         public DateTime? StartedAt { get; set; }
@@ -364,8 +338,8 @@ namespace WabbitBot.Core.Common.Models.Common
         // and to preserve complete historical record even if Game entity is modified
         public Guid MapId { get; set; }
         public TeamSize TeamSize { get; set; }
-        public List<Guid> Team1PlayerIds { get; set; } = new();
-        public List<Guid> Team2PlayerIds { get; set; } = new();
+        public List<Guid> Team1PlayerIds { get; set; } = [];
+        public List<Guid> Team2PlayerIds { get; set; } = [];
         public int GameNumber { get; set; } = 1;
 
         // Division tracking (denormalized for historical completeness)

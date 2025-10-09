@@ -2,7 +2,7 @@
 // using System.Collections.Generic;
 // using System.Linq;
 // using System.Threading.Tasks;
-// using WabbitBot.Common.Events.EventInterfaces;
+// using WabbitBot.Common.Events.Interfaces;
 // using WabbitBot.Common.ErrorHandling;
 // using WabbitBot.Core.Common.Models.Common;
 // using WabbitBot.Core.Scrimmages;

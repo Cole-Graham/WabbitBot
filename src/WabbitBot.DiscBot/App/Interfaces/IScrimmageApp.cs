@@ -1,10 +1,13 @@
-namespace WabbitBot.DiscBot.App;
+using WabbitBot.Common.Models;
 
-/// <summary>
-/// Interface for scrimmage app operations.
-/// </summary>
-public interface IScrimmageApp : IDiscBotApp
+
+namespace WabbitBot.DiscBot.App.Interfaces
 {
-    // Placeholder
-}
+    /// <summary>
+    /// Interface for scrimmage app operations.
+    /// </summary>
+    public interface IScrimmageApp : IDiscBotApp
+    {
 
+    }
+}

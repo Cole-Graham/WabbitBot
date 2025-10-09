@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using WabbitBot.Core.Common.Events;
 
 namespace WabbitBot.Core.Common.Models.Common
 {
@@ -30,7 +31,7 @@ namespace WabbitBot.Core.Common.Models.Common
                 /// </summary>
                 public void CaptureStateSnapshot(MatchStateSnapshot snapshot)
                 {
-                    snapshot.Timestamp = DateTime.UtcNow;
+                    snapshot.CreatedAt = DateTime.UtcNow;
 
                     // Add to history
                     if (!_stateHistory.ContainsKey(snapshot.MatchId))
@@ -119,8 +120,8 @@ namespace WabbitBot.Core.Common.Models.Common
                         AvailableMaps = match.AvailableMaps,
                         Team1MapBans = match.Team1MapBans,
                         Team2MapBans = match.Team2MapBans,
-                        Team1BansSubmitted = match.Team1MapBansSubmittedAt.HasValue,
-                        Team2BansSubmitted = match.Team2MapBansSubmittedAt.HasValue,
+                        Team1BansSubmitted = match.Team1MapBansConfirmedAt.HasValue,
+                        Team2BansSubmitted = match.Team2MapBansConfirmedAt.HasValue,
                         Team1BansConfirmed = currentSnapshot.Team1BansConfirmed,
                         Team2BansConfirmed = currentSnapshot.Team2BansConfirmed,
                         FinalMapPool = currentSnapshot.FinalMapPool,

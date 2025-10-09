@@ -1,0 +1,14 @@
+📁 Users
+│
+  📁 coleg
+  │
+    📁 Projects
+    │
+      📁 WabbitBot
+      │
+        📁 src
+          📁 WabbitBot.SourceGenerators.Tests
+            ├── 📁 Generators
+            │   ├── 📄 DbContextGeneratorSnapshotTests.cs
+            │   └── 📄 EventBoundaryGeneratorTests.cs
+            └── 📄 WabbitBot.SourceGenerators.Tests.csproj

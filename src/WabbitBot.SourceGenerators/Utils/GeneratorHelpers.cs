@@ -173,7 +173,7 @@ namespace WabbitBot.SourceGenerators.Utils
                 "using System;",
                 "using System.Threading.Tasks;",
                 "using WabbitBot.Common.Events;",
-                "using WabbitBot.Common.Events.EventInterfaces;"
+                "using WabbitBot.Common.Events.Interfaces;"
             };
 
             usings.AddRange(additionalUsings);

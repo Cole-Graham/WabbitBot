@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using WabbitBot.Core.Common.BotCore;
-using WabbitBot.Common.Events.EventInterfaces;
+using WabbitBot.Common.Events.Interfaces;
 using WabbitBot.Common.ErrorService;
 using WabbitBot.Common.Attributes;
 using WabbitBot.Core.Common.Services;

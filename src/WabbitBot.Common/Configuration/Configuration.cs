@@ -1,5 +1,5 @@
 // Modern .NET Configuration System for WabbitBot
-using WabbitBot.Common.Events.EventInterfaces;
+using WabbitBot.Common.Events.Interfaces;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 
@@ -54,11 +54,30 @@ namespace WabbitBot.Common.Configuration
             if (_botOptions.Scrimmage.KFactor <= 0)
                 throw new InvalidOperationException("K-factor must be positive");
 
-            if (_botOptions.Scrimmage.MaxRosterSize <= 0)
-                throw new InvalidOperationException("Max roster size must be positive");
+            // Validate roster size ranges
+            if (_botOptions.Scrimmage.RosterSizeRanges.Solo.Min <= 0 || _botOptions.Scrimmage.RosterSizeRanges.Solo.Max <= 0)
+                throw new InvalidOperationException("Solo roster size range must be positive");
+
+            if (_botOptions.Scrimmage.RosterSizeRanges.Duo.Min <= 0 || _botOptions.Scrimmage.RosterSizeRanges.Duo.Max <= 0)
+                throw new InvalidOperationException("Duo roster size range must be positive");
+
+            if (_botOptions.Scrimmage.RosterSizeRanges.Squad.Min <= 0 || _botOptions.Scrimmage.RosterSizeRanges.Squad.Max <= 0)
+                throw new InvalidOperationException("Squad roster size range must be positive");
+
+            if (_botOptions.Scrimmage.RosterSizeRanges.Solo.Min > _botOptions.Scrimmage.RosterSizeRanges.Solo.Max)
+                throw new InvalidOperationException("Solo roster minimum cannot exceed maximum");
+
+            if (_botOptions.Scrimmage.RosterSizeRanges.Duo.Min > _botOptions.Scrimmage.RosterSizeRanges.Duo.Max)
+                throw new InvalidOperationException("Duo roster minimum cannot exceed maximum");
+
+            if (_botOptions.Scrimmage.RosterSizeRanges.Squad.Min > _botOptions.Scrimmage.RosterSizeRanges.Squad.Max)
+                throw new InvalidOperationException("Squad roster minimum cannot exceed maximum");
 
             if (_botOptions.Scrimmage.MaxConcurrentScrimmages <= 0)
                 throw new InvalidOperationException("Max concurrent scrimmages must be positive");
+
+            if (_botOptions.Scrimmage.BestOf <= 0)
+                throw new InvalidOperationException("Scrimmage best of must be positive");
 
             // Validate tournament configuration
             if (_botOptions.Tournament.BracketSize <= 0)
@@ -159,6 +178,7 @@ namespace WabbitBot.Common.Configuration
 
     public class ChannelsOptions
     {
+        public const string SectionName = "Bot:Channels";
         public ulong? BotChannel { get; set; } = null;
         public ulong? ReplayChannel { get; set; } = null;
         public ulong? DeckChannel { get; set; } = null;
@@ -169,6 +189,7 @@ namespace WabbitBot.Common.Configuration
 
     public class RolesOptions
     {
+        public const string SectionName = "Bot:Roles";
         public ulong? Whitelisted { get; set; } = null;
         public ulong? Admin { get; set; } = null;
         public ulong? Moderator { get; set; } = null;
@@ -176,6 +197,7 @@ namespace WabbitBot.Common.Configuration
 
     public class ActivityOptions
     {
+        public const string SectionName = "Bot:Activity";
         public string Type { get; set; } = "Playing";
         public string Name { get; set; } = "Wabbit Wars";
     }
@@ -183,13 +205,14 @@ namespace WabbitBot.Common.Configuration
     public class ScrimmageOptions
     {
         public const string SectionName = "Bot:Scrimmage";
-        public int MaxRosterSize { get; set; } = 10; // Number of players in a team
+        public RosterSizeRanges RosterSizeRanges { get; set; } = new();
         public int TeamJoinLimit { get; set; } = 5; // Number of teams a player can join
         public int RejoinTeamAfterDays { get; set; } = 7; // Timeout for re-joining a team
         public int MaxConcurrentScrimmages { get; set; } = 10;
         public string RatingSystem { get; set; } = "elo";
         public double InitialRating { get; set; } = 1000;
         public double KFactor { get; set; } = 40;
+        public int BestOf { get; set; } = 1;
 
         // Rating System Constants
         public double EloDivisor { get; set; } = 400.0;
@@ -249,6 +272,8 @@ namespace WabbitBot.Common.Configuration
 
     public class RatingDecayOptions
     {
+        public const string SectionName = "Bot:Leaderboard:RatingDecay";
+
         public bool Enabled { get; set; } = true;
         public double DecayRatePerWeek { get; set; } = 25;
         public double MinimumRating { get; set; } = 1000;
@@ -277,6 +302,8 @@ namespace WabbitBot.Common.Configuration
 
     public class MapConfiguration
     {
+        public const string SectionName = "Bot:Maps";
+
         public string Name { get; set; } = string.Empty;
         public string Size { get; set; } = string.Empty;
         public string Density { get; set; } = "Medium"; // "Low", "Medium", or "High"
@@ -285,8 +312,20 @@ namespace WabbitBot.Common.Configuration
         public bool IsInTournamentPool { get; set; } = true;
     }
 
+    public class RosterSizeRanges
+    {
+        public const string SectionName = "Bot:Scrimmage:RosterSizeRanges";
+        public RosterSizeRange Solo { get; set; } = new(1, 1);
+        public RosterSizeRange Duo { get; set; } = new(4, 5);
+        public RosterSizeRange Squad { get; set; } = new(8, 10);
+    }
+
+    public record RosterSizeRange(int Min, int Max);
+
     public class DivisionConfiguration
     {
+        public const string SectionName = "Bot:Divisions";
+
         public string Name { get; set; } = string.Empty;
         public string Faction { get; set; } = string.Empty; // "BLUFOR" or "REDFOR"
         public string? Description { get; set; }

@@ -9,28 +9,30 @@
         📁 src
           📁 WabbitBot.SourceGenerators
             ├── 📁 Attributes
-            │   ├── 📄 GenerateCrossBoundaryAttribute.cs
-            │   ├── 📄 GenerateEmbedFactoryAttribute.cs
-            │   ├── 📄 GenerateEmbedStylingAttribute.cs
-            │   ├── 📄 GenerateImplementationAttribute.cs
-            │   └── 📄 WabbitCommandAttribute.cs
+            │   ├── 📄 Attributes.Core.cs
+            │   ├── 📄 Attributes.DiscBot.cs
+            │   └── 📄 Attributes.cs
             ├── 📁 Generators
             │   ├── 📁 Command
             │   │   └── 📄 CommandGenerator.cs
-            │   ├── 📁 Common
-            │   │   ├── 📄 BaseGenerator.cs
-            │   │   ├── 📄 GeneratorHelpers.cs
-            │   │   └── 📄 SourceWriter.cs
-            │   ├── 📁 CrossBoundary
-            │   │   └── 📄 CrossBoundaryGenerator.cs
-            │   ├── 📁 Embed
-            │   │   ├── 📄 EmbedFactoryGenerator.cs
-            │   │   └── 📄 EmbedStylingGenerator.cs
+            │   ├── 📁 Database
+            │   │   ├── 📄 DatabaseServiceGenerator.cs
+            │   │   ├── 📄 DbContextGenerator.cs
+            │   │   └── 📄 EntityMetadataGenerator.cs
             │   └── 📁 Event
-            │       └── 📄 EventBusSourceGenerator.cs
+            │       └── 📄 EventGenerator.cs
+            ├── 📁 Shared
+            │   └── 📄 IsExternalInit.cs
             ├── 📁 Templates
             │   ├── 📄 CommandTemplate.cs
+            │   ├── 📄 CommonTemplates.cs
             │   ├── 📄 EmbedTemplate.cs
-            │   └── 📄 EventTemplate.cs
+            │   └── 📄 EventTemplates.cs
+            ├── 📁 Utils
+            │   ├── 📄 CompilationGating.cs
+            │   ├── 📄 GeneratorHelpers.cs
+            │   ├── 📄 PipelineExtensions.cs
+            │   ├── 📄 SourceEmitter.cs
+            │   └── 📄 SyntaxExtensions.cs
             ├── 📄 README.md
             └── 📄 WabbitBot.SourceGenerators.csproj

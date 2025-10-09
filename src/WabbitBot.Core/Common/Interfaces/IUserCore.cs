@@ -6,26 +6,26 @@ namespace WabbitBot.Core.Common.Interfaces
     /// <summary>
     /// Interface for user-related core operations
     /// </summary>
-    public interface IUserCore : ICore
+    public interface IMashinaUserCore : ICore
     {
         /// <summary>
         /// Updates the last active timestamp for a user
         /// </summary>
-        Task<Result> UpdateLastActiveAsync(Guid userId);
+        Task<Result> UpdateLastActiveAsync(Guid mashinaUserId);
 
         /// <summary>
         /// Sets the active state of a user
         /// </summary>
-        Task<Result> SetActiveAsync(Guid userId, bool isActive);
+        Task<Result> SetActiveAsync(Guid mashinaUserId, bool isActive);
 
         /// <summary>
         /// Links a player to a user
         /// </summary>
-        Task<Result> LinkPlayerAsync(Guid userId, Guid playerId);
+        Task<Result> LinkPlayerAsync(Guid mashinaUserId, Guid playerId);
 
         /// <summary>
         /// Unlinks the player from a user
         /// </summary>
-        Task<Result> UnlinkPlayerAsync(Guid userId);
+        Task<Result> UnlinkPlayerAsync(Guid mashinaUserId);
     }
 }

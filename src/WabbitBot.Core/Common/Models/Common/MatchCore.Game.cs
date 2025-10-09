@@ -192,6 +192,7 @@ namespace WabbitBot.Core.Common.Models.Common
 
         public partial class Validation
         {
+            
             // ------------------------ Validation Logic -----------------------------------
             // No validation needed for TeamSize as it's a simple enum
             // Future: Add business rule validations here

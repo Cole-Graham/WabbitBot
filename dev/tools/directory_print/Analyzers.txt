@@ -1,0 +1,17 @@
+📁 Users
+│
+  📁 coleg
+  │
+    📁 Projects
+    │
+      📁 WabbitBot
+      │
+        📁 src
+          📁 WabbitBot.Analyzers
+            ├── 📁 Analyzers
+            │   └── 📄 EntityMetadataAnalyzer.cs
+            ├── 📁 Descriptors
+            │   └── 📄 EventAnalyzerDescriptors.cs
+            ├── 📄 AnalyzerReleases.Shipped.md
+            ├── 📄 AnalyzerReleases.Unshipped.md
+            └── 📄 WabbitBot.Analyzers.csproj

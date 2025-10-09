@@ -286,3 +286,85 @@ Is this within the same project boundary?
    - [x] 7e. All singleton/static patterns removed. `ConfigurationHandler` now uses `CoreService.ErrorHandler` directly.
 
 
+
+8. Complete Implementation Steps (Development) ✅ EXECUTION GUIDE
+
+   This section provides a concise, end-to-end checklist to take the component model design
+   from the current state to a working end-user experience. It assumes Steps 1–7 are complete
+   per this plan.
+
+   8.1. Component Models — define or refine POCOs (no inheritance)
+   - [x] Keep component models organized under `src/WabbitBot.DiscBot/DSharpPlus/ComponentModels/` by domain
+         (`ScrimmageComponents.cs`, `MatchComponents.cs`, `GameComponents.cs`).
+   - [x] For each visual, define a POCO with only view data and:
+         - `public required DiscordContainerComponent ComponentType { get; init; }`
+         - `[GenerateComponentFactory(Theme = "Info", SupportsAttachments = true)]` if images may be attached
+   - [x] Scrimmage: ensure `ChallengeContainer` exists and is annotated.
+   - [x] Match: ensure `MatchContainer` exists and is annotated.
+   - [x] Game: ensure `GameContainer` exists and is annotated.
+   - [x] Add required models in `MatchComponents.cs`: `MatchOverviewContainer`,
+         `MapBanProceedingsContainer`, `MatchCompleteContainer`.
+
+   8.2. Source Generator — verify factory generation
+   - [x] Build the solution: `dotnet build`.
+   - [x] Confirm `ComponentFactoryGenerator` emits `ComponentFactories.g.cs` with one method per model:
+         - `WabbitBot.DiscBot.DSharpPlus.Factories.ComponentFactory.Build{ModelName}(model)`
+         - Returns `VisualBuildResult.FromContainer(model.ComponentType, attachment: model.Attachment)` when the model supports attachments
+   - [x] Do not change generator wiring; it is already integrated and scoped to DiscBot.
+   - [x] Keep embeds reserved for future use; current models follow the Container pattern only.
+
+   8.3. Asset resolution — CDN-first with attachment fallback
+   - [x] When a model needs an image (banners, thumbnails), resolve via `DiscBotService.AssetResolver`:
+         - Use helpers like `ResolveMapThumbnailAsync(mapName)` when appropriate.
+         - Otherwise call `ResolveAssetAsync(assetType, assetId)` with a clear `assetType` (e.g., `mapthumbnail`).
+   - [x] If a CDN URL is returned, use it inside the built container content.
+   - [x] If an `AttachmentHint` is returned, set the container to reference `attachment://{CanonicalFileName}`
+         and pass the hint along with the visual (see 8.5).
+   - [x] Default/placeholder images live under `data/images/default/discord`; canonical names should align with
+         design docs (e.g., `match_banner.jpg`, `game_1_banner.jpg`, `leaderboard_1v1_banner.jpg`).
+   - [x] Configuration commands (`/config images`, `/maps`) should upload and register overrides; CDN links are
+         captured via the existing URL capture utilities.
+
+   8.4. Build the container components (render-time)
+   - [ ] Renderer constructs the necessary `DiscordContainerComponent` (using DSharpPlus container APIs).
+   - [ ] Inject view data from the POCO (team names, map pool, instructions, etc.).
+   - [ ] Apply URLs as CDN links when provided; otherwise refer to `attachment://...` if an attachment will be sent.
+   - [ ] Do not embed local filesystem paths in any Discord-visible URL. Follow URL policy strictly.
+
+   8.5. Construct and send visuals
+   - [ ] Create the model instance (e.g., `MatchContainer`) with `ComponentType` set to the built container.
+   - [ ] Build visual via generated factory:
+         - `var visual = ComponentFactory.BuildMatchContainer(model);`
+   - [ ] Send with the helper (validates URLs and attaches files automatically):
+         - `await new DiscordMessageBuilder().WithVisual(visual);`
+   - [ ] If an attachment is required for this visual, ensure the container references it as
+         `attachment://{CanonicalFileName}` and that the model’s attachment hint is provided through the renderer.
+
+   8.6. Commands, interactions, and flows
+   - [ ] Use `DSharpPlus.Commands` only. No `CommandsNext` or `SlashCommands`.
+   - [ ] Commands publish events; renderers subscribe and perform Discord API operations.
+   - [ ] Keep all DSharpPlus API usage within `src/WabbitBot.DiscBot/DSharpPlus/` or `DiscordBot.cs`.
+   - [ ] Avoid runtime DI; use existing static accessors and services per project rules.
+
+   8.7. Validation checklist
+   - [ ] Build succeeds with generators active: `dotnet build`.
+   - [ ] Render a scrimmage challenge: container shows, URLs validate, attachments upload when expected.
+   - [ ] Render a match thread container: map pool displays; default banners display or configured CDN banners load.
+   - [ ] Render a game container: per-game banner/thumbnail flow works with CDN-first and attachment fallback.
+   - [ ] Verify URL policy enforcement (only HTTPS CDN or `attachment://`); no filesystem paths leak.
+   - [ ] Confirm CDN link capture and reporting work (messages produce URLs that are recorded in Core).
+
+   8.8. Operational notes and guardrails
+   - [ ] Maintain vertical slice boundaries and event-driven communication; no DB work through events.
+   - [ ] Do not introduce runtime DI. Follow static service access patterns already established.
+   - [ ] Keep documentation lines under 120 characters and code within established style rules.
+   - [ ] When adding new component models, place them in existing domain files; do not create new files unless
+         analysis shows no suitable location exists.
+
+   8.9. Optional enhancements (defer unless needed now)
+   - [ ] Extend component models that use images with `AttachmentHint? Attachment` and update the renderer to
+         pass this along to `WithVisual`. The current generator already supports the `attachment:` parameter in
+         `VisualBuildResult.FromContainer(...)`, but defaults it to `null`. Passing a non-null hint enables
+         automatic file uploads.
+   - [ ] Introduce theming utilities to act on `Theme` metadata emitted by the generator.
+   - [ ] Add simple embed models and enable the generator’s embed branch when our UX calls for simple responses.

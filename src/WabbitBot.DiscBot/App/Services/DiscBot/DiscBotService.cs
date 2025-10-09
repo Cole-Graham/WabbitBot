@@ -1,6 +1,8 @@
-using WabbitBot.Common.Events.EventInterfaces;
+using DSharpPlus;
+using WabbitBot.Common.Events.Interfaces;
 using WabbitBot.Common.ErrorService;
 using WabbitBot.Common.Models;
+using WabbitBot.DiscBot.App;
 
 
 namespace WabbitBot.DiscBot.App.Services.DiscBot
@@ -17,6 +19,11 @@ namespace WabbitBot.DiscBot.App.Services.DiscBot
         // Static service instances accessible across all projects
         public static IDiscBotEventBus EventBus => _lazyEventBus!.Value;
         public static IErrorService ErrorHandler => _lazyErrorHandler!.Value;
+
+        /// <summary>
+        /// Gets the Discord client instance
+        /// </summary>
+        public static DiscordClient Client => DiscordClientProvider.GetClient();
 
         /// <summary>
         /// Initializes DiscBotService with required dependencies.

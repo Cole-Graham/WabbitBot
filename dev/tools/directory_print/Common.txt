@@ -9,16 +9,19 @@
         📁 src
           📁 WabbitBot.Common
             ├── 📁 Attributes
-            │   ├── 📄 EventBusAttributes.cs
-            │   ├── 📄 GenerateCrossBoundaryAttribute.cs
-            │   ├── 📄 GenerateEmbedFactoryAttribute.cs
-            │   ├── 📄 GenerateEmbedStylingAttribute.cs
-            │   ├── 📄 GenerateImplementationAttribute.cs
-            │   └── 📄 WabbitCommandAttribute.cs
+            │   ├── 📄 Attributes.Core.cs
+            │   ├── 📄 Attributes.DiscBot.cs
+            │   ├── 📄 Attributes.cs
+            │   └── 📄 EventBusAttributes.cs.deprecated
+            ├── 📁 Configuration
+            │   └── 📄 Configuration.cs
             ├── 📁 Data
             │   ├── 📁 Interfaces
+            │   │   ├── 📄 IArchiveProvider.cs
+            │   │   ├── 📄 ICacheProvider.cs
             │   │   ├── 📄 IDatabaseConnection.cs
-            │   │   └── 📄 IDatabaseService.cs
+            │   │   ├── 📄 IDatabaseService.cs
+            │   │   └── 📄 IRepositoryAdapter.cs
             │   ├── 📁 Schema
             │   │   ├── 📁 Interface
             │   │   │   └── 📄 IMigration.cs
@@ -37,26 +40,44 @@
             │   │   │   └── 📄 CreateUserAndPlayerTables.cs
             │   │   └── 📄 SchemaManager.cs
             │   ├── 📁 Service
-            │   │   ├── 📄 ArchiveService.cs
-            │   │   ├── 📄 CacheService.cs
-            │   │   └── 📄 RepositoryService.cs
+            │   │   ├── 📄 DatabaseService.Archive.cs
+            │   │   ├── 📄 DatabaseService.Cache.cs
+            │   │   ├── 📄 DatabaseService.Repository.cs
+            │   │   ├── 📄 DatabaseService.cs
+            │   │   ├── 📄 InMemoryLruCacheProvider.cs
+            │   │   ├── 📄 NoOpArchiveProvider.cs
+            │   │   └── 📄 NoOpCacheProvider.cs
             │   ├── 📁 Utilities
             │   │   ├── 📄 JsonUtil.cs
             │   │   └── 📄 QueryUtil.cs
             │   ├── 📄 Archive.cs
+            │   ├── 📄 ArchiveProviderRegistry.cs
             │   ├── 📄 Cache.cs
+            │   ├── 📄 CacheProviderRegistry.cs
             │   ├── 📄 DatabaseConnection.cs
             │   ├── 📄 DatabaseConnectionProvider.cs
-            │   └── 📄 Repository.cs
-            ├── 📁 ErrorHandling
+            │   ├── 📄 Repository.cs
+            │   └── 📄 RepositoryAdapterRegistry.cs
+            ├── 📁 ErrorService
             │   ├── 📁 ErrorInterfaces
-            │   │   └── 📄 ICoreErrorHandler.cs
-            │   └── 📄 GlobalErrorHandler.cs
+            │   ├── 📄 ErrorComponent.cs
+            │   ├── 📄 ErrorContext.cs
+            │   ├── 📄 ErrorService.Logging.cs
+            │   ├── 📄 ErrorService.Notification.cs
+            │   ├── 📄 ErrorService.Recovery.cs
+            │   ├── 📄 ErrorService.cs
+            │   ├── 📄 GlobalErrorHandler.cs
+            │   └── 📄 IErrorService.cs
             ├── 📁 Events
-            │   ├── 📁 EventInterfaces
+            │   ├── 📁 Core
+            │   │   └── 📄 ScrimmageEvents.cs
+            │   ├── 📁 DiscBot
+            │   ├── 📁 Interfaces
             │   │   ├── 📄 ICoreEventBus.cs
-            │   │   ├── 📄 IDiscordEventBus.cs
+            │   │   ├── 📄 IDiscBotEventBus.cs
             │   │   └── 📄 IEvent.cs
+            │   ├── 📄 AssetEvents.cs
+            │   ├── 📄 DatabaseEvents.cs
             │   ├── 📄 GlobalEventBus.cs
             │   ├── 📄 GlobalEventBusProvider.cs
             │   └── 📄 StartupEvents.cs
@@ -64,5 +85,5 @@
             │   ├── 📄 Entity.cs
             │   └── 📄 Result.cs
             ├── 📁 Utilities
-            ├── 📄 Configuration.cs
+            │   └── 📄 ThumbnailUtility.cs
             └── 📄 WabbitBot.Common.csproj
