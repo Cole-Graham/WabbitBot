@@ -30,7 +30,8 @@ namespace WabbitBot.DiscBot.App.Renderers
             DiscordThreadChannel team2thread,
             Guid matchId,
             int gameNumber,
-            string chosenMap)
+            string chosenMap
+        )
         {
             try
             {
@@ -38,22 +39,23 @@ namespace WabbitBot.DiscBot.App.Renderers
                 var (cdnUrl, attachmentHint) = await DiscBotService.AssetResolver.ResolveMapThumbnailAsync(chosenMap);
 
                 // Build markdown for thumbnail reference
-                string thumbnailMarkdown = cdnUrl is not null
-                    ? $"![Map Thumbnail]({cdnUrl})"
-                    : attachmentHint is not null
-                        ? $"![Map Thumbnail](attachment://{attachmentHint.CanonicalFileName})"
-                        : "_(Thumbnail unavailable)_";
+                string thumbnailMarkdown =
+                    cdnUrl is not null ? $"![Map Thumbnail]({cdnUrl})"
+                    : attachmentHint is not null ? $"![Map Thumbnail](attachment://{attachmentHint.CanonicalFileName})"
+                    : "_(Thumbnail unavailable)_";
 
                 // Compose container content
                 var header = $"**Game {gameNumber}**\n\n";
-                var body = $"Map: **{chosenMap}**\n{thumbnailMarkdown}\n\n"
+                var body =
+                    $"Map: **{chosenMap}**\n{thumbnailMarkdown}\n\n"
                     + "Please play the game and upload the replay when finished.";
 
                 // Build container components
                 var uploadButton = new DiscordButtonComponent(
                     DiscordButtonStyle.Primary,
                     $"upload_replay_{matchId}_{gameNumber}",
-                    "Upload Replay");
+                    "Upload Replay"
+                );
 
                 var components = new List<DiscordComponent>
                 {
@@ -64,8 +66,7 @@ namespace WabbitBot.DiscBot.App.Renderers
                 var container = new DiscordContainerComponent(components);
 
                 // Build message with container and optional attachment
-                var builder = new DiscordMessageBuilder()
-                    .AddContainerComponent(container);
+                var builder = new DiscordMessageBuilder().AddContainerComponent(container);
 
                 if (attachmentHint is not null)
                 {
@@ -80,7 +81,8 @@ namespace WabbitBot.DiscBot.App.Renderers
                         await DiscBotService.ErrorHandler.CaptureAsync(
                             new FileNotFoundException($"Attachment file not found: {filePath}"),
                             $"Failed to attach file: {attachmentHint.CanonicalFileName}",
-                            nameof(RenderGameContainerAsync));
+                            nameof(RenderGameContainerAsync)
+                        );
                     }
                 }
 
@@ -100,7 +102,8 @@ namespace WabbitBot.DiscBot.App.Renderers
                 await DiscBotService.ErrorHandler.CaptureAsync(
                     ex,
                     $"Failed to render game container for match {matchId}, game {gameNumber}",
-                    nameof(RenderGameContainerAsync));
+                    nameof(RenderGameContainerAsync)
+                );
                 return Result.Failure($"Failed to create game container: {ex.Message}");
             }
         }
@@ -117,7 +120,8 @@ namespace WabbitBot.DiscBot.App.Renderers
             DiscordClient client,
             DiscordUser user,
             Guid matchId,
-            int gameNumber)
+            int gameNumber
+        )
         {
             try
             {
@@ -125,12 +129,17 @@ namespace WabbitBot.DiscBot.App.Renderers
                 var submitButton = new DiscordButtonComponent(
                     DiscordButtonStyle.Primary,
                     $"open_deck_modal_{matchId}_{gameNumber}",
-                    "Submit Deck Code");
+                    "Submit Deck Code"
+                );
 
                 var dmChannel = await user.CreateDmChannelAsync();
-                await dmChannel.SendMessageAsync(new DiscordMessageBuilder()
-                    .WithContent($"**Deck Code Submission**\n\nMatch ID: `{matchId}` | Game {gameNumber}\n\nClick the button below to submit your deck code:")
-                    .AddActionRowComponent(submitButton));
+                await dmChannel.SendMessageAsync(
+                    new DiscordMessageBuilder()
+                        .WithContent(
+                            $"**Deck Code Submission**\n\nMatch ID: `{matchId}` | Game {gameNumber}\n\nClick the button below to submit your deck code:"
+                        )
+                        .AddActionRowComponent(submitButton)
+                );
 
                 // Note: The modal will be shown when the button is clicked
                 // The interaction handler will present the modal via ShowModalAsync
@@ -142,10 +151,12 @@ namespace WabbitBot.DiscBot.App.Renderers
                 await DiscBotService.ErrorHandler.CaptureAsync(
                     ex,
                     $"Failed to render deck DM for match {matchId}, game {gameNumber} to user {user.Id}",
-                    nameof(RenderDeckDmStartAsync));
+                    nameof(RenderDeckDmStartAsync)
+                );
                 return Result.Failure($"Failed to send deck DM: {ex.Message}");
             }
         }
+
         private static string ResolveFilePath(string canonicalFileName)
         {
             string relativePath;

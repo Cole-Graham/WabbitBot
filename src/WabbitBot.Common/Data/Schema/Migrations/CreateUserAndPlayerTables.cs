@@ -15,7 +15,8 @@ namespace WabbitBot.Common.Data.Schema.Migrations
             var conn = await connection.GetConnectionAsync();
 
             // Create Users table
-            const string createUsersTable = @"
+            const string createUsersTable =
+                @"
                 CREATE TABLE IF NOT EXISTS Users (
                     Id TEXT PRIMARY KEY,
                     DiscordUserId TEXT UNIQUE NOT NULL,
@@ -33,7 +34,8 @@ namespace WabbitBot.Common.Data.Schema.Migrations
             await QueryUtil.ExecuteNonQueryAsync(conn, createUsersTable);
 
             // Create Players table
-            const string createPlayersTable = @"
+            const string createPlayersTable =
+                @"
                 CREATE TABLE IF NOT EXISTS Players (
                     Id TEXT PRIMARY KEY,
                     Name TEXT NOT NULL,
@@ -50,7 +52,8 @@ namespace WabbitBot.Common.Data.Schema.Migrations
             await QueryUtil.ExecuteNonQueryAsync(conn, createPlayersTable);
 
             // Create UserPlayerHistory table
-            const string createHistoryTable = @"
+            const string createHistoryTable =
+                @"
                 CREATE TABLE IF NOT EXISTS UserPlayerHistory (
                     Id TEXT PRIMARY KEY,
                     UserId TEXT NOT NULL,
@@ -67,7 +70,8 @@ namespace WabbitBot.Common.Data.Schema.Migrations
             await QueryUtil.ExecuteNonQueryAsync(conn, createHistoryTable);
 
             // Create indexes
-            const string createIndexes = @"
+            const string createIndexes =
+                @"
                 CREATE INDEX IF NOT EXISTS idx_users_discord_id ON Users(DiscordUserId);
                 CREATE INDEX IF NOT EXISTS idx_users_current_player ON Users(CurrentPlayerId);
                 CREATE INDEX IF NOT EXISTS idx_players_name ON Players(Name);
@@ -83,7 +87,8 @@ namespace WabbitBot.Common.Data.Schema.Migrations
             var conn = await connection.GetConnectionAsync();
 
             // Drop tables in reverse order
-            const string dropTables = @"
+            const string dropTables =
+                @"
                 DROP TABLE IF EXISTS UserPlayerHistory;
                 DROP TABLE IF EXISTS Players;
                 DROP TABLE IF EXISTS Users;";

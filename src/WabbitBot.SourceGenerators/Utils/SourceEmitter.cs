@@ -1,7 +1,7 @@
 // # Static: IndentedStringBuilder wrappers, templates (replaces SourceWriter)
 
-using Microsoft.CodeAnalysis.Text;
 using System.Text;
+using Microsoft.CodeAnalysis.Text;
 
 namespace WabbitBot.SourceGenerators.Utils;
 
@@ -84,7 +84,13 @@ public static class SourceEmitter
     /// <summary>
     /// Creates a method declaration with optional modifiers.
     /// </summary>
-    public static string CreateMethod(string returnType, string methodName, string parameters, string body, string modifiers = "public")
+    public static string CreateMethod(
+        string returnType,
+        string methodName,
+        string parameters,
+        string body,
+        string modifiers = "public"
+    )
     {
         return $$"""
             {{modifiers}} {{returnType}} {{methodName}}({{parameters}})
@@ -97,7 +103,13 @@ public static class SourceEmitter
     /// <summary>
     /// Creates a property declaration.
     /// </summary>
-    public static string CreateProperty(string type, string name, string? getter = null, string? setter = null, string modifiers = "public")
+    public static string CreateProperty(
+        string type,
+        string name,
+        string? getter = null,
+        string? setter = null,
+        string modifiers = "public"
+    )
     {
         var getterBody = getter != null ? $"get => {getter};" : "";
         var setterBody = setter != null ? $"set => {setter};" : "";
@@ -113,9 +125,12 @@ public static class SourceEmitter
     {
         var indent = new string(' ', spaces);
         var newline = "\n"; // Hardcoded newline instead of Environment.NewLine
-        return string.Join(newline,
-            content.Split(new char[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
-                   .Select(line => string.IsNullOrWhiteSpace(line) ? line : indent + line));
+        return string.Join(
+            newline,
+            content
+                .Split(new char[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(line => string.IsNullOrWhiteSpace(line) ? line : indent + line)
+        );
     }
 
     /// <summary>

@@ -20,7 +20,8 @@ namespace WabbitBot.Core.Common.Interfaces
             List<Player> Team1Players,
             List<Player> Team2Players,
             Player IssuedByPlayer,
-            Player AcceptedByPlayer);
+            Player AcceptedByPlayer
+        );
 
         /// <summary>
         /// Accepts a scrimmage challenge

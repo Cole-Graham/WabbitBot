@@ -1,7 +1,7 @@
-using WabbitBot.Common.Attributes;
-using WabbitBot.Core.Common.Models.Common;
-using WabbitBot.Common.Models;
 using System.ComponentModel;
+using WabbitBot.Common.Attributes;
+using WabbitBot.Common.Models;
+using WabbitBot.Core.Common.Models.Common;
 using WabbitBot.Core.Common.Models.Tournament;
 
 namespace WabbitBot.Core.Common.Models.Leaderboard
@@ -20,13 +20,13 @@ namespace WabbitBot.Core.Common.Models.Leaderboard
         // Navigation properties
         public Guid SeasonId { get; set; }
         public Season Season { get; set; } = new();
-        public virtual ICollection<ScrimmageLeaderboardItem> LeaderboardItems { get; set; } = new List<ScrimmageLeaderboardItem>();
+        public virtual ICollection<ScrimmageLeaderboardItem> LeaderboardItems { get; set; } =
+            new List<ScrimmageLeaderboardItem>();
 
         // Data properties
         public string Name { get; set; } = string.Empty; // For Season names like "Fall 2024", "Season 1", "Preseason 2", etc.
         public TeamSize TeamSize { get; set; }
         public override Domain Domain => Domain.Leaderboard;
-
     }
 
     [EntityMetadata(
@@ -44,9 +44,9 @@ namespace WabbitBot.Core.Common.Models.Leaderboard
         public Guid SeasonId { get; set; }
         public Season Season { get; set; } = new();
         public TeamSize TeamSize { get; set; }
-        public virtual ICollection<TournamentLeaderboardItem> LeaderboardItems { get; set; } = new List<TournamentLeaderboardItem>();
+        public virtual ICollection<TournamentLeaderboardItem> LeaderboardItems { get; set; } =
+            new List<TournamentLeaderboardItem>();
         public override Domain Domain => Domain.Leaderboard;
-
     }
 
     [EntityMetadata(
@@ -79,27 +79,27 @@ namespace WabbitBot.Core.Common.Models.Leaderboard
         public double RecentRatingChange { get; set; }
 
         public override Domain Domain => Domain.Leaderboard;
-
     }
 
     [EntityMetadata(
-    tableName: "tournament_leaderboard_items",
-    archiveTableName: "tournament_leaderboard_item_archive",
-    maxCacheSize: 2000,
-    cacheExpiryMinutes: 15,
-    servicePropertyName: "TournamentLeaderboardItems",
-    emitCacheRegistration: true,
-    emitArchiveRegistration: true
-)]
+        tableName: "tournament_leaderboard_items",
+        archiveTableName: "tournament_leaderboard_item_archive",
+        maxCacheSize: 2000,
+        cacheExpiryMinutes: 15,
+        servicePropertyName: "TournamentLeaderboardItems",
+        emitCacheRegistration: true,
+        emitArchiveRegistration: true
+    )]
     public class TournamentLeaderboardItem : Entity, ILeaderboardEntity
     {
-        // Navigation properties   
+        // Navigation properties
         public Guid TeamId { get; set; }
         public Team Team { get; set; } = new();
         public List<Guid> PlayerIds { get; set; } = new();
         public ICollection<Player> Players { get; set; } = new List<Player>();
         public Guid TournamentLeaderboardId { get; set; }
         public TournamentLeaderboard TournamentLeaderboard { get; set; } = new();
+
         // Navigation to tournaments this Team has played in
 
         // Data properties
@@ -115,7 +115,6 @@ namespace WabbitBot.Core.Common.Models.Leaderboard
         public DateTime LastUpdated { get; set; }
 
         public override Domain Domain => Domain.Leaderboard;
-
     }
 
     /// <summary>
@@ -137,7 +136,8 @@ namespace WabbitBot.Core.Common.Models.Leaderboard
         public Guid SeasonConfigId { get; set; }
         public SeasonConfig Config { get; set; } = new();
         public ICollection<ScrimmageLeaderboard> ScrimmageLeaderboards { get; set; } = new List<ScrimmageLeaderboard>();
-        public ICollection<TournamentLeaderboard> TournamentLeaderboards { get; set; } = new List<TournamentLeaderboard>();
+        public ICollection<TournamentLeaderboard> TournamentLeaderboards { get; set; } =
+            new List<TournamentLeaderboard>();
 
         // Data properties
         public string Name { get; set; } = string.Empty;
@@ -167,7 +167,5 @@ namespace WabbitBot.Core.Common.Models.Leaderboard
         public double TournamentDecayRatePerWeek { get; set; }
 
         public override Domain Domain => Domain.Leaderboard;
-
     }
-
 }

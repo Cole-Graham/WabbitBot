@@ -10,7 +10,8 @@ namespace WabbitBot.Common.Data.Service;
 /// Repository operations for DatabaseService using PostgreSQL with Npgsql
 /// Implements database CRUD operations using raw SQL queries
 /// </summary>
-public partial class DatabaseService<TEntity> where TEntity : Entity
+public partial class DatabaseService<TEntity>
+    where TEntity : Entity
 {
     // Repository-specific properties and configuration
     private string? _tableName;
@@ -138,7 +139,10 @@ public partial class DatabaseService<TEntity> where TEntity : Entity
         return Array.Empty<TEntity>();
     }
 
-    protected virtual async Task<IEnumerable<TEntity>> GetByDateRangeFromRepositoryAsync(DateTime startDate, DateTime endDate)
+    protected virtual async Task<IEnumerable<TEntity>> GetByDateRangeFromRepositoryAsync(
+        DateTime startDate,
+        DateTime endDate
+    )
     {
         // Prefer EF-level implementation in Core if needed; not provided by adapter by default
         return Array.Empty<TEntity>();

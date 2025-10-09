@@ -15,6 +15,7 @@ namespace WabbitBot.Core.Tests.Common.Events
             // Touch instance to bind to the initialized global bus
             _ = CoreEventBus.Instance;
         }
+
         private record TestGlobalEvent(Guid EventId, DateTime Timestamp) : IEvent
         {
             public EventBusType EventBusType => EventBusType.Global;
@@ -38,7 +39,11 @@ namespace WabbitBot.Core.Tests.Common.Events
 
             var global = GlobalEventBusProvider.GetGlobalEventBus();
             var tcs = new TaskCompletionSource<TestGlobalEvent>();
-            global.Subscribe<TestGlobalEvent>(e => { tcs.TrySetResult(e); return Task.CompletedTask; });
+            global.Subscribe<TestGlobalEvent>(e =>
+            {
+                tcs.TrySetResult(e);
+                return Task.CompletedTask;
+            });
 
             var evt = new TestGlobalEvent(Guid.NewGuid(), DateTime.UtcNow);
             await core.PublishAsync(evt);
@@ -67,5 +72,3 @@ namespace WabbitBot.Core.Tests.Common.Events
         }
     }
 }
-
-

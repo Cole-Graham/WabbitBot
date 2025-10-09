@@ -7,8 +7,8 @@ namespace WabbitBot.Core.Common.Utilities
 {
     public static class ApplicationInfo
     {
-        public static Version CurrentVersion => new(
-            FileVersionInfo.GetVersionInfo(Assembly.GetExecutingAssembly().Location).FileVersion ?? "1.0.0.0");
+        public static Version CurrentVersion =>
+            new(FileVersionInfo.GetVersionInfo(Assembly.GetExecutingAssembly().Location).FileVersion ?? "1.0.0.0");
 
         public static string VersionString => CurrentVersion.ToString(3);
 
@@ -19,7 +19,7 @@ namespace WabbitBot.Core.Common.Utilities
             {
                 ["1.0.x"] = ("001-1.0", "001-1.1"),
                 ["1.1.x"] = ("001-1.0", "002-1.0"),
-                ["1.2.x"] = ("002-1.0", "999-9.9")
+                ["1.2.x"] = ("002-1.0", "999-9.9"),
             };
 
             foreach (var range in ranges)
@@ -45,8 +45,7 @@ namespace WabbitBot.Core.Common.Utilities
 
         private static bool VersionInRange(string version, string min, string max)
         {
-            return string.Compare(version, min) >= 0 &&
-                   string.Compare(version, max) <= 0;
+            return string.Compare(version, min) >= 0 && string.Compare(version, max) <= 0;
         }
     }
 }

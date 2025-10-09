@@ -26,7 +26,8 @@ namespace WabbitBot.Core.Common.Models.Tournament
         public int BestOf { get; set; } = 1; // Number of games to win each match
 
         // State Management Properties - StateHistory stored as JSONB
-        public virtual ICollection<TournamentStateSnapshot> StateHistory { get; set; } = new List<TournamentStateSnapshot>();
+        public virtual ICollection<TournamentStateSnapshot> StateHistory { get; set; } =
+            new List<TournamentStateSnapshot>();
 
         public override Domain Domain => Domain.Tournament;
     }
@@ -38,7 +39,7 @@ namespace WabbitBot.Core.Common.Models.Tournament
         RegistrationClosed,
         InProgress,
         Completed,
-        Cancelled
+        Cancelled,
     }
 
     #region # TournamentStateSnapshot
@@ -56,7 +57,6 @@ namespace WabbitBot.Core.Common.Models.Tournament
     )]
     public class TournamentStateSnapshot : Entity, ITournamentEntity
     {
-
         // Tournament state properties
         public Guid TournamentId { get; set; }
         public DateTime Timestamp { get; set; }
@@ -95,7 +95,6 @@ namespace WabbitBot.Core.Common.Models.Tournament
         public virtual Tournament Tournament { get; set; } = null!;
 
         public override Domain Domain => Domain.Tournament;
-
     }
     #endregion
 }

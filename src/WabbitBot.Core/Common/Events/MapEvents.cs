@@ -11,19 +11,22 @@ public partial record MapsSavedEvent(
     List<Map> Maps,
     EventBusType EventBusType = EventBusType.Core,
     Guid EventId = default,
-    DateTime Timestamp = default) : IEvent;
+    DateTime Timestamp = default
+) : IEvent;
 
 public partial record MapsExportedEvent(
     string Path,
     EventBusType EventBusType = EventBusType.Core,
     Guid EventId = default,
-    DateTime Timestamp = default) : IEvent;
+    DateTime Timestamp = default
+) : IEvent;
 
 public partial record MapsImportedEvent(
     List<Map> Maps,
     EventBusType EventBusType = EventBusType.Core,
     Guid EventId = default,
-    DateTime Timestamp = default) : IEvent;
+    DateTime Timestamp = default
+) : IEvent;
 
 // CRUD events removed: MapAddedEvent, MapUpdatedEvent, MapRemovedEvent, MapThumbnailUpdatedEvent, MapThumbnailRemovedEvent
 // These were database operations and violate the critical principle that events are not for CRUD.

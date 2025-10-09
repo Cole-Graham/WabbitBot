@@ -3,13 +3,21 @@ using System;
 namespace WabbitBot.Common.Models
 {
     public interface ITeamEntity { }
+
     public interface ILeaderboardEntity { }
+
     public interface IMatchEntity { }
+
     public interface IScrimmageEntity { }
+
     public interface ITournamentEntity { }
+
     public interface IPlayerEntity { }
+
     public interface IMashinaUserEntity { }
+
     public interface IMapEntity { }
+
     public interface IDivisionEntity { }
 
     // Domain definition for entities, if you add a new domain, you must add it to the
@@ -19,7 +27,7 @@ namespace WabbitBot.Common.Models
         Common,
         Leaderboard,
         Scrimmage,
-        Tournament
+        Tournament,
     }
 
     /// <summary>

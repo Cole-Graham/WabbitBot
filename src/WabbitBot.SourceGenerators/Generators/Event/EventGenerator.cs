@@ -1,9 +1,9 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using WabbitBot.SourceGenerators.Utils;
 
 namespace WabbitBot.SourceGenerators.Generators.Event
@@ -20,8 +20,10 @@ namespace WabbitBot.SourceGenerators.Generators.Event
             // Register a post-initialization output for diagnostics
             context.RegisterPostInitializationOutput(ctx =>
             {
-                ctx.AddSource("__WG_Init_EventGenerator.g.cs",
-                    "// EventGenerator: Looking for event classes with [EventGenerator] attribute\n");
+                ctx.AddSource(
+                    "__WG_Init_EventGenerator.g.cs",
+                    "// EventGenerator: Looking for event classes with [EventGenerator] attribute\n"
+                );
             });
 
             // Determine which project we're compiling
@@ -29,13 +31,13 @@ namespace WabbitBot.SourceGenerators.Generators.Event
             var isDiscBotProject = context.CompilationProvider.IsDiscBot();
 
             // Find all classes/records with [EventGenerator] attribute in CURRENT project source
-            var eventClasses = context.SyntaxProvider
-                .CreateSyntaxProvider(
+            var eventClasses = context
+                .SyntaxProvider.CreateSyntaxProvider(
                     predicate: static (node, _) =>
                     {
                         // Look for class or record declarations with attributes
-                        return (node is ClassDeclarationSyntax or RecordDeclarationSyntax) &&
-                               ((TypeDeclarationSyntax)node).AttributeLists.Count > 0;
+                        return (node is ClassDeclarationSyntax or RecordDeclarationSyntax)
+                            && ((TypeDeclarationSyntax)node).AttributeLists.Count > 0;
                     },
                     transform: static (ctx, _) =>
                     {
@@ -45,24 +47,29 @@ namespace WabbitBot.SourceGenerators.Generators.Event
                             return null;
 
                         // Check for EventGenerator attribute
-                        var attr = typeSymbol.GetAttributes()
+                        var attr = typeSymbol
+                            .GetAttributes()
                             .FirstOrDefault(a =>
-                                a.AttributeClass?.ToDisplayString() == "WabbitBot.SourceGenerators.Attributes.EventGeneratorAttribute" ||
-                                a.AttributeClass?.ToDisplayString() == "WabbitBot.Common.Attributes.EventGeneratorAttribute");
+                                a.AttributeClass?.ToDisplayString()
+                                    == "WabbitBot.SourceGenerators.Attributes.EventGeneratorAttribute"
+                                || a.AttributeClass?.ToDisplayString()
+                                    == "WabbitBot.Common.Attributes.EventGeneratorAttribute"
+                            );
 
                         if (attr is null)
                             return null;
 
                         return ExtractEventInfo(typeSymbol, attr);
-                    })
+                    }
+                )
                 .Where(static info => info is not null);
 
             // Collect events from source files
             var sourceEvents = eventClasses.Collect();
 
             // Also scan referenced assemblies for events (for cross-project generation)
-            var referencedEvents = context.CompilationProvider
-                .Select((compilation, _) =>
+            var referencedEvents = context.CompilationProvider.Select(
+                (compilation, _) =>
                 {
                     var events = new List<EventInfo>();
 
@@ -76,10 +83,14 @@ namespace WabbitBot.SourceGenerators.Generators.Event
                         // Look for types with EventGenerator attribute
                         foreach (var typeSymbol in GetAllTypes(assembly.GlobalNamespace))
                         {
-                            var attr = typeSymbol.GetAttributes()
+                            var attr = typeSymbol
+                                .GetAttributes()
                                 .FirstOrDefault(a =>
-                                    a.AttributeClass?.ToDisplayString() == "WabbitBot.SourceGenerators.Attributes.EventGeneratorAttribute" ||
-                                    a.AttributeClass?.ToDisplayString() == "WabbitBot.Common.Attributes.EventGeneratorAttribute");
+                                    a.AttributeClass?.ToDisplayString()
+                                        == "WabbitBot.SourceGenerators.Attributes.EventGeneratorAttribute"
+                                    || a.AttributeClass?.ToDisplayString()
+                                        == "WabbitBot.Common.Attributes.EventGeneratorAttribute"
+                                );
 
                             if (attr is not null)
                             {
@@ -117,127 +128,152 @@ namespace WabbitBot.SourceGenerators.Generators.Event
                                 yield return deeplyNested;
                         }
                     }
-                });
+                }
+            );
 
             // Combine source events and referenced events for all generation
-            var allEvents = sourceEvents.Combine(referencedEvents)
-                .Select((data, _) =>
-                {
-                    var (srcEvents, refEvents) = data;
-                    return srcEvents.Concat(refEvents).ToArray();
-                });
+            var allEvents = sourceEvents
+                .Combine(referencedEvents)
+                .Select(
+                    (data, _) =>
+                    {
+                        var (srcEvents, refEvents) = data;
+                        return srcEvents.Concat(refEvents).ToArray();
+                    }
+                );
 
             // Diagnostic output
-            context.RegisterSourceOutput(allEvents, (spc, events) =>
-            {
-                var names = string.Join(", ", events.Select(e => e!.EventClassName));
-                spc.AddSource("__WG_Diagnostic_EventGenerator.g.cs",
-                    $"// Found {events.Length} event generators (source + referenced): {names}\n");
-            });
+            context.RegisterSourceOutput(
+                allEvents,
+                (spc, events) =>
+                {
+                    var names = string.Join(", ", events.Select(e => e!.EventClassName));
+                    spc.AddSource(
+                        "__WG_Diagnostic_EventGenerator.g.cs",
+                        $"// Found {events.Length} event generators (source + referenced): {names}\n"
+                    );
+                }
+            );
 
             // Generate publishers grouped by namespace
             var publisherOutput = allEvents.Combine(context.CompilationProvider);
-            context.RegisterSourceOutput(publisherOutput, (spc, data) =>
-            {
-                var (events, compilation) = data;
-
-                // Filter to events whose pubTargetClass is defined in THIS compilation's source (not references)
-                var eventsForThisCompilation = events
-                    .Where(e => e?.PubTargetClass is not null)
-                    .Where(e =>
-                    {
-                        var targetSymbol = compilation.GetTypeByMetadataName(e!.PubTargetClass!);
-                        // Check that the symbol exists AND is defined in this compilation (not a reference)
-                        return targetSymbol is not null &&
-                               SymbolEqualityComparer.Default.Equals(targetSymbol.ContainingAssembly, compilation.Assembly);
-                    })
-                    .ToList();
-
-                if (!eventsForThisCompilation.Any())
-                    return;
-
-                var grouped = eventsForThisCompilation
-                    .Where(e => e is not null && e.ShouldGeneratePublisher)
-                    .GroupBy(e => GetPublisherFileName(e!.PubTargetClass!));
-
-                foreach (var group in grouped)
+            context.RegisterSourceOutput(
+                publisherOutput,
+                (spc, data) =>
                 {
-                    try
+                    var (events, compilation) = data;
+
+                    // Filter to events whose pubTargetClass is defined in THIS compilation's source (not references)
+                    var eventsForThisCompilation = events
+                        .Where(e => e?.PubTargetClass is not null)
+                        .Where(e =>
+                        {
+                            var targetSymbol = compilation.GetTypeByMetadataName(e!.PubTargetClass!);
+                            // Check that the symbol exists AND is defined in this compilation (not a reference)
+                            return targetSymbol is not null
+                                && SymbolEqualityComparer.Default.Equals(
+                                    targetSymbol.ContainingAssembly,
+                                    compilation.Assembly
+                                );
+                        })
+                        .ToList();
+
+                    if (!eventsForThisCompilation.Any())
+                        return;
+
+                    var grouped = eventsForThisCompilation
+                        .Where(e => e is not null && e.ShouldGeneratePublisher)
+                        .GroupBy(e => GetPublisherFileName(e!.PubTargetClass!));
+
+                    foreach (var group in grouped)
                     {
-                        var source = GeneratePublishers(group.ToList()!);
-                        spc.AddSource($"{group.Key}_Publishers.g.cs", source);
-                    }
-                    catch (Exception ex)
-                    {
-                        spc.AddSource($"{group.Key}_Publishers_Error.g.cs",
-                            $"// Error generating publishers for {group.Key}: {ex.Message}");
+                        try
+                        {
+                            var source = GeneratePublishers(group.ToList()!);
+                            spc.AddSource($"{group.Key}_Publishers.g.cs", source);
+                        }
+                        catch (Exception ex)
+                        {
+                            spc.AddSource(
+                                $"{group.Key}_Publishers_Error.g.cs",
+                                $"// Error generating publishers for {group.Key}: {ex.Message}"
+                            );
+                        }
                     }
                 }
-            });
+            );
 
             // Generate subscribers grouped by target subscriber classes
             var subscriberOutput = allEvents.Combine(context.CompilationProvider);
-            context.RegisterSourceOutput(subscriberOutput, (spc, data) =>
-            {
-                var (events, compilation) = data;
+            context.RegisterSourceOutput(
+                subscriberOutput,
+                (spc, data) =>
+                {
+                    var (events, compilation) = data;
 
-                // Filter to events whose subscriber target classes are defined in THIS compilation's source
-                var eventsForThisCompilation = events
-                    .Where(e => e is not null && e.ShouldGenerateSubscribers)
-                    .Where(e =>
-                    {
-                        // Check if ANY of the subscriber target classes are defined in this compilation (not references)
-                        return e!.SubTargetClasses.Any(targetClass =>
+                    // Filter to events whose subscriber target classes are defined in THIS compilation's source
+                    var eventsForThisCompilation = events
+                        .Where(e => e is not null && e.ShouldGenerateSubscribers)
+                        .Where(e =>
                         {
+                            // Check if ANY of the subscriber target classes are defined in this compilation (not references)
+                            return e!.SubTargetClasses.Any(targetClass =>
+                            {
+                                var targetSymbol = compilation.GetTypeByMetadataName(targetClass);
+                                return targetSymbol is not null
+                                    && SymbolEqualityComparer.Default.Equals(
+                                        targetSymbol.ContainingAssembly,
+                                        compilation.Assembly
+                                    );
+                            });
+                        })
+                        .ToList();
+
+                    if (!eventsForThisCompilation.Any())
+                        return;
+
+                    // Build per-target-class groups to generate one partial per target class
+                    var byTargetClass = new Dictionary<string, List<EventInfo>>();
+                    foreach (var evt in eventsForThisCompilation)
+                    {
+                        foreach (var targetClass in evt!.SubTargetClasses)
+                        {
+                            // Only emit for classes that exist in this compilation (safety)
                             var targetSymbol = compilation.GetTypeByMetadataName(targetClass);
-                            return targetSymbol is not null &&
-                                   SymbolEqualityComparer.Default.Equals(targetSymbol.ContainingAssembly, compilation.Assembly);
-                        });
-                    })
-                    .ToList();
+                            if (targetSymbol is null)
+                                continue;
 
-                if (!eventsForThisCompilation.Any())
-                    return;
-
-                // Build per-target-class groups to generate one partial per target class
-                var byTargetClass = new Dictionary<string, List<EventInfo>>();
-                foreach (var evt in eventsForThisCompilation)
-                {
-                    foreach (var targetClass in evt!.SubTargetClasses)
-                    {
-                        // Only emit for classes that exist in this compilation (safety)
-                        var targetSymbol = compilation.GetTypeByMetadataName(targetClass);
-                        if (targetSymbol is null)
-                            continue;
-
-                        if (!byTargetClass.TryGetValue(targetClass, out var list))
-                        {
-                            list = new List<EventInfo>();
-                            byTargetClass[targetClass] = list;
+                            if (!byTargetClass.TryGetValue(targetClass, out var list))
+                            {
+                                list = new List<EventInfo>();
+                                byTargetClass[targetClass] = list;
+                            }
+                            list.Add(evt);
                         }
-                        list.Add(evt);
                     }
-                }
 
-                foreach (var kvp in byTargetClass)
-                {
-                    var targetClass = kvp.Key;
-                    var targetEvents = kvp.Value;
-                    try
+                    foreach (var kvp in byTargetClass)
                     {
-                        var source = GenerateSubscribersForTarget(targetClass, targetEvents, compilation);
-                        // Use a stable filename per target class
-                        var safeName = targetClass.Replace('.', '_');
-                        spc.AddSource($"{safeName}_Subscribers.g.cs", source);
-                    }
-                    catch (Exception ex)
-                    {
-                        var safeName = targetClass.Replace('.', '_');
-                        spc.AddSource($"{safeName}_Subscribers_Error.g.cs",
-                            $"// Error generating subscribers for {targetClass}: {ex.Message}");
+                        var targetClass = kvp.Key;
+                        var targetEvents = kvp.Value;
+                        try
+                        {
+                            var source = GenerateSubscribersForTarget(targetClass, targetEvents, compilation);
+                            // Use a stable filename per target class
+                            var safeName = targetClass.Replace('.', '_');
+                            spc.AddSource($"{safeName}_Subscribers.g.cs", source);
+                        }
+                        catch (Exception ex)
+                        {
+                            var safeName = targetClass.Replace('.', '_');
+                            spc.AddSource(
+                                $"{safeName}_Subscribers_Error.g.cs",
+                                $"// Error generating subscribers for {targetClass}: {ex.Message}"
+                            );
+                        }
                     }
                 }
-            });
+            );
         }
 
         private static string GetLastNamespacePart(string fullNamespace)
@@ -306,8 +342,8 @@ namespace WabbitBot.SourceGenerators.Generators.Event
                         case "SubTargetClasses":
                             if (namedArg.Value.Values.Length > 0)
                             {
-                                subTargetClasses = namedArg.Value.Values
-                                    .Select(v => v.Value as string)
+                                subTargetClasses = namedArg
+                                    .Value.Values.Select(v => v.Value as string)
                                     .Where(s => !string.IsNullOrEmpty(s))
                                     .Select(s => s!)
                                     .ToList();
@@ -326,8 +362,8 @@ namespace WabbitBot.SourceGenerators.Generators.Event
                     var arrayArg = attribute.ConstructorArguments[1];
                     if (!arrayArg.IsNull && arrayArg.Values.Length > 0)
                     {
-                        subTargetClasses = arrayArg.Values
-                            .Select(v => v.Value as string)
+                        subTargetClasses = arrayArg
+                            .Values.Select(v => v.Value as string)
                             .Where(s => !string.IsNullOrEmpty(s))
                             .Select(s => s!)
                             .ToList();
@@ -340,8 +376,7 @@ namespace WabbitBot.SourceGenerators.Generators.Event
                 // For records, get primary constructor parameters
                 if (typeSymbol.IsRecord)
                 {
-                    var primaryCtor = typeSymbol.InstanceConstructors
-                        .FirstOrDefault(c => c.Parameters.Length > 0);
+                    var primaryCtor = typeSymbol.InstanceConstructors.FirstOrDefault(c => c.Parameters.Length > 0);
 
                     if (primaryCtor is not null)
                     {
@@ -351,25 +386,35 @@ namespace WabbitBot.SourceGenerators.Generators.Event
                             if (param.Name == "EventId" || param.Name == "Timestamp" || param.Name == "EventBusType")
                                 continue;
 
-                            parameters.Add(new EventParameter(
-                                param.Name,
-                                param.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)));
+                            parameters.Add(
+                                new EventParameter(
+                                    param.Name,
+                                    param.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+                                )
+                            );
                         }
                     }
                 }
                 else
                 {
                     // For classes, get public properties
-                    foreach (var prop in typeSymbol.GetMembers().OfType<IPropertySymbol>()
-                        .Where(p => p.DeclaredAccessibility == Microsoft.CodeAnalysis.Accessibility.Public))
+                    foreach (
+                        var prop in typeSymbol
+                            .GetMembers()
+                            .OfType<IPropertySymbol>()
+                            .Where(p => p.DeclaredAccessibility == Microsoft.CodeAnalysis.Accessibility.Public)
+                    )
                     {
                         // Skip IEvent interface properties
                         if (prop.Name == "EventId" || prop.Name == "Timestamp" || prop.Name == "EventBusType")
                             continue;
 
-                        parameters.Add(new EventParameter(
-                            prop.Name,
-                            prop.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)));
+                        parameters.Add(
+                            new EventParameter(
+                                prop.Name,
+                                prop.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+                            )
+                        );
                     }
                 }
 
@@ -379,7 +424,8 @@ namespace WabbitBot.SourceGenerators.Generators.Event
                     pubTargetClass,
                     subTargetClasses,
                     parameters,
-                    typeSymbol);
+                    typeSymbol
+                );
             }
             catch
             {
@@ -431,11 +477,14 @@ namespace WabbitBot.SourceGenerators.Generators.Event
                 foreach (var evt in classGroup)
                 {
                     // Generate publisher method with simplified type names
-                    var paramList = string.Join(", ", evt.Parameters.Select(p =>
-                    {
-                        var simplifiedType = SimplifyTypeName(p.Type);
-                        return $"{simplifiedType} {ToCamelCase(p.Name)}";
-                    }));
+                    var paramList = string.Join(
+                        ", ",
+                        evt.Parameters.Select(p =>
+                        {
+                            var simplifiedType = SimplifyTypeName(p.Type);
+                            return $"{simplifiedType} {ToCamelCase(p.Name)}";
+                        })
+                    );
                     var methodName = $"Publish{evt.EventClassName}Async";
 
                     sb.AppendLine($"        /// <summary>");
@@ -464,8 +513,12 @@ namespace WabbitBot.SourceGenerators.Generators.Event
                     sb.AppendLine("            }");
                     sb.AppendLine("            catch (Exception ex)");
                     sb.AppendLine("            {");
-                    sb.AppendLine($"                await CoreService.ErrorHandler.CaptureAsync(ex, \"Failed to publish {evt.EventClassName}\", \"{methodName}\");");
-                    sb.AppendLine($"                return Result.Failure(\"Failed to publish {evt.EventClassName}: \" + ex.Message);");
+                    sb.AppendLine(
+                        $"                await CoreService.ErrorHandler.CaptureAsync(ex, \"Failed to publish {evt.EventClassName}\", \"{methodName}\");"
+                    );
+                    sb.AppendLine(
+                        $"                return Result.Failure(\"Failed to publish {evt.EventClassName}: \" + ex.Message);"
+                    );
                     sb.AppendLine("            }");
                     sb.AppendLine("        }");
                     sb.AppendLine();
@@ -478,7 +531,11 @@ namespace WabbitBot.SourceGenerators.Generators.Event
             return sb.ToString();
         }
 
-        private static string GenerateSubscribersForTarget(string targetClass, List<EventInfo> events, Compilation compilation)
+        private static string GenerateSubscribersForTarget(
+            string targetClass,
+            List<EventInfo> events,
+            Compilation compilation
+        )
         {
             var targetSymbol = compilation.GetTypeByMetadataName(targetClass);
             if (targetSymbol is null)
@@ -554,18 +611,24 @@ namespace WabbitBot.SourceGenerators.Generators.Event
                 var hasExistingHandler = targetSymbol
                     .GetMembers(handlerName)
                     .OfType<IMethodSymbol>()
-                    .Any(m => m.IsStatic &&
-                              m.Parameters.Length == 1 &&
-                              string.Equals(m.Parameters[0].Type.ToDisplayString(), evtFullName, StringComparison.Ordinal));
+                    .Any(m =>
+                        m.IsStatic
+                        && m.Parameters.Length == 1
+                        && string.Equals(m.Parameters[0].Type.ToDisplayString(), evtFullName, StringComparison.Ordinal)
+                    );
 
                 if (hasExistingHandler)
                 {
-                    sb.AppendLine($"            {busAccessor}.Subscribe<{evt.EventClassName}>(async evt => await {targetClassName}.{handlerName}(evt));");
+                    sb.AppendLine(
+                        $"            {busAccessor}.Subscribe<{evt.EventClassName}>(async evt => await {targetClassName}.{handlerName}(evt));"
+                    );
                 }
                 else
                 {
                     // Wire to a generated local handler stub to keep compile green
-                    sb.AppendLine($"            {busAccessor}.Subscribe<{evt.EventClassName}>(async evt => await {handlerName}(evt));");
+                    sb.AppendLine(
+                        $"            {busAccessor}.Subscribe<{evt.EventClassName}>(async evt => await {handlerName}(evt));"
+                    );
                 }
             }
 
@@ -581,9 +644,11 @@ namespace WabbitBot.SourceGenerators.Generators.Event
                 var hasExistingHandler = targetSymbol
                     .GetMembers(handlerName)
                     .OfType<IMethodSymbol>()
-                    .Any(m => m.IsStatic &&
-                              m.Parameters.Length == 1 &&
-                              string.Equals(m.Parameters[0].Type.ToDisplayString(), evtFullName, StringComparison.Ordinal));
+                    .Any(m =>
+                        m.IsStatic
+                        && m.Parameters.Length == 1
+                        && string.Equals(m.Parameters[0].Type.ToDisplayString(), evtFullName, StringComparison.Ordinal)
+                    );
 
                 if (!hasExistingHandler)
                 {
@@ -618,8 +683,14 @@ namespace WabbitBot.SourceGenerators.Generators.Event
             {
                 var simpleName = typeName.Substring("System.".Length);
                 // Keep common types simple
-                if (simpleName == "Guid" || simpleName == "String" || simpleName == "Int32" ||
-                    simpleName == "Boolean" || simpleName == "DateTime" || simpleName == "Double")
+                if (
+                    simpleName == "Guid"
+                    || simpleName == "String"
+                    || simpleName == "Int32"
+                    || simpleName == "Boolean"
+                    || simpleName == "DateTime"
+                    || simpleName == "Double"
+                )
                 {
                     return simpleName;
                 }
@@ -652,7 +723,8 @@ namespace WabbitBot.SourceGenerators.Generators.Event
         string? PubTargetClass,
         List<string> SubTargetClasses,
         List<EventParameter> Parameters,
-        INamedTypeSymbol EventClassSymbol)
+        INamedTypeSymbol EventClassSymbol
+    )
     {
         public bool ShouldGeneratePublisher => !string.IsNullOrEmpty(PubTargetClass);
         public bool ShouldGenerateSubscribers => SubTargetClasses?.Any() ?? false;
@@ -661,7 +733,5 @@ namespace WabbitBot.SourceGenerators.Generators.Event
     /// <summary>
     /// Local copy of EventParameter metadata.
     /// </summary>
-    internal record EventParameter(
-        string Name,
-        string Type);
+    internal record EventParameter(string Name, string Type);
 }

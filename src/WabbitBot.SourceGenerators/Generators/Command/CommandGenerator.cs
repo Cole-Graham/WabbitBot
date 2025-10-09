@@ -1,11 +1,11 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Text;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Text;
 using WabbitBot.Analyzers.Descriptors;
 using WabbitBot.Generator.Shared.Analyzers;
 using WabbitBot.SourceGenerators.Templates;
@@ -24,51 +24,61 @@ public class CommandGenerator : IIncrementalGenerator
         var isDiscBotProject = context.CompilationProvider.IsDiscBot();
 
         // Pipeline: Filter classes with [WabbitCommand] attribute
-        var commandClasses = context.SyntaxProvider.CreateSyntaxProvider(
+        var commandClasses = context
+            .SyntaxProvider.CreateSyntaxProvider(
                 predicate: (node, _) => node.HasAttribute("WabbitCommand"),
                 transform: (ctx, ct) =>
                 {
                     ct.ThrowIfCancellationRequested();
                     var classSymbol = ctx.SemanticModel.GetDeclaredSymbol(ctx.Node) as INamedTypeSymbol;
                     return classSymbol!;
-                })
+                }
+            )
             .Collect();
 
         // Generate registration handler
-        var registrationSource = commandClasses.Select((classes, ct) =>
-        {
-            ct.ThrowIfCancellationRequested();
-            return GenerateCommandRegistration(classes.Where(c => c != null).ToList()!);
-        });
-
+        var registrationSource = commandClasses.Select(
+            (classes, ct) =>
+            {
+                ct.ThrowIfCancellationRequested();
+                return GenerateCommandRegistration(classes.Where(c => c != null).ToList()!);
+            }
+        );
 
         // Generate event-raising partial classes
         var eventRaisingClasses = commandClasses
-            .SelectMany((classes, ct) =>
-            {
-                ct.ThrowIfCancellationRequested();
-                return classes.Where(c => c != null).Select(c => GenerateEventRaisingPartial(c!));
-            })
+            .SelectMany(
+                (classes, ct) =>
+                {
+                    ct.ThrowIfCancellationRequested();
+                    return classes.Where(c => c != null).Select(c => GenerateEventRaisingPartial(c!));
+                }
+            )
             .Collect();
 
-        context.RegisterSourceOutput(registrationSource.Combine(isDiscBotProject), (spc, tuple) =>
-        {
-            if (!tuple.Right)
-                return;
-            spc.AddSource("CommandRegistrationHandler.g.cs", tuple.Left);
-        });
-
-        context.RegisterSourceOutput(eventRaisingClasses.Combine(isDiscBotProject), (spc, tuple) =>
-        {
-            if (!tuple.Right)
-                return;
-            foreach (var cls in tuple.Left)
+        context.RegisterSourceOutput(
+            registrationSource.Combine(isDiscBotProject),
+            (spc, tuple) =>
             {
-                spc.AddSource(cls.FileName, cls.Content);
+                if (!tuple.Right)
+                    return;
+                spc.AddSource("CommandRegistrationHandler.g.cs", tuple.Left);
             }
-        });
-    }
+        );
 
+        context.RegisterSourceOutput(
+            eventRaisingClasses.Combine(isDiscBotProject),
+            (spc, tuple) =>
+            {
+                if (!tuple.Right)
+                    return;
+                foreach (var cls in tuple.Left)
+                {
+                    spc.AddSource(cls.FileName, cls.Content);
+                }
+            }
+        );
+    }
 
     private SourceText GenerateCommandRegistration(List<INamedTypeSymbol> commandClasses)
     {
@@ -91,7 +101,9 @@ public class CommandGenerator : IIncrementalGenerator
             var discordClassName = businessClassName + "Discord";
 
             builder.AppendLine($"            // Auto-register generated Discord command class");
-            builder.AppendLine($"            await commands.RegisterCommands<{discordClassName}>(0); // Guild ID 0 = global");
+            builder.AppendLine(
+                $"            await commands.RegisterCommands<{discordClassName}>(0); // Guild ID 0 = global"
+            );
         }
 
         builder.AppendLine("        }");
@@ -104,11 +116,12 @@ public class CommandGenerator : IIncrementalGenerator
     private (string FileName, SourceText Content) GenerateEventRaisingPartial(INamedTypeSymbol commandClass)
     {
         var className = commandClass.Name;
-        var methods = commandClass.GetMembers()
+        var methods = commandClass
+            .GetMembers()
             .OfType<IMethodSymbol>()
-            .Where(m => m.DeclaredAccessibility == Accessibility.Public &&
-                       !m.IsStatic &&
-                       m.MethodKind == MethodKind.Ordinary)
+            .Where(m =>
+                m.DeclaredAccessibility == Accessibility.Public && !m.IsStatic && m.MethodKind == MethodKind.Ordinary
+            )
             .ToList();
 
         var eventRaisers = new StringBuilder();
@@ -126,30 +139,38 @@ public class CommandGenerator : IIncrementalGenerator
                 methodName: $"Raise{method.Name}EventAsync",
                 parameters: paramList,
                 body: $$"""
-                    ArgumentNullException.ThrowIfNull(_eventBus);
-                    var @event = new {{eventName}}({{paramAssignments}}, EventBusType = EventBusType.DiscBot);
-                    await _eventBus.PublishAsync(@event);
-                    """,
-                modifiers: "partial");
+                ArgumentNullException.ThrowIfNull(_eventBus);
+                var @event = new {{eventName}}({{paramAssignments}}, EventBusType = EventBusType.DiscBot);
+                await _eventBus.PublishAsync(@event);
+                """,
+                modifiers: "partial"
+            );
 
-            eventRaisers.AppendLine(CommonTemplates.CreateGeneratedDoc($"Raises {eventName} event after command execution."));
+            eventRaisers.AppendLine(
+                CommonTemplates.CreateGeneratedDoc($"Raises {eventName} event after command execution.")
+            );
             eventRaisers.AppendLine(raiserMethod);
             eventRaisers.AppendLine();
         }
 
         var constructorParams = string.Join(", ", dependencies.Select(d => $"{d.Item1} {d.Item2}"));
-        var fieldAssignments = string.Join("\n    ",
-            dependencies.Select(d => $"private readonly {d.Item1} _{d.Item2};"));
+        var fieldAssignments = string.Join(
+            "\n    ",
+            dependencies.Select(d => $"private readonly {d.Item1} _{d.Item2};")
+        );
 
         var constructor = SourceEmitter.CreateMethod(
             returnType: "",
             methodName: className,
             parameters: constructorParams,
             body: string.Join("\n        ", dependencies.Select(d => $"_{d.Item2} = {d.Item2};")),
-            modifiers: "public");
+            modifiers: "public"
+        );
 
-        var classContent = SourceEmitter.CreatePartialClass(className,
-            $"{fieldAssignments}\n\n{constructor}\n\n{eventRaisers}");
+        var classContent = SourceEmitter.CreatePartialClass(
+            className,
+            $"{fieldAssignments}\n\n{constructor}\n\n{eventRaisers}"
+        );
 
         var content = $$"""
             // <auto-generated>
@@ -164,5 +185,4 @@ public class CommandGenerator : IIncrementalGenerator
 
         return ($"{className}.Events.g.cs", content.ToSourceText());
     }
-
 }

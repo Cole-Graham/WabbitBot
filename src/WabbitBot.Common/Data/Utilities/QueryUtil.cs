@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
-using System.Threading.Tasks;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace WabbitBot.Common.Data.Utilities
 {
@@ -12,7 +12,8 @@ namespace WabbitBot.Common.Data.Utilities
             IDbConnection connection,
             string sql,
             object? parameters = null,
-            IDbTransaction? transaction = null)
+            IDbTransaction? transaction = null
+        )
         {
             ArgumentNullException.ThrowIfNull(connection);
             ArgumentNullException.ThrowIfNull(sql);
@@ -25,7 +26,8 @@ namespace WabbitBot.Common.Data.Utilities
             IDbConnection connection,
             string sql,
             object? parameters = null,
-            IDbTransaction? transaction = null)
+            IDbTransaction? transaction = null
+        )
         {
             ArgumentNullException.ThrowIfNull(connection);
             ArgumentNullException.ThrowIfNull(sql);
@@ -46,7 +48,8 @@ namespace WabbitBot.Common.Data.Utilities
             string sql,
             Func<IDataReader, T> mapper,
             object? parameters = null,
-            IDbTransaction? transaction = null)
+            IDbTransaction? transaction = null
+        )
         {
             ArgumentNullException.ThrowIfNull(connection);
             ArgumentNullException.ThrowIfNull(sql);
@@ -68,7 +71,8 @@ namespace WabbitBot.Common.Data.Utilities
             IDbConnection connection,
             string sql,
             object? parameters = null,
-            IDbTransaction? transaction = null)
+            IDbTransaction? transaction = null
+        )
         {
             ArgumentNullException.ThrowIfNull(connection);
             ArgumentNullException.ThrowIfNull(sql);
@@ -116,7 +120,8 @@ namespace WabbitBot.Common.Data.Utilities
             IEnumerable<string>? columns = null,
             string? whereClause = null,
             string? orderByClause = null,
-            int? limit = null)
+            int? limit = null
+        )
         {
             ArgumentNullException.ThrowIfNull(tableName);
 

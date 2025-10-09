@@ -1,7 +1,3 @@
 using System;
 
-
-namespace WabbitBot.SourceGenerators.Attributes
-{
-
-}
+namespace WabbitBot.SourceGenerators.Attributes { }

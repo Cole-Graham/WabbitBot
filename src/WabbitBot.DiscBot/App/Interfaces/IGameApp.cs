@@ -9,7 +9,12 @@ namespace WabbitBot.DiscBot.App.Interfaces
         /// <summary>
         /// Starts the deck submission DM flow for players before a game.
         /// </summary>
-        Task StartDeckSubmissionDMsAsync(Guid matchId, int gameNumber, ulong player1DiscordUserId, ulong player2DiscordUserId);
+        Task StartDeckSubmissionDMsAsync(
+            Guid matchId,
+            int gameNumber,
+            ulong player1DiscordUserId,
+            ulong player2DiscordUserId
+        );
 
         /// <summary>
         /// Handles player deck code submission (provisional).

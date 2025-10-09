@@ -4,7 +4,6 @@ namespace WabbitBot.Generator.Shared;
 /// Types needed for event generation that are shared between generators.
 /// These are duplicated to avoid circular dependencies.
 /// </summary>
-
 /// <summary>
 /// Event bus types for routing events.
 /// </summary>
@@ -23,7 +22,7 @@ public enum EventBusType
     /// <summary>
     /// Discord event bus for UI/interaction events.
     /// </summary>
-    DiscBot
+    DiscBot,
 }
 
 /// <summary>

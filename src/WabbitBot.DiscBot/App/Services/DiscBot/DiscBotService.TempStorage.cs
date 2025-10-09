@@ -49,7 +49,8 @@ namespace WabbitBot.DiscBot.App.Services.DiscBot
                     if (!_isInitialized)
                     {
                         throw new InvalidOperationException(
-                            "TempStorage has not been initialized. Call Initialize() first.");
+                            "TempStorage has not been initialized. Call Initialize() first."
+                        );
                     }
 
                     return _tempDirectory;
@@ -162,7 +163,8 @@ namespace WabbitBot.DiscBot.App.Services.DiscBot
                                 await DiscBotService.ErrorHandler.CaptureAsync(
                                     new InvalidOperationException($"Cleaned up {deletedCount} temp files"),
                                     $"Temp storage cleanup removed {deletedCount} old file(s)",
-                                    nameof(StartPeriodicCleanup));
+                                    nameof(StartPeriodicCleanup)
+                                );
                             }
                         }
                         catch (Exception ex)
@@ -170,7 +172,8 @@ namespace WabbitBot.DiscBot.App.Services.DiscBot
                             await DiscBotService.ErrorHandler.CaptureAsync(
                                 ex,
                                 "Temp storage cleanup failed",
-                                nameof(StartPeriodicCleanup));
+                                nameof(StartPeriodicCleanup)
+                            );
                         }
                     }
                 });

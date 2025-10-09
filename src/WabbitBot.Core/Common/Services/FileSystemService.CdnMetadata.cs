@@ -19,7 +19,8 @@ public partial class FileSystemService
         string canonicalFileName,
         string cdnUrl,
         ulong? messageId = null,
-        ulong? channelId = null)
+        ulong? channelId = null
+    )
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(canonicalFileName);
         ArgumentException.ThrowIfNullOrWhiteSpace(cdnUrl);
@@ -44,9 +45,7 @@ public partial class FileSystemService
 
         lock (_cdnMetadataCache)
         {
-            return _cdnMetadataCache.TryGetValue(canonicalFileName, out var metadata)
-                ? metadata
-                : null;
+            return _cdnMetadataCache.TryGetValue(canonicalFileName, out var metadata) ? metadata : null;
         }
     }
 
@@ -103,7 +102,7 @@ public partial class FileSystemService
             canonicalFileName,
             cdnMetadata?.CdnUrl, // Prefer CDN URL when available
             cdnMetadata is null ? relativePathUnderAppBase : null, // Only provide path if no CDN
-            Guid.Empty); // Correlation ID set by caller
+            Guid.Empty
+        ); // Correlation ID set by caller
     }
 }
-

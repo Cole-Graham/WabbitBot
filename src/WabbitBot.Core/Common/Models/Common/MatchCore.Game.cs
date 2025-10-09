@@ -1,5 +1,3 @@
-
-
 namespace WabbitBot.Core.Common.Models.Common
 {
     public partial class MatchCore
@@ -85,10 +83,14 @@ namespace WabbitBot.Core.Common.Models.Common
             public static GameStatus GetCurrentStatus(Game game)
             {
                 var snapshot = GetCurrentSnapshot(game);
-                if (snapshot.CompletedAt.HasValue) return GameStatus.Completed;
-                if (snapshot.CancelledAt.HasValue) return GameStatus.Cancelled;
-                if (snapshot.ForfeitedAt.HasValue) return GameStatus.Forfeited;
-                if (snapshot.StartedAt.HasValue) return GameStatus.InProgress;
+                if (snapshot.CompletedAt.HasValue)
+                    return GameStatus.Completed;
+                if (snapshot.CancelledAt.HasValue)
+                    return GameStatus.Cancelled;
+                if (snapshot.ForfeitedAt.HasValue)
+                    return GameStatus.Forfeited;
+                if (snapshot.StartedAt.HasValue)
+                    return GameStatus.InProgress;
                 return GameStatus.Created;
             }
 
@@ -127,15 +129,19 @@ namespace WabbitBot.Core.Common.Models.Common
         {
             public class GameState
             {
-
                 // ------------------------ State Machine Definition ---------------------------
                 private static readonly Dictionary<GameStatus, List<GameStatus>> _validTransitions = new()
                 {
                     [GameStatus.Created] = new() { GameStatus.InProgress, GameStatus.Cancelled },
-                    [GameStatus.InProgress] = new() { GameStatus.Completed, GameStatus.Cancelled, GameStatus.Forfeited },
+                    [GameStatus.InProgress] = new()
+                    {
+                        GameStatus.Completed,
+                        GameStatus.Cancelled,
+                        GameStatus.Forfeited,
+                    },
                     [GameStatus.Completed] = new(), // Terminal state
                     [GameStatus.Cancelled] = new(), // Terminal state
-                    [GameStatus.Forfeited] = new(),  // Terminal state
+                    [GameStatus.Forfeited] = new(), // Terminal state
                 };
 
                 // ------------------------ State Machine Logic --------------------------------
@@ -153,7 +159,13 @@ namespace WabbitBot.Core.Common.Models.Common
                         : new List<GameStatus>();
                 }
 
-                public static bool TryTransition(Game game, GameStatus toState, Guid userId, string userName, string? reason = null)
+                public static bool TryTransition(
+                    Game game,
+                    GameStatus toState,
+                    Guid userId,
+                    string userName,
+                    string? reason = null
+                )
                 {
                     if (!CanTransition(game, toState))
                         return false;
@@ -192,7 +204,7 @@ namespace WabbitBot.Core.Common.Models.Common
 
         public partial class Validation
         {
-            
+
             // ------------------------ Validation Logic -----------------------------------
             // No validation needed for TeamSize as it's a simple enum
             // Future: Add business rule validations here

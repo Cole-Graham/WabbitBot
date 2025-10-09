@@ -1,17 +1,17 @@
 using DSharpPlus;
 using DSharpPlus.Entities;
 using DSharpPlus.EventArgs;
+using WabbitBot.Common.Attributes;
 using WabbitBot.Common.Configuration;
 using WabbitBot.Common.Data.Interfaces;
+using WabbitBot.Common.Events.Core;
 using WabbitBot.Common.Models;
+using WabbitBot.Core.Common.Models.Scrimmage;
 using WabbitBot.Core.Common.Services;
+using WabbitBot.Core.Scrimmages;
 using WabbitBot.DiscBot.App;
 using WabbitBot.DiscBot.App.Events;
 using WabbitBot.DiscBot.App.Services.DiscBot;
-using WabbitBot.Common.Attributes;
-using WabbitBot.Core.Scrimmages;
-using WabbitBot.Core.Common.Models.Scrimmage;
-using WabbitBot.Common.Events.Core;
 
 /// <summary>
 /// Handles button and component interactions for scrimmage flows.
@@ -29,7 +29,8 @@ namespace WabbitBot.DiscBot.App.Handlers
         {
             // Get scrimmage channel from config
             var scrimmageChannelId = ConfigurationProvider
-                .GetSection<ChannelsOptions>(ChannelsOptions.SectionName).ScrimmageChannel;
+                .GetSection<ChannelsOptions>(ChannelsOptions.SectionName)
+                .ScrimmageChannel;
             if (scrimmageChannelId is null)
             {
                 return Result.Failure("Scrimmage channel not found");
@@ -37,7 +38,10 @@ namespace WabbitBot.DiscBot.App.Handlers
 
             // Update scrimmage to accepted
             var challengeId = evt.ChallengeId;
-            var challengeResult = await CoreService.ScrimmageChallenges.GetByIdAsync(challengeId, DatabaseComponent.Repository);
+            var challengeResult = await CoreService.ScrimmageChallenges.GetByIdAsync(
+                challengeId,
+                DatabaseComponent.Repository
+            );
             if (!challengeResult.Success)
             {
                 return Result.Failure("Failed to get challenge");
@@ -48,7 +52,10 @@ namespace WabbitBot.DiscBot.App.Handlers
                 return Result.Failure("Challenge not found");
             }
             challenge.ChallengeStatus = ScrimmageChallengeStatus.Accepted;
-            var updateResult = await CoreService.ScrimmageChallenges.UpdateAsync(challenge, DatabaseComponent.Repository);
+            var updateResult = await CoreService.ScrimmageChallenges.UpdateAsync(
+                challenge,
+                DatabaseComponent.Repository
+            );
             if (!updateResult.Success)
             {
                 return Result.Failure("Failed to update scrimmage challenge");
@@ -65,7 +72,10 @@ namespace WabbitBot.DiscBot.App.Handlers
         /// Returns Result indicating success/failure for immediate feedback.
         /// Publishes events for cross-boundary communication.
         /// </summary>
-        public static async Task<Result> HandleButtonInteractionAsync(DiscordClient client, ComponentInteractionCreatedEventArgs args)
+        public static async Task<Result> HandleButtonInteractionAsync(
+            DiscordClient client,
+            ComponentInteractionCreatedEventArgs args
+        )
         {
             var interaction = args.Interaction;
             var customId = interaction.Data.CustomId;
@@ -91,7 +101,8 @@ namespace WabbitBot.DiscBot.App.Handlers
                 await DiscBotService.ErrorHandler.CaptureAsync(
                     ex,
                     $"Failed to handle button interaction: {customId}",
-                    nameof(HandleButtonInteractionAsync));
+                    nameof(HandleButtonInteractionAsync)
+                );
 
                 // Try to respond with error - may fail if response was already sent
                 try
@@ -100,7 +111,8 @@ namespace WabbitBot.DiscBot.App.Handlers
                         DiscordInteractionResponseType.ChannelMessageWithSource,
                         new DiscordInteractionResponseBuilder()
                             .WithContent("An error occurred while processing your interaction. Please try again.")
-                            .AsEphemeral());
+                            .AsEphemeral()
+                    );
                 }
                 catch
                 {
@@ -115,7 +127,10 @@ namespace WabbitBot.DiscBot.App.Handlers
         /// Handles string select dropdown interactions (map ban selections).
         /// Returns Result indicating success/failure for immediate feedback.
         /// </summary>
-        public static async Task<Result> HandleSelectMenuInteractionAsync(DiscordClient client, ComponentInteractionCreatedEventArgs args)
+        public static async Task<Result> HandleSelectMenuInteractionAsync(
+            DiscordClient client,
+            ComponentInteractionCreatedEventArgs args
+        )
         {
             var interaction = args.Interaction;
             var customId = interaction.Data.CustomId;
@@ -130,7 +145,8 @@ namespace WabbitBot.DiscBot.App.Handlers
                 await DiscBotService.ErrorHandler.CaptureAsync(
                     ex,
                     $"Failed to handle select menu interaction: {customId}",
-                    nameof(HandleSelectMenuInteractionAsync));
+                    nameof(HandleSelectMenuInteractionAsync)
+                );
 
                 // Try to respond with error - may fail if response was already sent
                 try
@@ -139,7 +155,8 @@ namespace WabbitBot.DiscBot.App.Handlers
                         DiscordInteractionResponseType.ChannelMessageWithSource,
                         new DiscordInteractionResponseBuilder()
                             .WithContent("An error occurred while processing your selection. Please try again.")
-                            .AsEphemeral());
+                            .AsEphemeral()
+                    );
                 }
                 catch
                 {
@@ -169,7 +186,8 @@ namespace WabbitBot.DiscBot.App.Handlers
                 await DiscBotService.ErrorHandler.CaptureAsync(
                     ex,
                     $"Failed to handle modal submission: {customId}",
-                    nameof(HandleModalSubmitAsync));
+                    nameof(HandleModalSubmitAsync)
+                );
 
                 // Try to respond with error - may fail if response was already sent
                 try
@@ -178,7 +196,8 @@ namespace WabbitBot.DiscBot.App.Handlers
                         DiscordInteractionResponseType.ChannelMessageWithSource,
                         new DiscordInteractionResponseBuilder()
                             .WithContent("An error occurred while processing your submission. Please try again.")
-                            .AsEphemeral());
+                            .AsEphemeral()
+                    );
                 }
                 catch
                 {
@@ -189,7 +208,10 @@ namespace WabbitBot.DiscBot.App.Handlers
             }
         }
 
-        private static async Task<Result> HandleAcceptChallengeButtonAsync(DiscordInteraction interaction, string customId)
+        private static async Task<Result> HandleAcceptChallengeButtonAsync(
+            DiscordInteraction interaction,
+            string customId
+        )
         {
             // Parse challenge ID from custom ID: "accept_challenge_{challengeId}"
             var challengeIdStr = customId.Replace("accept_challenge_", "", StringComparison.Ordinal);
@@ -197,15 +219,13 @@ namespace WabbitBot.DiscBot.App.Handlers
             {
                 await interaction.CreateResponseAsync(
                     DiscordInteractionResponseType.ChannelMessageWithSource,
-                    new DiscordInteractionResponseBuilder()
-                        .WithContent("Invalid challenge ID.")
-                        .AsEphemeral());
+                    new DiscordInteractionResponseBuilder().WithContent("Invalid challenge ID.").AsEphemeral()
+                );
                 return Result.Failure("Invalid challenge ID");
             }
 
             // Acknowledge interaction
-            await interaction.CreateResponseAsync(
-                DiscordInteractionResponseType.DeferredMessageUpdate);
+            await interaction.CreateResponseAsync(DiscordInteractionResponseType.DeferredMessageUpdate);
 
             // Publish ScrimmageAccepted (Global) to Core
             // await PublishChallengeAcceptedAsync(challengeId, interaction.User.Id);
@@ -213,21 +233,22 @@ namespace WabbitBot.DiscBot.App.Handlers
             return Result.CreateSuccess("Challenge accepted");
         }
 
-        private static async Task<Result> HandleDeclineChallengeButtonAsync(DiscordInteraction interaction, string customId)
+        private static async Task<Result> HandleDeclineChallengeButtonAsync(
+            DiscordInteraction interaction,
+            string customId
+        )
         {
             var challengeIdStr = customId.Replace("decline_challenge_", "", StringComparison.Ordinal);
             if (!Guid.TryParse(challengeIdStr, out var challengeId))
             {
                 await interaction.CreateResponseAsync(
                     DiscordInteractionResponseType.ChannelMessageWithSource,
-                    new DiscordInteractionResponseBuilder()
-                        .WithContent("Invalid challenge ID.")
-                        .AsEphemeral());
+                    new DiscordInteractionResponseBuilder().WithContent("Invalid challenge ID.").AsEphemeral()
+                );
                 return Result.Failure("Invalid challenge ID");
             }
 
-            await interaction.CreateResponseAsync(
-                DiscordInteractionResponseType.DeferredMessageUpdate);
+            await interaction.CreateResponseAsync(DiscordInteractionResponseType.DeferredMessageUpdate);
 
             // Publish ScrimmageDeclined (Global) to Core
             // await PublishChallengeDeclinedAsync(challengeId, interaction.User.Id);

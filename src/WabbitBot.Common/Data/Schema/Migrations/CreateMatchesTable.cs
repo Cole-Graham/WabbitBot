@@ -19,7 +19,9 @@ namespace WabbitBot.Common.Data.Schema.Migrations
             try
             {
                 // Create Matches table
-                await QueryUtil.ExecuteNonQueryAsync(conn, @"
+                await QueryUtil.ExecuteNonQueryAsync(
+                    conn,
+                    @"
                     CREATE TABLE IF NOT EXISTS Matches (
                         Id TEXT PRIMARY KEY,
                         Team1Id TEXT NOT NULL,
@@ -47,21 +49,54 @@ namespace WabbitBot.Common.Data.Schema.Migrations
                         Team2MapBans TEXT NULL,
                         Team1MapBansSubmittedAt DATETIME NULL,
                         Team2MapBansSubmittedAt DATETIME NULL
-                    )", new { }, transaction);
+                    )",
+                    new { },
+                    transaction
+                );
 
                 // Create indexes for faster lookups
-                await QueryUtil.ExecuteNonQueryAsync(conn, @"
-                    CREATE INDEX IF NOT EXISTS idx_matches_team1id ON Matches(Team1Id)", new { }, transaction);
-                await QueryUtil.ExecuteNonQueryAsync(conn, @"
-                    CREATE INDEX IF NOT EXISTS idx_matches_team2id ON Matches(Team2Id)", new { }, transaction);
-                await QueryUtil.ExecuteNonQueryAsync(conn, @"
-                    CREATE INDEX IF NOT EXISTS idx_matches_parent ON Matches(ParentId, ParentType)", new { }, transaction);
-                await QueryUtil.ExecuteNonQueryAsync(conn, @"
-                    CREATE INDEX IF NOT EXISTS idx_matches_channelid ON Matches(ChannelId)", new { }, transaction);
-                await QueryUtil.ExecuteNonQueryAsync(conn, @"
-                    CREATE INDEX IF NOT EXISTS idx_matches_team1threadid ON Matches(Team1ThreadId)", new { }, transaction);
-                await QueryUtil.ExecuteNonQueryAsync(conn, @"
-                    CREATE INDEX IF NOT EXISTS idx_matches_team2threadid ON Matches(Team2ThreadId)", new { }, transaction);
+                await QueryUtil.ExecuteNonQueryAsync(
+                    conn,
+                    @"
+                    CREATE INDEX IF NOT EXISTS idx_matches_team1id ON Matches(Team1Id)",
+                    new { },
+                    transaction
+                );
+                await QueryUtil.ExecuteNonQueryAsync(
+                    conn,
+                    @"
+                    CREATE INDEX IF NOT EXISTS idx_matches_team2id ON Matches(Team2Id)",
+                    new { },
+                    transaction
+                );
+                await QueryUtil.ExecuteNonQueryAsync(
+                    conn,
+                    @"
+                    CREATE INDEX IF NOT EXISTS idx_matches_parent ON Matches(ParentId, ParentType)",
+                    new { },
+                    transaction
+                );
+                await QueryUtil.ExecuteNonQueryAsync(
+                    conn,
+                    @"
+                    CREATE INDEX IF NOT EXISTS idx_matches_channelid ON Matches(ChannelId)",
+                    new { },
+                    transaction
+                );
+                await QueryUtil.ExecuteNonQueryAsync(
+                    conn,
+                    @"
+                    CREATE INDEX IF NOT EXISTS idx_matches_team1threadid ON Matches(Team1ThreadId)",
+                    new { },
+                    transaction
+                );
+                await QueryUtil.ExecuteNonQueryAsync(
+                    conn,
+                    @"
+                    CREATE INDEX IF NOT EXISTS idx_matches_team2threadid ON Matches(Team2ThreadId)",
+                    new { },
+                    transaction
+                );
 
                 transaction.Commit();
             }

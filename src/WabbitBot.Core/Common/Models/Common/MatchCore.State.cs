@@ -12,6 +12,7 @@ namespace WabbitBot.Core.Common.Models.Common
             public class MatchState
             {
                 private readonly Dictionary<Guid, Match> _activeMatches = new();
+
                 // Removed _matchStates dictionary - using state snapshots instead
                 private readonly Dictionary<Guid, List<MatchStateSnapshot>> _stateHistory = new();
                 private readonly Dictionary<Guid, MatchStateSnapshot> _currentStateSnapshots = new();
@@ -20,10 +21,15 @@ namespace WabbitBot.Core.Common.Models.Common
                 private static readonly Dictionary<MatchStatus, List<MatchStatus>> _validTransitions = new()
                 {
                     [MatchStatus.Created] = new() { MatchStatus.InProgress, MatchStatus.Cancelled },
-                    [MatchStatus.InProgress] = new() { MatchStatus.Completed, MatchStatus.Cancelled, MatchStatus.Forfeited },
+                    [MatchStatus.InProgress] = new()
+                    {
+                        MatchStatus.Completed,
+                        MatchStatus.Cancelled,
+                        MatchStatus.Forfeited,
+                    },
                     [MatchStatus.Completed] = new(), // Terminal state
                     [MatchStatus.Cancelled] = new(), // Terminal state
-                    [MatchStatus.Forfeited] = new(),  // Terminal state
+                    [MatchStatus.Forfeited] = new(), // Terminal state
                 };
 
                 /// <summary>
@@ -57,7 +63,9 @@ namespace WabbitBot.Core.Common.Models.Common
                 /// </summary>
                 public IEnumerable<MatchStateSnapshot> GetStateHistory(Guid matchId)
                 {
-                    return _stateHistory.TryGetValue(matchId, out var history) ? history : Enumerable.Empty<MatchStateSnapshot>();
+                    return _stateHistory.TryGetValue(matchId, out var history)
+                        ? history
+                        : Enumerable.Empty<MatchStateSnapshot>();
                 }
 
                 /// <summary>
@@ -114,7 +122,9 @@ namespace WabbitBot.Core.Common.Models.Common
                         CompletedAt = match.CompletedAt,
                         WinnerId = match.WinnerId,
                         CurrentGameNumber = currentSnapshot.CurrentGameNumber,
-                        CurrentMapId = match.Games?.FirstOrDefault(g => g.GameNumber == currentSnapshot.CurrentGameNumber)?.MapId,
+                        CurrentMapId = match
+                            .Games?.FirstOrDefault(g => g.GameNumber == currentSnapshot.CurrentGameNumber)
+                            ?.MapId,
 
                         // Map ban properties
                         AvailableMaps = match.AvailableMaps,
@@ -155,7 +165,13 @@ namespace WabbitBot.Core.Common.Models.Common
                         : new List<MatchStatus>();
                 }
 
-                public bool TryTransition(Match match, MatchStatus toState, Guid userId, string userName, string? reason = null)
+                public bool TryTransition(
+                    Match match,
+                    MatchStatus toState,
+                    Guid userId,
+                    string userName,
+                    string? reason = null
+                )
                 {
                     if (!CanTransition(match, toState))
                         return false;

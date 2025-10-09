@@ -69,4 +69,3 @@ public record Result(
     /// </summary>
     public static implicit operator Result(string message) => CreateSuccess(message);
 }
-

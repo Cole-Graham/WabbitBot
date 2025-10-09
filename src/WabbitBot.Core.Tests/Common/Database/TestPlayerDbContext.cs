@@ -9,7 +9,8 @@ namespace WabbitBot.Core.Common.Database.Tests
     /// </summary>
     public sealed class TestPlayerDbContext : DbContext
     {
-        public TestPlayerDbContext(DbContextOptions<TestPlayerDbContext> options) : base(options) { }
+        public TestPlayerDbContext(DbContextOptions<TestPlayerDbContext> options)
+            : base(options) { }
 
         public DbSet<Player> Players { get; set; } = null!;
 
@@ -24,23 +25,13 @@ namespace WabbitBot.Core.Common.Database.Tests
             entity.HasKey(p => p.Id);
 
             // Arrays and JSONB mappings for Postgres
-            entity
-                .Property(p => p.TeamIds)
-                .HasColumnType("uuid[]");
+            entity.Property(p => p.TeamIds).HasColumnType("uuid[]");
 
-            entity
-                .Property(p => p.PreviousGameUsernames)
-                .HasColumnType("text[]");
+            entity.Property(p => p.PreviousGameUsernames).HasColumnType("text[]");
 
-            entity
-                .Property(p => p.TeamJoinCooldowns)
-                .HasColumnType("jsonb");
+            entity.Property(p => p.TeamJoinCooldowns).HasColumnType("jsonb");
 
-            entity
-                .Property(p => p.PreviousPlatformIds)
-                .HasColumnType("jsonb");
+            entity.Property(p => p.PreviousPlatformIds).HasColumnType("jsonb");
         }
     }
 }
-
-

@@ -16,7 +16,8 @@ public record EntityMetadataInfo(
     bool EmitArchiveRegistration = false,
     string[] ColumnNames = null!,
     INamedTypeSymbol EntityType = null!,
-    string? ServicePropertyName = null)
+    string? ServicePropertyName = null
+)
 {
     // Computed property for snake_case column names (common in databases)
     public string[] SnakeCaseColumnNames => ColumnNames.Select(ToSnakeCase).ToArray();
@@ -24,7 +25,8 @@ public record EntityMetadataInfo(
 
     private static string ToSnakeCase(string pascalCase)
     {
-        return string.Concat(pascalCase.Select((c, i) =>
-            i > 0 && char.IsUpper(c) ? "_" + char.ToLower(c) : char.ToLower(c).ToString()));
+        return string.Concat(
+            pascalCase.Select((c, i) => i > 0 && char.IsUpper(c) ? "_" + char.ToLower(c) : char.ToLower(c).ToString())
+        );
     }
 }

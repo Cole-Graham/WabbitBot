@@ -1,6 +1,5 @@
 using DSharpPlus;
 
-
 namespace WabbitBot.DiscBot.App
 {
     /// <summary>
@@ -27,7 +26,9 @@ namespace WabbitBot.DiscBot.App
             {
                 if (_isInitialized)
                 {
-                    throw new InvalidOperationException("DiscordClient has already been set. This should only be called once during initialization.");
+                    throw new InvalidOperationException(
+                        "DiscordClient has already been set. This should only be called once during initialization."
+                    );
                 }
 
                 _client = client;
@@ -46,7 +47,9 @@ namespace WabbitBot.DiscBot.App
             {
                 if (!_isInitialized || _client is null)
                 {
-                    throw new InvalidOperationException("DiscordClient has not been initialized. Make sure the DiscBot bootstrap has been called.");
+                    throw new InvalidOperationException(
+                        "DiscordClient has not been initialized. Make sure the DiscBot bootstrap has been called."
+                    );
                 }
 
                 return _client;

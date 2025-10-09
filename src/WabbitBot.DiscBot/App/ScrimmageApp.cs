@@ -10,8 +10,8 @@ using WabbitBot.Core.Common.Models.Scrimmage;
 using WabbitBot.Core.Common.Services;
 using WabbitBot.DiscBot.App.Events;
 using WabbitBot.DiscBot.App.Interfaces;
-using WabbitBot.DiscBot.App.Services.DiscBot;
 using WabbitBot.DiscBot.App.Renderers;
+using WabbitBot.DiscBot.App.Services.DiscBot;
 
 namespace WabbitBot.DiscBot.App
 {
@@ -23,13 +23,15 @@ namespace WabbitBot.DiscBot.App
             {
                 // Get scrimmage channel from config
                 var scrimmageChannelId = ConfigurationProvider
-                    .GetSection<ChannelsOptions>(ChannelsOptions.SectionName).ScrimmageChannel;
+                    .GetSection<ChannelsOptions>(ChannelsOptions.SectionName)
+                    .ScrimmageChannel;
                 if (scrimmageChannelId is null)
                 {
                     return Result.Failure("Scrimmage channel not found");
                 }
                 var scrimmageChannel = await DiscordClientProvider
-                    .GetClient().GetChannelAsync(scrimmageChannelId.Value);
+                    .GetClient()
+                    .GetChannelAsync(scrimmageChannelId.Value);
 
                 // var matchContainers = await MatchRenderer.RenderMatchContainerAsync(scrimmageChannel, scrimmage);
 
@@ -43,7 +45,8 @@ namespace WabbitBot.DiscBot.App
                 await DiscBotService.ErrorHandler.CaptureAsync(
                     ex,
                     "Failed to create scrimmage threads",
-                    nameof(CreateScrimmageThreadsAsync));
+                    nameof(CreateScrimmageThreadsAsync)
+                );
                 return Result.Failure($"Failed to create scrimmage threads: {ex.Message}");
             }
         }

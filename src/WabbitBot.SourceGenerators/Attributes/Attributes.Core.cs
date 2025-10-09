@@ -1,6 +1,5 @@
 using System;
 
-
 namespace WabbitBot.SourceGenerators.Attributes
 {
     #region Database/Entity
@@ -16,7 +15,8 @@ namespace WabbitBot.SourceGenerators.Attributes
         string[]? explicitIndexedColumns = null,
         string? servicePropertyName = null,
         bool emitCacheRegistration = false,
-        bool emitArchiveRegistration = false) : Attribute
+        bool emitArchiveRegistration = false
+    ) : Attribute
     {
         public string? TableName { get; } = tableName;
         public string? ArchiveTableName { get; } = archiveTableName;

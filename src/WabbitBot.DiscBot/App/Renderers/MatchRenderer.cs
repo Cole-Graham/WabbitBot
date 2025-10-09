@@ -1,9 +1,9 @@
-using DSharpPlus;
-using DSharpPlus.Entities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using DSharpPlus;
+using DSharpPlus.Entities;
 using WabbitBot.Common.Data.Interfaces;
 using WabbitBot.Common.Models;
 using WabbitBot.Core.Common.Models.Common;
@@ -35,7 +35,8 @@ namespace WabbitBot.DiscBot.App.Renderers
             DiscordMessageBuilder opponentBuilder,
             List<Player> selectedTeam1Players,
             List<Player> selectedTeam2Players,
-            Guid matchId)
+            Guid matchId
+        )
         {
             try
             {
@@ -48,24 +49,26 @@ namespace WabbitBot.DiscBot.App.Renderers
                 var match = matchResult.Data!;
 
                 // Fetch team1 data
-                var challengerTeamResult = await CoreService.Teams
-                    .GetByIdAsync(match.Team1Id, DatabaseComponent.Repository);
+                var challengerTeamResult = await CoreService.Teams.GetByIdAsync(
+                    match.Team1Id,
+                    DatabaseComponent.Repository
+                );
                 if (!challengerTeamResult.Success)
                 {
                     return Result.Failure("Challenger team not found");
                 }
                 var challengerTeam = challengerTeamResult.Data!;
-                var challengerRating = (int)Math
-                    .Round(challengerTeam.ScrimmageTeamStats[match.TeamSize].CurrentRating);
+                var challengerRating = (int)Math.Round(challengerTeam.ScrimmageTeamStats[match.TeamSize].CurrentRating);
                 var challengerTeamInfo = new Dictionary<ulong, Dictionary<string, string>>();
                 for (int i1 = 0; i1 < selectedTeam1Players.Count; i1++)
                 {
                     var team1Player = selectedTeam1Players.ElementAt(i1);
                     var team1User = team1Player.MashinaUser;
-                    challengerTeamInfo[team1User.DiscordUserId] = new Dictionary<string, string> {
+                    challengerTeamInfo[team1User.DiscordUserId] = new Dictionary<string, string>
+                    {
                         { "DiscordMention", team1User.DiscordMention ?? "<@unknown>" },
                         { "DiscordUsername", team1User.DiscordUsername ?? "Unknown" },
-                        { "DiscordUserId", team1User.DiscordUserId.ToString() }
+                        { "DiscordUserId", team1User.DiscordUserId.ToString() },
                     };
                 }
                 var challengerMentions = new List<string>();
@@ -75,24 +78,26 @@ namespace WabbitBot.DiscBot.App.Renderers
                 }
 
                 // Fetch team2 data
-                var opponentTeamResult = await CoreService.Teams
-                    .GetByIdAsync(match.Team2Id, DatabaseComponent.Repository);
+                var opponentTeamResult = await CoreService.Teams.GetByIdAsync(
+                    match.Team2Id,
+                    DatabaseComponent.Repository
+                );
                 if (!opponentTeamResult.Success)
                 {
                     return Result.Failure("Opponent team not found");
                 }
                 var opponentTeam = opponentTeamResult.Data!;
-                var opponentRating = (int)Math
-                        .Round(opponentTeam.ScrimmageTeamStats[match.TeamSize].CurrentRating);
+                var opponentRating = (int)Math.Round(opponentTeam.ScrimmageTeamStats[match.TeamSize].CurrentRating);
                 var opponentTeamInfo = new Dictionary<ulong, Dictionary<string, string>>();
                 for (int i2 = 0; i2 < selectedTeam2Players.Count; i2++)
                 {
                     var team2Player = selectedTeam2Players.ElementAt(i2);
                     var team2User = team2Player.MashinaUser;
-                    opponentTeamInfo[team2User.DiscordUserId] = new Dictionary<string, string> {
+                    opponentTeamInfo[team2User.DiscordUserId] = new Dictionary<string, string>
+                    {
                         { "DiscordMention", team2User.DiscordMention ?? "<@unknown>" },
                         { "DiscordUsername", team2User.DiscordUsername ?? "Unknown" },
-                        { "DiscordUserId", team2User.DiscordUserId.ToString() }
+                        { "DiscordUserId", team2User.DiscordUserId.ToString() },
                     };
                 }
                 var opponentMentions = new List<string>();
@@ -102,7 +107,9 @@ namespace WabbitBot.DiscBot.App.Renderers
                 }
 
                 // Placeholder for map pool (use match.AvailableMaps or fetch)
-                var mapPool = match.AvailableMaps ?? new List<string> { "Echeneis", "Glittering Lagoon", "Silent Sanctum", "Thornwood", }; // Placeholder
+                var mapPool =
+                    match.AvailableMaps
+                    ?? new List<string> { "Echeneis", "Glittering Lagoon", "Silent Sanctum", "Thornwood" }; // Placeholder
                 var teamSize = match.TeamSize;
                 var matchLength = match.BestOf != 0 ? match.BestOf : 3; // Assume bo3, placeholder - adjust property name
 
@@ -125,10 +132,11 @@ namespace WabbitBot.DiscBot.App.Renderers
                 mapPoolText += $"{opponentTeam.Name} In Progress\n";
 
                 // Placeholder for ban instructions
-                var banInstructions = $"Please select your map bans in order of priority. You will have a chance to preview\n" +
-                                      $"your selections before confirming. You have {guaranteedBans} guaranteed bans, and \n" +
-                                      $"{coinflipBans} coinflip bans. Coinflip bans come into play depending on the number of\n" +
-                                      $"games played."; // Placeholder
+                var banInstructions =
+                    $"Please select your map bans in order of priority. You will have a chance to preview\n"
+                    + $"your selections before confirming. You have {guaranteedBans} guaranteed bans, and \n"
+                    + $"{coinflipBans} coinflip bans. Coinflip bans come into play depending on the number of\n"
+                    + $"games played."; // Placeholder
 
                 // Build components
                 var challengerContainerComponents = new List<DiscordComponent>();
@@ -140,13 +148,15 @@ namespace WabbitBot.DiscBot.App.Renderers
                 // opponentContainerComponents.Add(topBanner);
 
                 // 2. Match info text
-                var challengerMatchInfoText = $"## {challengerTeam.Name} ({challengerRating})\n vs. {opponentTeam.Name} ({opponentRating})\n" +
-                                    $"{string.Join(" ", challengerMentions)}\n" +
-                                    $"**Best of {matchLength}**";
+                var challengerMatchInfoText =
+                    $"## {challengerTeam.Name} ({challengerRating})\n vs. {opponentTeam.Name} ({opponentRating})\n"
+                    + $"{string.Join(" ", challengerMentions)}\n"
+                    + $"**Best of {matchLength}**";
                 challengerContainerComponents.Add(new DiscordTextDisplayComponent(challengerMatchInfoText));
-                var opponentMatchInfoText = $"## {opponentTeam.Name} ({opponentRating})\n vs. {challengerTeam.Name} ({challengerRating})\n" +
-                                    $"{string.Join(" ", opponentMentions)}\n" +
-                                    $"**Best of {matchLength}**";
+                var opponentMatchInfoText =
+                    $"## {opponentTeam.Name} ({opponentRating})\n vs. {challengerTeam.Name} ({challengerRating})\n"
+                    + $"{string.Join(" ", opponentMentions)}\n"
+                    + $"**Best of {matchLength}**";
                 opponentContainerComponents.Add(new DiscordTextDisplayComponent(opponentMatchInfoText));
 
                 // 3. Map ban banner - placeholder
@@ -164,20 +174,23 @@ namespace WabbitBot.DiscBot.App.Renderers
                 // opponentContainerComponents.Add(mapThumbnails);
 
                 // 6. Instructions text
-                var instructionsText = $"## Map bans - {challengerTeam.Name} vs." +
-                                       $"{opponentTeam.Name}\n\n{banInstructions}";
+                var instructionsText =
+                    $"## Map bans - {challengerTeam.Name} vs." + $"{opponentTeam.Name}\n\n{banInstructions}";
                 challengerContainerComponents.Add(new DiscordTextDisplayComponent(instructionsText));
                 opponentContainerComponents.Add(new DiscordTextDisplayComponent(instructionsText));
 
                 // 7. Select menu for bans (custom id based on team thread to distinguish - but since same content, use generic for now, handler will distinguish)
                 var selectId = $"ban_select_{matchId}_{challengerTeam.Id}"; // Customize per thread
-                var selectOptions = mapPool.Select(map => new DiscordSelectComponentOption(map, map, isDefault: false)).ToList();
+                var selectOptions = mapPool
+                    .Select(map => new DiscordSelectComponentOption(map, map, isDefault: false))
+                    .ToList();
                 var banSelect = new DiscordSelectComponent(
                     selectId,
                     "Select maps to ban",
                     selectOptions,
                     minOptions: 1,
-                    maxOptions: guaranteedBans + coinflipBans);
+                    maxOptions: guaranteedBans + coinflipBans
+                );
 
                 var actionRow = new DiscordActionRowComponent(new DiscordComponent[] { banSelect });
                 challengerContainerComponents.Add(actionRow);
@@ -187,7 +200,8 @@ namespace WabbitBot.DiscBot.App.Renderers
                 var refreshButton = new DiscordButtonComponent(
                     DiscordButtonStyle.Secondary,
                     $"refresh_bans_{matchId}",
-                    "Refresh");
+                    "Refresh"
+                );
                 challengerContainerComponents.Add(refreshButton);
                 opponentContainerComponents.Add(refreshButton);
 
@@ -195,11 +209,13 @@ namespace WabbitBot.DiscBot.App.Renderers
                 var startButton = new DiscordButtonComponent(
                     DiscordButtonStyle.Primary,
                     $"start_match_{matchId}",
-                    "Start Match");
+                    "Start Match"
+                );
                 var cancelButton = new DiscordButtonComponent(
                     DiscordButtonStyle.Danger,
                     $"cancel_match_{matchId}",
-                    "Cancel Match");
+                    "Cancel Match"
+                );
                 challengerContainerComponents.Add(startButton);
                 opponentContainerComponents.Add(startButton);
                 challengerContainerComponents.Add(cancelButton);
@@ -224,7 +240,8 @@ namespace WabbitBot.DiscBot.App.Renderers
                 await DiscBotService.ErrorHandler.CaptureAsync(
                     ex,
                     $"Failed to render match container for {matchId}",
-                    nameof(RenderMatchContainerAsync));
+                    nameof(RenderMatchContainerAsync)
+                );
                 return Result.Failure($"Failed to create match container: {ex.Message}");
             }
         }

@@ -1,25 +1,29 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-
-  <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
-    <LangVersion>13.0</LangVersion>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-    <!-- Enable source generator output to disk for debugging -->
-    <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
-  </PropertyGroup>
-
-  <ItemGroup>
-    <PackageReference Include="DSharpPlus" Version="5.0.0-nightly-02551" />
-    <PackageReference Include="DSharpPlus.Commands" Version="5.0.0-nightly-02551" />
-    <PackageReference Include="DSharpPlus.Interactivity" Version="5.0.0-nightly-02551" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\WabbitBot.Common\WabbitBot.Common.csproj" />
-    <ProjectReference Include="..\WabbitBot.Core\WabbitBot.Core.csproj" />
-    <ProjectReference Include="..\WabbitBot.SourceGenerators\WabbitBot.SourceGenerators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
-    <ProjectReference Include="..\WabbitBot.Analyzers\WabbitBot.Analyzers.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
-  </ItemGroup>
-
+    <PropertyGroup>
+        <TargetFramework>net9.0</TargetFramework>
+        <LangVersion>13.0</LangVersion>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <!-- Enable source generator output to disk for debugging -->
+        <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+    </PropertyGroup>
+    <ItemGroup>
+        <PackageReference Include="DSharpPlus" Version="5.0.0-nightly-02551" />
+        <PackageReference Include="DSharpPlus.Commands" Version="5.0.0-nightly-02551" />
+        <PackageReference Include="DSharpPlus.Interactivity" Version="5.0.0-nightly-02551" />
+    </ItemGroup>
+    <ItemGroup>
+        <ProjectReference Include="..\WabbitBot.Common\WabbitBot.Common.csproj" />
+        <ProjectReference Include="..\WabbitBot.Core\WabbitBot.Core.csproj" />
+        <ProjectReference
+            Include="..\WabbitBot.SourceGenerators\WabbitBot.SourceGenerators.csproj"
+            OutputItemType="Analyzer"
+            ReferenceOutputAssembly="false"
+        />
+        <ProjectReference
+            Include="..\WabbitBot.Analyzers\WabbitBot.Analyzers.csproj"
+            OutputItemType="Analyzer"
+            ReferenceOutputAssembly="false"
+        />
+    </ItemGroup>
 </Project>

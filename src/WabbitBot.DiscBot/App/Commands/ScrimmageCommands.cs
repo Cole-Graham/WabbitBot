@@ -1,17 +1,17 @@
 using System.ComponentModel;
 using DSharpPlus.Commands;
 using DSharpPlus.Commands.ContextChecks;
+using DSharpPlus.Commands.Processors.SlashCommands;
 using DSharpPlus.Commands.Processors.SlashCommands.ArgumentModifiers;
 using DSharpPlus.Entities;
 using Microsoft.EntityFrameworkCore;
-using WabbitBot.Common.Events.Core;
-using WabbitBot.Core.Common.Services;
-using WabbitBot.Core.Common.Models.Common;
-using WabbitBot.DiscBot.App.Services.DiscBot;
-using WabbitBot.DiscBot.App.Providers;
-using WabbitBot.Common.Data.Interfaces;
-using DSharpPlus.Commands.Processors.SlashCommands;
 using WabbitBot.Common.Configuration;
+using WabbitBot.Common.Data.Interfaces;
+using WabbitBot.Common.Events.Core;
+using WabbitBot.Core.Common.Models.Common;
+using WabbitBot.Core.Common.Services;
+using WabbitBot.DiscBot.App.Providers;
+using WabbitBot.DiscBot.App.Services.DiscBot;
 
 namespace WabbitBot.DiscBot.App.Commands
 {
@@ -22,9 +22,11 @@ namespace WabbitBot.DiscBot.App.Commands
     {
         [Description("Best of 1")]
         BestOf1 = 1,
+
         [Description("Best of 3")]
         BestOf3 = 3,
     }
+
     /// <summary>
     /// Discord slash commands for scrimmage management.
     /// Translates Discord interactions into events via DiscBotService.PublishAsync.
@@ -44,13 +46,17 @@ namespace WabbitBot.DiscBot.App.Commands
         public async Task ChallengeAsync(
             CommandContext ctx,
             [Description("Game Size")] TeamSize TeamSize,
-            [Description("Your Team")] [SlashAutoCompleteProvider(typeof(UserTeamAutoComplete))]
+            [Description("Your Team")]
+            [SlashAutoCompleteProvider(typeof(UserTeamAutoComplete))]
                 string ChallengerTeamName,
-            [Description("Opponent Team")] [SlashAutoCompleteProvider(typeof(OpponentTeamAutoComplete))]
+            [Description("Opponent Team")]
+            [SlashAutoCompleteProvider(typeof(OpponentTeamAutoComplete))]
                 string OpponentTeamName,
-            [Description("Select your teammates")] [SlashAutoCompleteProvider(typeof(RosterPlayerAutoComplete))]
+            [Description("Select your teammates")]
+            [SlashAutoCompleteProvider(typeof(RosterPlayerAutoComplete))]
                 string[] SelectedPlayerNames,
-            [Description("Best of games")] BestOfOption BestOf = BestOfOption.BestOf1)
+            [Description("Best of games")] BestOfOption BestOf = BestOfOption.BestOf1
+        )
         {
             await ctx.DeferResponseAsync();
 
@@ -62,7 +68,9 @@ namespace WabbitBot.DiscBot.App.Commands
 
                 if (BestOf == BestOfOption.BestOf3 && scrimmageOptions.BestOf < 3)
                 {
-                    await ctx.EditResponseAsync("Best of 3 scrimmages are not currently enabled in the bot configuration.");
+                    await ctx.EditResponseAsync(
+                        "Best of 3 scrimmages are not currently enabled in the bot configuration."
+                    );
                     return;
                 }
 
@@ -72,10 +80,14 @@ namespace WabbitBot.DiscBot.App.Commands
                     return;
                 }
 
-                var challengerTeamResult = await CoreService.Teams
-                    .GetByNameAsync(ChallengerTeamName, DatabaseComponent.Repository);
-                var opponentTeamResult = await CoreService.Teams
-                    .GetByNameAsync(OpponentTeamName, DatabaseComponent.Repository);
+                var challengerTeamResult = await CoreService.Teams.GetByNameAsync(
+                    ChallengerTeamName,
+                    DatabaseComponent.Repository
+                );
+                var opponentTeamResult = await CoreService.Teams.GetByNameAsync(
+                    OpponentTeamName,
+                    DatabaseComponent.Repository
+                );
 
                 if (!challengerTeamResult.Success || challengerTeamResult.Data == null)
                 {
@@ -95,22 +107,26 @@ namespace WabbitBot.DiscBot.App.Commands
                     OpponentTeamName,
                     SelectedPlayerNames,
                     ctx.User.Id,
-                    (int)BestOf);
+                    (int)BestOf
+                );
                 if (!pubResult.Success)
                 {
                     await ctx.EditResponseAsync($"Failed to publish challenge requested. {pubResult.ErrorMessage}");
                     return;
                 }
 
-                await ctx.EditResponseAsync($"Challenge request from **{ChallengerTeamName}** to " +
-                    $"**{OpponentTeamName}** has been submitted. Core will validate and create the challenge.");
+                await ctx.EditResponseAsync(
+                    $"Challenge request from **{ChallengerTeamName}** to "
+                        + $"**{OpponentTeamName}** has been submitted. Core will validate and create the challenge."
+                );
             }
             catch (Exception ex)
             {
                 await DiscBotService.ErrorHandler.CaptureAsync(
                     ex,
                     "Failed to process scrimmage challenge command",
-                    nameof(ChallengeAsync));
+                    nameof(ChallengeAsync)
+                );
                 await ctx.EditResponseAsync("An error occurred while processing your challenge. Please try again.");
             }
         }
@@ -127,7 +143,8 @@ namespace WabbitBot.DiscBot.App.Commands
             CommandContext ctx,
             [Description("Challenge to delete")]
             [SlashAutoCompleteProvider(typeof(ActiveChallengeAutoComplete))]
-            string challengeId)
+                string challengeId
+        )
         {
             await ctx.DeferResponseAsync();
 
@@ -153,7 +170,8 @@ namespace WabbitBot.DiscBot.App.Commands
                 await DiscBotService.ErrorHandler.CaptureAsync(
                     ex,
                     "Failed to process scrimmage delete command",
-                    nameof(DeleteAsync));
+                    nameof(DeleteAsync)
+                );
                 await ctx.EditResponseAsync("An error occurred while processing your delete. Please try again.");
             }
         }

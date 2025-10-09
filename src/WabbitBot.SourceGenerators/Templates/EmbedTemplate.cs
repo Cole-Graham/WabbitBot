@@ -1,5 +1,5 @@
-using Microsoft.CodeAnalysis.Text;
 using System.Collections.Generic;
+using Microsoft.CodeAnalysis.Text;
 using WabbitBot.SourceGenerators.Utils;
 
 namespace WabbitBot.SourceGenerators.Templates;
@@ -14,8 +14,10 @@ public static class EmbedTemplates
     /// </summary>
     public static SourceText GenerateFactory(IEnumerable<string> classNames)
     {
-        var factoryRegistrations = string.Join("\n",
-            classNames.Select(cn => $"        _embedFactories[typeof({cn})] = () => new {cn}();"));
+        var factoryRegistrations = string.Join(
+            "\n",
+            classNames.Select(cn => $"        _embedFactories[typeof({cn})] = () => new {cn}();")
+        );
 
         var content = $$"""
             {{CommonTemplates.CreateFileHeader("EmbedFactoryGenerator")}}

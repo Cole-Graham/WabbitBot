@@ -13,5 +13,3 @@ namespace WabbitBot.SourceGenerators.Tests.Generators
         }
     }
 }
-
-

@@ -26,7 +26,7 @@ namespace WabbitBot.Core.Common.Database
             {
                 "postgresql" => ConnectionString,
                 "sqlite" => $"Data Source={Path};Pooling=True;Max Pool Size={MaxPoolSize};",
-                _ => throw new NotSupportedException($"Database provider '{Provider}' is not supported")
+                _ => throw new NotSupportedException($"Database provider '{Provider}' is not supported"),
             };
         }
 

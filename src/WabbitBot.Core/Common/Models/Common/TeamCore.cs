@@ -1,10 +1,10 @@
-using WabbitBot.Core.Common.Services;
-using WabbitBot.Common.Data.Service;
+using System.Linq;
 using WabbitBot.Common.Configuration;
 using WabbitBot.Common.Data.Interfaces;
+using WabbitBot.Common.Data.Service;
 using WabbitBot.Common.Models;
-using System.Linq;
 using WabbitBot.Core.Common.Interfaces;
+using WabbitBot.Core.Common.Services;
 
 namespace WabbitBot.Core.Common.Models.Common
 {
@@ -24,7 +24,8 @@ namespace WabbitBot.Core.Common.Models.Common
                 Guid teamCaptainId,
                 TeamType teamType,
                 DateTime createdAt,
-                DateTime lastActive)
+                DateTime lastActive
+            )
             {
                 return new Team
                 {
@@ -41,10 +42,10 @@ namespace WabbitBot.Core.Common.Models.Common
             public static TeamRoster CreateRoster(
                 Guid teamId,
                 TeamSizeRosterGroup rosterGroup,
-                Guid? rosterCaptainId = null)
+                Guid? rosterCaptainId = null
+            )
             {
-                var scrimmageConfig = ConfigurationProvider.GetSection<ScrimmageOptions>(
-                    ScrimmageOptions.SectionName);
+                var scrimmageConfig = ConfigurationProvider.GetSection<ScrimmageOptions>(ScrimmageOptions.SectionName);
 
                 var rosterRange = GetRosterSizeRange(rosterGroup, scrimmageConfig.RosterSizeRanges);
 
@@ -89,23 +90,19 @@ namespace WabbitBot.Core.Common.Models.Common
 
             public static (int Min, int Max) GetDefaultRosterSizeRange(TeamSizeRosterGroup group)
             {
-                var scrimmageConfig = ConfigurationProvider.GetSection<ScrimmageOptions>(
-                    ScrimmageOptions.SectionName);
+                var scrimmageConfig = ConfigurationProvider.GetSection<ScrimmageOptions>(ScrimmageOptions.SectionName);
 
                 return group switch
                 {
-                    TeamSizeRosterGroup.Solo =>
-                    (
+                    TeamSizeRosterGroup.Solo => (
                         scrimmageConfig.RosterSizeRanges.Solo.Min,
                         scrimmageConfig.RosterSizeRanges.Solo.Max
                     ),
-                    TeamSizeRosterGroup.Duo =>
-                    (
+                    TeamSizeRosterGroup.Duo => (
                         scrimmageConfig.RosterSizeRanges.Duo.Min,
                         scrimmageConfig.RosterSizeRanges.Duo.Max
                     ),
-                    TeamSizeRosterGroup.Squad =>
-                    (
+                    TeamSizeRosterGroup.Squad => (
                         scrimmageConfig.RosterSizeRanges.Squad.Min,
                         scrimmageConfig.RosterSizeRanges.Squad.Max
                     ),
@@ -116,13 +113,12 @@ namespace WabbitBot.Core.Common.Models.Common
 
         public async Task UpdateLastActive(Guid teamId)
         {
-            var teamResult = await CoreService.Teams.GetByIdAsync(teamId,
-                DatabaseComponent.Repository);
+            var teamResult = await CoreService.Teams.GetByIdAsync(teamId, DatabaseComponent.Repository);
             if (!teamResult.Success)
             {
-                await CoreService.ErrorHandler.CaptureAsync(new Exception(
-                        $"Failed to retrieve team {teamId} for last active update: " +
-                        $"{teamResult.ErrorMessage}"
+                await CoreService.ErrorHandler.CaptureAsync(
+                    new Exception(
+                        $"Failed to retrieve team {teamId} for last active update: " + $"{teamResult.ErrorMessage}"
                     ),
                     "Team Last Active Warning",
                     nameof(UpdateLastActive)
@@ -133,9 +129,8 @@ namespace WabbitBot.Core.Common.Models.Common
 
             if (team is null)
             {
-                await CoreService.ErrorHandler.CaptureAsync(new Exception(
-                        $"Team {teamId} not found for last active update after successful retrieval."
-                    ),
+                await CoreService.ErrorHandler.CaptureAsync(
+                    new Exception($"Team {teamId} not found for last active update after successful retrieval."),
                     "Team Last Active Warning",
                     nameof(UpdateLastActive)
                 );
@@ -143,27 +138,31 @@ namespace WabbitBot.Core.Common.Models.Common
             }
 
             team.LastActive = DateTime.UtcNow;
-            var updateTeamRepoResult = await CoreService.Teams.UpdateAsync(team,
-                DatabaseComponent.Repository);
-            var updateTeamCacheResult = await CoreService.Teams.UpdateAsync(team,
-                DatabaseComponent.Cache);
+            var updateTeamRepoResult = await CoreService.Teams.UpdateAsync(team, DatabaseComponent.Repository);
+            var updateTeamCacheResult = await CoreService.Teams.UpdateAsync(team, DatabaseComponent.Cache);
 
             if (!updateTeamRepoResult.Success || !updateTeamCacheResult.Success)
             {
-                await CoreService.ErrorHandler.CaptureAsync(new Exception(
-                        $"Failed to update last active for team {teamId}: " +
-                        $"{updateTeamRepoResult.ErrorMessage} / " +
-                        $"{updateTeamCacheResult.ErrorMessage}"
+                await CoreService.ErrorHandler.CaptureAsync(
+                    new Exception(
+                        $"Failed to update last active for team {teamId}: "
+                            + $"{updateTeamRepoResult.ErrorMessage} / "
+                            + $"{updateTeamCacheResult.ErrorMessage}"
                     ),
                     "Team Last Active Warning",
                     nameof(UpdateLastActive)
                 );
             }
         }
-        public async Task AddPlayer(Guid teamId, Guid playerId, TeamSizeRosterGroup rosterGroup, TeamRole role = TeamRole.Core)
+
+        public async Task AddPlayer(
+            Guid teamId,
+            Guid playerId,
+            TeamSizeRosterGroup rosterGroup,
+            TeamRole role = TeamRole.Core
+        )
         {
-            var teamResult = await CoreService.Teams.GetByIdAsync(teamId,
-                DatabaseComponent.Repository);
+            var teamResult = await CoreService.Teams.GetByIdAsync(teamId, DatabaseComponent.Repository);
             if (!teamResult.Success)
             {
                 throw new InvalidOperationException($"Failed to retrieve team {teamId}: {teamResult.ErrorMessage}");
@@ -200,26 +199,27 @@ namespace WabbitBot.Core.Common.Models.Common
                 throw new InvalidOperationException("Player is already on this roster");
             }
 
-            roster.RosterMembers.Add(new TeamMember
-            {
-                PlayerId = playerId,
-                Role = role,
-                JoinedAt = DateTime.UtcNow,
-                IsActive = true,
-                IsTeamManager = role == TeamRole.Captain // Captains are automatically team managers
-            });
+            roster.RosterMembers.Add(
+                new TeamMember
+                {
+                    PlayerId = playerId,
+                    Role = role,
+                    JoinedAt = DateTime.UtcNow,
+                    IsActive = true,
+                    IsTeamManager = role == TeamRole.Captain, // Captains are automatically team managers
+                }
+            );
 
-            var updateTeamResult = await CoreService.Teams.UpdateAsync(team,
-                DatabaseComponent.Repository);
-            var updateTeamCacheResult = await CoreService.Teams.UpdateAsync(team,
-                DatabaseComponent.Cache);
+            var updateTeamResult = await CoreService.Teams.UpdateAsync(team, DatabaseComponent.Repository);
+            var updateTeamCacheResult = await CoreService.Teams.UpdateAsync(team, DatabaseComponent.Cache);
 
             if (!updateTeamResult.Success || !updateTeamCacheResult.Success)
             {
-                await CoreService.ErrorHandler.CaptureAsync(new Exception(
-                        $"Failed to add player {playerId} to team {teamId}: " +
-                        $"{updateTeamResult.ErrorMessage} / " +
-                        $"{updateTeamCacheResult.ErrorMessage}"
+                await CoreService.ErrorHandler.CaptureAsync(
+                    new Exception(
+                        $"Failed to add player {playerId} to team {teamId}: "
+                            + $"{updateTeamResult.ErrorMessage} / "
+                            + $"{updateTeamCacheResult.ErrorMessage}"
                     ),
                     "Team Add Player Warning",
                     nameof(AddPlayer)
@@ -235,13 +235,12 @@ namespace WabbitBot.Core.Common.Models.Common
 
         public async Task RemovePlayer(Guid teamId, Guid playerId)
         {
-            var teamResult = await CoreService.Teams.GetByIdAsync(teamId,
-                DatabaseComponent.Repository);
+            var teamResult = await CoreService.Teams.GetByIdAsync(teamId, DatabaseComponent.Repository);
             if (!teamResult.Success)
             {
-                await CoreService.ErrorHandler.CaptureAsync(new Exception(
-                        $"Failed to retrieve team {teamId} for player removal: " +
-                        $"{teamResult.ErrorMessage}"
+                await CoreService.ErrorHandler.CaptureAsync(
+                    new Exception(
+                        $"Failed to retrieve team {teamId} for player removal: " + $"{teamResult.ErrorMessage}"
                     ),
                     "Team Remove Player Warning",
                     nameof(RemovePlayer)
@@ -252,9 +251,8 @@ namespace WabbitBot.Core.Common.Models.Common
 
             if (team is null)
             {
-                await CoreService.ErrorHandler.CaptureAsync(new Exception(
-                        $"Team {teamId} not found for player removal after successful retrieval."
-                    ),
+                await CoreService.ErrorHandler.CaptureAsync(
+                    new Exception($"Team {teamId} not found for player removal after successful retrieval."),
                     "Team Remove Player Warning",
                     nameof(RemovePlayer)
                 );
@@ -262,25 +260,22 @@ namespace WabbitBot.Core.Common.Models.Common
             }
 
             // Find the member across all rosters
-            var member = team.Rosters
-                .SelectMany(r => r.RosterMembers)
-                .FirstOrDefault(m => m.PlayerId == playerId);
+            var member = team.Rosters.SelectMany(r => r.RosterMembers).FirstOrDefault(m => m.PlayerId == playerId);
             if (member != null)
             {
                 // Remove from the specific roster
                 var roster = team.Rosters.First(r => r.RosterMembers.Contains(member));
                 roster.RosterMembers.Remove(member);
-                var updateTeamResult = await CoreService.Teams.UpdateAsync(team,
-                    DatabaseComponent.Repository);
-                var updateTeamCacheResult = await CoreService.Teams.UpdateAsync(team,
-                    DatabaseComponent.Cache);
+                var updateTeamResult = await CoreService.Teams.UpdateAsync(team, DatabaseComponent.Repository);
+                var updateTeamCacheResult = await CoreService.Teams.UpdateAsync(team, DatabaseComponent.Cache);
 
                 if (!updateTeamResult.Success || !updateTeamCacheResult.Success)
                 {
-                    await CoreService.ErrorHandler.CaptureAsync(new Exception(
-                            $"Failed to remove player {playerId} from team {teamId}: " +
-                            $"{updateTeamResult.ErrorMessage} / " +
-                            $"{updateTeamCacheResult.ErrorMessage}"
+                    await CoreService.ErrorHandler.CaptureAsync(
+                        new Exception(
+                            $"Failed to remove player {playerId} from team {teamId}: "
+                                + $"{updateTeamResult.ErrorMessage} / "
+                                + $"{updateTeamCacheResult.ErrorMessage}"
                         ),
                         "Team Remove Player Warning",
                         nameof(RemovePlayer)
@@ -291,13 +286,12 @@ namespace WabbitBot.Core.Common.Models.Common
 
         public async Task UpdatePlayerRole(Guid teamId, Guid playerId, TeamRole newRole)
         {
-            var teamResult = await CoreService.Teams.GetByIdAsync(teamId,
-                DatabaseComponent.Repository);
+            var teamResult = await CoreService.Teams.GetByIdAsync(teamId, DatabaseComponent.Repository);
             if (!teamResult.Success)
             {
-                await CoreService.ErrorHandler.CaptureAsync(new Exception(
-                        $"Failed to retrieve team {teamId} for player role update: " +
-                        $"{teamResult.ErrorMessage}"
+                await CoreService.ErrorHandler.CaptureAsync(
+                    new Exception(
+                        $"Failed to retrieve team {teamId} for player role update: " + $"{teamResult.ErrorMessage}"
                     ),
                     "Team Update Player Role Warning",
                     nameof(UpdatePlayerRole)
@@ -308,18 +302,15 @@ namespace WabbitBot.Core.Common.Models.Common
 
             if (team is null)
             {
-                await CoreService.ErrorHandler.CaptureAsync(new Exception(
-                        $"Team {teamId} not found for player role update after successful retrieval."
-                    ),
+                await CoreService.ErrorHandler.CaptureAsync(
+                    new Exception($"Team {teamId} not found for player role update after successful retrieval."),
                     "Team Update Player Role Warning",
                     nameof(UpdatePlayerRole)
                 );
                 return; // Exit if team not found
             }
 
-            var member = team.Rosters
-                .SelectMany(r => r.RosterMembers)
-                .FirstOrDefault(m => m.PlayerId == playerId);
+            var member = team.Rosters.SelectMany(r => r.RosterMembers).FirstOrDefault(m => m.PlayerId == playerId);
             if (member != null)
             {
                 member.Role = newRole;
@@ -328,17 +319,16 @@ namespace WabbitBot.Core.Common.Models.Common
                 {
                     member.IsTeamManager = true;
                 }
-                var updateTeamResult = await CoreService.Teams.UpdateAsync(team,
-                    DatabaseComponent.Repository);
-                var updateTeamCacheResult = await CoreService.Teams.UpdateAsync(team,
-                    DatabaseComponent.Cache);
+                var updateTeamResult = await CoreService.Teams.UpdateAsync(team, DatabaseComponent.Repository);
+                var updateTeamCacheResult = await CoreService.Teams.UpdateAsync(team, DatabaseComponent.Cache);
 
                 if (!updateTeamResult.Success || !updateTeamCacheResult.Success)
                 {
-                    await CoreService.ErrorHandler.CaptureAsync(new Exception(
-                            $"Failed to update player role for team {teamId}: " +
-                            $"{updateTeamResult.ErrorMessage} / " +
-                            $"{updateTeamCacheResult.ErrorMessage}"
+                    await CoreService.ErrorHandler.CaptureAsync(
+                        new Exception(
+                            $"Failed to update player role for team {teamId}: "
+                                + $"{updateTeamResult.ErrorMessage} / "
+                                + $"{updateTeamCacheResult.ErrorMessage}"
                         ),
                         "Team Update Player Role Warning",
                         nameof(UpdatePlayerRole)
@@ -349,13 +339,12 @@ namespace WabbitBot.Core.Common.Models.Common
 
         public async Task ChangeCaptain(Guid teamId, Guid newCaptainId)
         {
-            var teamResult = await CoreService.Teams.GetByIdAsync(teamId,
-                DatabaseComponent.Repository);
+            var teamResult = await CoreService.Teams.GetByIdAsync(teamId, DatabaseComponent.Repository);
             if (!teamResult.Success)
             {
-                await CoreService.ErrorHandler.CaptureAsync(new Exception(
-                        $"Failed to retrieve team {teamId} for captain change: " +
-                        $"{teamResult.ErrorMessage}"
+                await CoreService.ErrorHandler.CaptureAsync(
+                    new Exception(
+                        $"Failed to retrieve team {teamId} for captain change: " + $"{teamResult.ErrorMessage}"
                     ),
                     "Team Change Captain Warning",
                     nameof(ChangeCaptain)
@@ -366,9 +355,8 @@ namespace WabbitBot.Core.Common.Models.Common
 
             if (team is null)
             {
-                await CoreService.ErrorHandler.CaptureAsync(new Exception(
-                        $"Team {teamId} not found for captain change after successful retrieval."
-                    ),
+                await CoreService.ErrorHandler.CaptureAsync(
+                    new Exception($"Team {teamId} not found for captain change after successful retrieval."),
                     "Team Change Captain Warning",
                     nameof(ChangeCaptain)
                 );
@@ -376,8 +364,8 @@ namespace WabbitBot.Core.Common.Models.Common
             }
 
             // Find current captain across all rosters
-            var currentCaptain = team.Rosters
-                .SelectMany(r => r.RosterMembers)
+            var currentCaptain = team
+                .Rosters.SelectMany(r => r.RosterMembers)
                 .FirstOrDefault(m => m.Role == TeamRole.Captain);
             if (currentCaptain != null)
             {
@@ -388,8 +376,8 @@ namespace WabbitBot.Core.Common.Models.Common
             }
 
             // Find new captain across all rosters
-            var newCaptain = team.Rosters
-                .SelectMany(r => r.RosterMembers)
+            var newCaptain = team
+                .Rosters.SelectMany(r => r.RosterMembers)
                 .FirstOrDefault(m => m.PlayerId == newCaptainId);
             if (newCaptain != null)
             {
@@ -399,17 +387,16 @@ namespace WabbitBot.Core.Common.Models.Common
                 newCaptain.IsTeamManager = true;
                 // Update team captain ID
                 team.TeamCaptainId = newCaptainId;
-                var updateTeamResult = await CoreService.Teams.UpdateAsync(team,
-                    DatabaseComponent.Repository);
-                var updateTeamCacheResult = await CoreService.Teams.UpdateAsync(team,
-                    DatabaseComponent.Cache);
+                var updateTeamResult = await CoreService.Teams.UpdateAsync(team, DatabaseComponent.Repository);
+                var updateTeamCacheResult = await CoreService.Teams.UpdateAsync(team, DatabaseComponent.Cache);
 
                 if (!updateTeamResult.Success || !updateTeamCacheResult.Success)
                 {
-                    await CoreService.ErrorHandler.CaptureAsync(new Exception(
-                            $"Failed to change captain for team {teamId}: " +
-                            $"{updateTeamResult.ErrorMessage} / " +
-                            $"{updateTeamCacheResult.ErrorMessage}"
+                    await CoreService.ErrorHandler.CaptureAsync(
+                        new Exception(
+                            $"Failed to change captain for team {teamId}: "
+                                + $"{updateTeamResult.ErrorMessage} / "
+                                + $"{updateTeamCacheResult.ErrorMessage}"
                         ),
                         "Team Change Captain Warning",
                         nameof(ChangeCaptain)
@@ -420,13 +407,13 @@ namespace WabbitBot.Core.Common.Models.Common
 
         public async Task SetTeamManagerStatus(Guid teamId, Guid playerId, bool isTeamManager)
         {
-            var teamResult = await CoreService.Teams.GetByIdAsync(teamId,
-                DatabaseComponent.Repository);
+            var teamResult = await CoreService.Teams.GetByIdAsync(teamId, DatabaseComponent.Repository);
             if (!teamResult.Success)
             {
-                await CoreService.ErrorHandler.CaptureAsync(new Exception(
-                        $"Failed to retrieve team {teamId} for team manager status update: " +
-                        $"{teamResult.ErrorMessage}"
+                await CoreService.ErrorHandler.CaptureAsync(
+                    new Exception(
+                        $"Failed to retrieve team {teamId} for team manager status update: "
+                            + $"{teamResult.ErrorMessage}"
                     ),
                     "Team Set Manager Status Warning",
                     nameof(SetTeamManagerStatus)
@@ -437,7 +424,8 @@ namespace WabbitBot.Core.Common.Models.Common
 
             if (team is null)
             {
-                await CoreService.ErrorHandler.CaptureAsync(new Exception(
+                await CoreService.ErrorHandler.CaptureAsync(
+                    new Exception(
                         $"Team {teamId} not found for team manager status update after successful retrieval."
                     ),
                     "Team Set Manager Status Warning",
@@ -446,9 +434,7 @@ namespace WabbitBot.Core.Common.Models.Common
                 return; // Exit if team not found
             }
 
-            var member = team.Rosters
-                .SelectMany(r => r.RosterMembers)
-                .FirstOrDefault(m => m.PlayerId == playerId);
+            var member = team.Rosters.SelectMany(r => r.RosterMembers).FirstOrDefault(m => m.PlayerId == playerId);
             if (member != null)
             {
                 // Captains are always team managers and cannot be demoted
@@ -458,17 +444,16 @@ namespace WabbitBot.Core.Common.Models.Common
                 }
 
                 member.IsTeamManager = isTeamManager;
-                var updateTeamResult = await CoreService.Teams.UpdateAsync(team,
-                    DatabaseComponent.Repository);
-                var updateTeamCacheResult = await CoreService.Teams.UpdateAsync(team,
-                    DatabaseComponent.Cache);
+                var updateTeamResult = await CoreService.Teams.UpdateAsync(team, DatabaseComponent.Repository);
+                var updateTeamCacheResult = await CoreService.Teams.UpdateAsync(team, DatabaseComponent.Cache);
 
                 if (!updateTeamResult.Success || !updateTeamCacheResult.Success)
                 {
-                    await CoreService.ErrorHandler.CaptureAsync(new Exception(
-                            $"Failed to set team manager status for team {teamId}: " +
-                            $"{updateTeamResult.ErrorMessage} / " +
-                            $"{updateTeamCacheResult.ErrorMessage}"
+                    await CoreService.ErrorHandler.CaptureAsync(
+                        new Exception(
+                            $"Failed to set team manager status for team {teamId}: "
+                                + $"{updateTeamResult.ErrorMessage} / "
+                                + $"{updateTeamCacheResult.ErrorMessage}"
                         ),
                         "Team Set Manager Status Warning",
                         nameof(SetTeamManagerStatus)
@@ -479,13 +464,12 @@ namespace WabbitBot.Core.Common.Models.Common
 
         public async Task DeactivatePlayer(Guid teamId, Guid playerId)
         {
-            var teamResult = await CoreService.Teams.GetByIdAsync(teamId,
-                DatabaseComponent.Repository);
+            var teamResult = await CoreService.Teams.GetByIdAsync(teamId, DatabaseComponent.Repository);
             if (!teamResult.Success)
             {
-                await CoreService.ErrorHandler.CaptureAsync(new Exception(
-                        $"Failed to retrieve team {teamId} for player deactivation: " +
-                        $"{teamResult.ErrorMessage}"
+                await CoreService.ErrorHandler.CaptureAsync(
+                    new Exception(
+                        $"Failed to retrieve team {teamId} for player deactivation: " + $"{teamResult.ErrorMessage}"
                     ),
                     "Team Deactivate Player Warning",
                     nameof(DeactivatePlayer)
@@ -496,32 +480,28 @@ namespace WabbitBot.Core.Common.Models.Common
 
             if (team is null)
             {
-                await CoreService.ErrorHandler.CaptureAsync(new Exception(
-                        $"Team {teamId} not found for player deactivation after successful retrieval."
-                    ),
+                await CoreService.ErrorHandler.CaptureAsync(
+                    new Exception($"Team {teamId} not found for player deactivation after successful retrieval."),
                     "Team Deactivate Player Warning",
                     nameof(DeactivatePlayer)
                 );
                 return; // Exit if team not found
             }
 
-            var member = team.Rosters
-                .SelectMany(r => r.RosterMembers)
-                .FirstOrDefault(m => m.PlayerId == playerId);
+            var member = team.Rosters.SelectMany(r => r.RosterMembers).FirstOrDefault(m => m.PlayerId == playerId);
             if (member != null)
             {
                 member.IsActive = false;
-                var updateTeamResult = await CoreService.Teams.UpdateAsync(team,
-                    DatabaseComponent.Repository);
-                var updateTeamCacheResult = await CoreService.Teams.UpdateAsync(team,
-                    DatabaseComponent.Cache);
+                var updateTeamResult = await CoreService.Teams.UpdateAsync(team, DatabaseComponent.Repository);
+                var updateTeamCacheResult = await CoreService.Teams.UpdateAsync(team, DatabaseComponent.Cache);
 
                 if (!updateTeamResult.Success || !updateTeamCacheResult.Success)
                 {
-                    await CoreService.ErrorHandler.CaptureAsync(new Exception(
-                            $"Failed to deactivate player {playerId} in team {teamId}: " +
-                            $"{updateTeamResult.ErrorMessage} / " +
-                            $"{updateTeamCacheResult.ErrorMessage}"
+                    await CoreService.ErrorHandler.CaptureAsync(
+                        new Exception(
+                            $"Failed to deactivate player {playerId} in team {teamId}: "
+                                + $"{updateTeamResult.ErrorMessage} / "
+                                + $"{updateTeamCacheResult.ErrorMessage}"
                         ),
                         "Team Deactivate Player Warning",
                         nameof(DeactivatePlayer)
@@ -532,14 +512,13 @@ namespace WabbitBot.Core.Common.Models.Common
 
         public async Task ReactivatePlayer(Guid teamId, Guid playerId)
         {
-            var teamResult = await CoreService.Teams.GetByIdAsync(teamId,
-                DatabaseComponent.Repository);
+            var teamResult = await CoreService.Teams.GetByIdAsync(teamId, DatabaseComponent.Repository);
             if (!teamResult.Success)
             {
                 // Log but don't fail if team not found (already reactivated or deleted)
-                await CoreService.ErrorHandler.CaptureAsync(new Exception(
-                        $"Failed to retrieve team {teamId} for reactivation: " +
-                        $"{teamResult.ErrorMessage}"
+                await CoreService.ErrorHandler.CaptureAsync(
+                    new Exception(
+                        $"Failed to retrieve team {teamId} for reactivation: " + $"{teamResult.ErrorMessage}"
                     ),
                     "Team Reactivation Warning",
                     nameof(ReactivatePlayer)
@@ -551,32 +530,28 @@ namespace WabbitBot.Core.Common.Models.Common
             if (team is null)
             {
                 // Log but don't fail if team not found (already reactivated or deleted)
-                await CoreService.ErrorHandler.CaptureAsync(new Exception(
-                        $"Team {teamId} not found for reactivation after successful retrieval."
-                    ),
+                await CoreService.ErrorHandler.CaptureAsync(
+                    new Exception($"Team {teamId} not found for reactivation after successful retrieval."),
                     "Team Reactivation Warning",
                     nameof(ReactivatePlayer)
                 );
                 return; // Exit if team not found
             }
 
-            var member = team.Rosters
-                .SelectMany(r => r.RosterMembers)
-                .FirstOrDefault(m => m.PlayerId == playerId);
+            var member = team.Rosters.SelectMany(r => r.RosterMembers).FirstOrDefault(m => m.PlayerId == playerId);
             if (member != null)
             {
                 member.IsActive = true;
-                var updateTeamRepoResult = await CoreService.Teams.UpdateAsync(team,
-                    DatabaseComponent.Repository);
-                var updateTeamCacheResult = await CoreService.Teams.UpdateAsync(team,
-                    DatabaseComponent.Cache);
+                var updateTeamRepoResult = await CoreService.Teams.UpdateAsync(team, DatabaseComponent.Repository);
+                var updateTeamCacheResult = await CoreService.Teams.UpdateAsync(team, DatabaseComponent.Cache);
 
                 if (!updateTeamRepoResult.Success || !updateTeamCacheResult.Success)
                 {
-                    await CoreService.ErrorHandler.CaptureAsync(new Exception(
-                            $"Failed to reactivate player {playerId} in team {teamId}: " +
-                            $"{updateTeamRepoResult.ErrorMessage} / " +
-                            $"{updateTeamCacheResult.ErrorMessage}"
+                    await CoreService.ErrorHandler.CaptureAsync(
+                        new Exception(
+                            $"Failed to reactivate player {playerId} in team {teamId}: "
+                                + $"{updateTeamRepoResult.ErrorMessage} / "
+                                + $"{updateTeamCacheResult.ErrorMessage}"
                         ),
                         "Team Reactivation Warning",
                         nameof(ReactivatePlayer)
@@ -588,13 +563,10 @@ namespace WabbitBot.Core.Common.Models.Common
         // Moved from StatsCore
         public async Task<Result> UpdateScrimmageStats(Guid teamId, TeamSize teamSize, bool isWin)
         {
-            var teamResult = await CoreService.Teams.GetByIdAsync(teamId,
-                DatabaseComponent.Repository);
+            var teamResult = await CoreService.Teams.GetByIdAsync(teamId, DatabaseComponent.Repository);
             if (!teamResult.Success)
             {
-                return Result.Failure(
-                    $"Failed to retrieve team {teamId}: {teamResult.ErrorMessage}"
-                );
+                return Result.Failure($"Failed to retrieve team {teamId}: {teamResult.ErrorMessage}");
             }
             var team = teamResult.Data;
 
@@ -605,7 +577,7 @@ namespace WabbitBot.Core.Common.Models.Common
 
             if (!team.ScrimmageTeamStats.TryGetValue(teamSize, out var stats))
             {
-                stats = new Common.ScrimmageTeamStats { TeamId = teamId, TeamSize = teamSize, };
+                stats = new Common.ScrimmageTeamStats { TeamId = teamId, TeamSize = teamSize };
                 team.ScrimmageTeamStats.Add(teamSize, stats);
             }
 
@@ -620,22 +592,22 @@ namespace WabbitBot.Core.Common.Models.Common
                 stats.CurrentStreak = Math.Min(0, stats.CurrentStreak) - 1;
             }
 
-            stats.LongestStreak = Math.Max(Math.Abs(stats.CurrentStreak),
-                stats.LongestStreak);
+            stats.LongestStreak = Math.Max(Math.Abs(stats.CurrentStreak), stats.LongestStreak);
             stats.LastMatchAt = DateTime.UtcNow;
             stats.LastUpdated = DateTime.UtcNow;
 
-            var updateTeamResult = await CoreService.Teams.UpdateAsync(team,
-                DatabaseComponent.Repository);
-            var updateStatsResult = await CoreService.ScrimmageTeamStats.UpdateAsync(stats,
-                DatabaseComponent.Repository); // Update individual stats object
+            var updateTeamResult = await CoreService.Teams.UpdateAsync(team, DatabaseComponent.Repository);
+            var updateStatsResult = await CoreService.ScrimmageTeamStats.UpdateAsync(
+                stats,
+                DatabaseComponent.Repository
+            ); // Update individual stats object
 
             if (!updateTeamResult.Success || !updateStatsResult.Success)
             {
                 return Result.Failure(
-                    $"Failed to update stats for team {teamId}: " +
-                    $"{updateTeamResult.ErrorMessage} / " +
-                    $"{updateStatsResult.ErrorMessage}"
+                    $"Failed to update stats for team {teamId}: "
+                        + $"{updateTeamResult.ErrorMessage} / "
+                        + $"{updateStatsResult.ErrorMessage}"
                 );
             }
 
@@ -645,13 +617,10 @@ namespace WabbitBot.Core.Common.Models.Common
         // Moved from StatsCore
         public async Task<Result> UpdateScrimmageRating(Guid teamId, TeamSize teamSize, double newRating)
         {
-            var teamResult = await CoreService.Teams.GetByIdAsync(teamId,
-                DatabaseComponent.Repository);
+            var teamResult = await CoreService.Teams.GetByIdAsync(teamId, DatabaseComponent.Repository);
             if (!teamResult.Success)
             {
-                return Result.Failure(
-                    $"Failed to retrieve team {teamId}: {teamResult.ErrorMessage}"
-                );
+                return Result.Failure($"Failed to retrieve team {teamId}: {teamResult.ErrorMessage}");
             }
             var team = teamResult.Data;
 
@@ -662,7 +631,7 @@ namespace WabbitBot.Core.Common.Models.Common
 
             if (!team.ScrimmageTeamStats.TryGetValue(teamSize, out var stats))
             {
-                stats = new Common.ScrimmageTeamStats { TeamId = teamId, TeamSize = teamSize, };
+                stats = new Common.ScrimmageTeamStats { TeamId = teamId, TeamSize = teamSize };
                 team.ScrimmageTeamStats.Add(teamSize, stats);
             }
 
@@ -670,17 +639,18 @@ namespace WabbitBot.Core.Common.Models.Common
             stats.HighestRating = Math.Max(stats.HighestRating, newRating);
             stats.LastUpdated = DateTime.UtcNow;
 
-            var updateTeamResult = await CoreService.Teams.UpdateAsync(team,
-                DatabaseComponent.Repository);
-            var updateStatsResult = await CoreService.ScrimmageTeamStats.UpdateAsync(stats,
-                DatabaseComponent.Repository); // Update individual stats object
+            var updateTeamResult = await CoreService.Teams.UpdateAsync(team, DatabaseComponent.Repository);
+            var updateStatsResult = await CoreService.ScrimmageTeamStats.UpdateAsync(
+                stats,
+                DatabaseComponent.Repository
+            ); // Update individual stats object
 
             if (!updateTeamResult.Success || !updateStatsResult.Success)
             {
                 return Result.Failure(
-                    $"Failed to update scrimmage rating for team {teamId}: " +
-                    $"{updateTeamResult.ErrorMessage} / " +
-                    $"{updateStatsResult.ErrorMessage}"
+                    $"Failed to update scrimmage rating for team {teamId}: "
+                        + $"{updateTeamResult.ErrorMessage} / "
+                        + $"{updateStatsResult.ErrorMessage}"
                 );
             }
 
@@ -711,8 +681,8 @@ namespace WabbitBot.Core.Common.Models.Common
         {
             public static List<Guid> GetTeamManagerIds(Team team)
             {
-                return team.Rosters
-                    .SelectMany(r => r.RosterMembers)
+                return team
+                    .Rosters.SelectMany(r => r.RosterMembers)
                     .Where(m => m.IsActive && m.IsTeamManager)
                     .Select(m => m.PlayerId)
                     .Distinct()
@@ -721,16 +691,13 @@ namespace WabbitBot.Core.Common.Models.Common
 
             public static List<TeamMember> GetActiveMembers(Team team)
             {
-                return team.Rosters
-                    .SelectMany(r => r.RosterMembers)
-                    .Where(m => m.IsActive)
-                    .ToList();
+                return team.Rosters.SelectMany(r => r.RosterMembers).Where(m => m.IsActive).ToList();
             }
 
             public static List<TeamMember> GetActiveMembersForRosterGroup(Team team, TeamSizeRosterGroup rosterGroup)
             {
-                return team.Rosters
-                    .Where(r => r.RosterGroup == rosterGroup)
+                return team
+                    .Rosters.Where(r => r.RosterGroup == rosterGroup)
                     .SelectMany(r => r.RosterMembers)
                     .Where(m => m.IsActive)
                     .ToList();
@@ -738,52 +705,44 @@ namespace WabbitBot.Core.Common.Models.Common
 
             public static TeamMember? GetMember(Team team, Guid playerId)
             {
-                return team.Rosters
-                    .SelectMany(r => r.RosterMembers)
-                    .FirstOrDefault(m => m.PlayerId == playerId);
+                return team.Rosters.SelectMany(r => r.RosterMembers).FirstOrDefault(m => m.PlayerId == playerId);
             }
 
             public static bool HasPlayer(Team team, Guid playerId)
             {
-                return team.Rosters
-                    .SelectMany(r => r.RosterMembers)
-                    .Any(m => m.PlayerId == playerId);
+                return team.Rosters.SelectMany(r => r.RosterMembers).Any(m => m.PlayerId == playerId);
             }
 
             public static bool HasActivePlayer(Team team, Guid playerId)
             {
-                return team.Rosters
-                    .SelectMany(r => r.RosterMembers)
-                    .Any(m => m.PlayerId == playerId && m.IsActive);
+                return team.Rosters.SelectMany(r => r.RosterMembers).Any(m => m.PlayerId == playerId && m.IsActive);
             }
 
             public static bool HasActivePlayerInRosterGroup(Team team, Guid playerId, TeamSizeRosterGroup rosterGroup)
             {
-                return team.Rosters
-                    .Where(r => r.RosterGroup == rosterGroup)
+                return team
+                    .Rosters.Where(r => r.RosterGroup == rosterGroup)
                     .SelectMany(r => r.RosterMembers)
                     .Any(m => m.PlayerId == playerId && m.IsActive);
             }
 
             public static int GetActivePlayerCount(Team team)
             {
-                return team.Rosters
-                    .SelectMany(r => r.RosterMembers)
-                    .Count(m => m.IsActive);
+                return team.Rosters.SelectMany(r => r.RosterMembers).Count(m => m.IsActive);
             }
 
             public static int GetActivePlayerCountForRosterGroup(Team team, TeamSizeRosterGroup rosterGroup)
             {
-                return team.Rosters
-                    .Where(r => r.RosterGroup == rosterGroup)
+                return team
+                    .Rosters.Where(r => r.RosterGroup == rosterGroup)
                     .SelectMany(r => r.RosterMembers)
                     .Count(m => m.IsActive);
             }
 
             public static List<Guid> GetActivePlayerIds(Team team)
             {
-                return team.Rosters
-                    .SelectMany(r => r.RosterMembers)
+                return team
+                    .Rosters.SelectMany(r => r.RosterMembers)
                     .Where(m => m.IsActive)
                     .Select(m => m.PlayerId)
                     .Distinct()
@@ -792,8 +751,8 @@ namespace WabbitBot.Core.Common.Models.Common
 
             public static List<Guid> GetActivePlayerIdsForRosterGroup(Team team, TeamSizeRosterGroup rosterGroup)
             {
-                return team.Rosters
-                    .Where(r => r.RosterGroup == rosterGroup)
+                return team
+                    .Rosters.Where(r => r.RosterGroup == rosterGroup)
                     .SelectMany(r => r.RosterMembers)
                     .Where(m => m.IsActive)
                     .Select(m => m.PlayerId)
@@ -802,8 +761,8 @@ namespace WabbitBot.Core.Common.Models.Common
 
             public static List<Guid> GetCorePlayerIds(Team team)
             {
-                return team.Rosters
-                    .SelectMany(r => r.RosterMembers)
+                return team
+                    .Rosters.SelectMany(r => r.RosterMembers)
                     .Where(m => m.IsActive && (m.Role == TeamRole.Core || m.Role == TeamRole.Captain))
                     .Select(m => m.PlayerId)
                     .Distinct()
@@ -812,8 +771,8 @@ namespace WabbitBot.Core.Common.Models.Common
 
             public static List<Guid> GetCaptainIds(Team team)
             {
-                return team.Rosters
-                    .SelectMany(r => r.RosterMembers)
+                return team
+                    .Rosters.SelectMany(r => r.RosterMembers)
                     .Where(m => m.IsActive && m.Role == TeamRole.Captain)
                     .Select(m => m.PlayerId)
                     .Distinct()
@@ -822,15 +781,15 @@ namespace WabbitBot.Core.Common.Models.Common
 
             public static bool IsCaptain(Team team, Guid playerId)
             {
-                return team.Rosters
-                    .SelectMany(r => r.RosterMembers)
+                return team
+                    .Rosters.SelectMany(r => r.RosterMembers)
                     .Any(m => m.PlayerId == playerId && m.IsActive && m.Role == TeamRole.Captain);
             }
 
             public static bool IsTeamManager(Team team, Guid playerId)
             {
-                return team.Rosters
-                    .SelectMany(r => r.RosterMembers)
+                return team
+                    .Rosters.SelectMany(r => r.RosterMembers)
                     .Any(m => m.PlayerId == playerId && m.IsActive && m.IsTeamManager);
             }
 
@@ -847,7 +806,7 @@ namespace WabbitBot.Core.Common.Models.Common
                     TeamSize.TwoVTwo => 2,
                     TeamSize.ThreeVThree => 3,
                     TeamSize.FourVFour => 4,
-                    _ => 1
+                    _ => 1,
                 };
 
                 return GetActivePlayerCountForRosterGroup(team, rosterGroup) >= requiredPlayers;
@@ -886,7 +845,7 @@ namespace WabbitBot.Core.Common.Models.Common
                 {
                     TeamType.Solo => ValidateSoloTeamRosters(rosterGroups),
                     TeamType.Team => ValidateTeamTypeRosters(rosterGroups),
-                    _ => Result.Failure($"Invalid team type: {team.TeamType}")
+                    _ => Result.Failure($"Invalid team type: {team.TeamType}"),
                 };
             }
 
@@ -928,11 +887,13 @@ namespace WabbitBot.Core.Common.Models.Common
             {
                 return teamType switch
                 {
-                    TeamType.Solo when rosterGroup != TeamSizeRosterGroup.Solo =>
-                        Result.Failure("Solo teams can only have Solo rosters"),
-                    TeamType.Team when rosterGroup == TeamSizeRosterGroup.Solo =>
-                        Result.Failure("Team-type teams cannot have Solo rosters"),
-                    _ => Result.CreateSuccess()
+                    TeamType.Solo when rosterGroup != TeamSizeRosterGroup.Solo => Result.Failure(
+                        "Solo teams can only have Solo rosters"
+                    ),
+                    TeamType.Team when rosterGroup == TeamSizeRosterGroup.Solo => Result.Failure(
+                        "Team-type teams cannot have Solo rosters"
+                    ),
+                    _ => Result.CreateSuccess(),
                 };
             }
 

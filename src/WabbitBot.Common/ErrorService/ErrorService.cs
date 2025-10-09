@@ -1,4 +1,3 @@
-
 using System.Threading.Tasks;
 
 namespace WabbitBot.Common.ErrorService;
@@ -47,7 +46,8 @@ public partial class ErrorService : IErrorService
         Exception exception,
         string message,
         string operationName,
-        ErrorSeverity severity = ErrorSeverity.Error)
+        ErrorSeverity severity = ErrorSeverity.Error
+    )
     {
         var context = new ErrorContext(message, severity, operationName, exception);
 
@@ -58,6 +58,8 @@ public partial class ErrorService : IErrorService
 
     // Partial method declarations. The implementations will be in the partial class files.
     private partial Task LogAsync(ErrorContext context);
+
     private partial Task NotifyAsync(ErrorContext context);
+
     private partial Task RecoverAsync(ErrorContext context);
 }

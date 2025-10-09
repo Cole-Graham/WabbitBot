@@ -17,7 +17,12 @@ namespace WabbitBot.DiscBot.App
         /// Starts the deck submission DM flow for players before a game.
         /// Publishes DM start requests for each player.
         /// </summary>
-        public async Task StartDeckSubmissionDMsAsync(Guid matchId, int gameNumber, ulong player1DiscordUserId, ulong player2DiscordUserId)
+        public async Task StartDeckSubmissionDMsAsync(
+            Guid matchId,
+            int gameNumber,
+            ulong player1DiscordUserId,
+            ulong player2DiscordUserId
+        )
         {
             // Request DM creation for both players; Renderer will send the actual DMs
             await DiscBotService.PublishAsync(new DeckDmStartRequested(matchId, gameNumber, player1DiscordUserId));
@@ -102,11 +107,14 @@ namespace WabbitBot.DiscBot.App
         public void Initialize()
         {
             DiscBotService.EventBus.Subscribe<GameReplaySubmitted>(evt =>
-                OnReplaySubmittedAsync(evt.MatchId, evt.GameNumber, evt.ReplayFileIds));
+                OnReplaySubmittedAsync(evt.MatchId, evt.GameNumber, evt.ReplayFileIds)
+            );
             DiscBotService.EventBus.Subscribe<PlayerDeckSubmitted>(evt =>
-                OnDeckSubmittedAsync(evt.MatchId, evt.GameNumber, evt.PlayerId, evt.DeckCode));
+                OnDeckSubmittedAsync(evt.MatchId, evt.GameNumber, evt.PlayerId, evt.DeckCode)
+            );
             DiscBotService.EventBus.Subscribe<PlayerDeckConfirmed>(evt =>
-                OnDeckConfirmedAsync(evt.MatchId, evt.GameNumber, evt.PlayerId, evt.DeckCode));
+                OnDeckConfirmedAsync(evt.MatchId, evt.GameNumber, evt.PlayerId, evt.DeckCode)
+            );
         }
 
         private static string ChooseRandomMap(string[] remainingMaps)

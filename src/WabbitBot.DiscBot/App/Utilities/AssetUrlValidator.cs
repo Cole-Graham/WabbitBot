@@ -3,7 +3,7 @@ namespace WabbitBot.DiscBot.App.Utilities
     /// <summary>
     /// Validates URLs used in Discord embeds and containers to prevent
     /// accidental exposure of internal file paths.
-    /// 
+    ///
     /// Policy: Only CDN URLs (https://) or attachment:// URIs are permitted.
     /// Internal file paths (C:\, /var/www, etc.) are forbidden.
     /// </summary>
@@ -60,29 +60,35 @@ namespace WabbitBot.DiscBot.App.Utilities
             if (string.IsNullOrWhiteSpace(url))
             {
                 throw new InvalidOperationException(
-                    $"{context} cannot be null or empty. Use attachment:// or CDN URLs only.");
+                    $"{context} cannot be null or empty. Use attachment:// or CDN URLs only."
+                );
             }
 
             if (!IsValidAssetUrl(url))
             {
                 // Determine the specific error
-                if (url.StartsWith("file://", StringComparison.OrdinalIgnoreCase) ||
-                    url.Contains(":\\", StringComparison.Ordinal) ||
-                    url.StartsWith("/", StringComparison.Ordinal))
+                if (
+                    url.StartsWith("file://", StringComparison.OrdinalIgnoreCase)
+                    || url.Contains(":\\", StringComparison.Ordinal)
+                    || url.StartsWith("/", StringComparison.Ordinal)
+                )
                 {
                     throw new InvalidOperationException(
-                        $"{context} appears to be an internal file path: {url}. " +
-                        "Only HTTPS CDN URLs or attachment:// URIs are permitted in Discord embeds/containers.");
+                        $"{context} appears to be an internal file path: {url}. "
+                            + "Only HTTPS CDN URLs or attachment:// URIs are permitted in Discord embeds/containers."
+                    );
                 }
 
                 if (url.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
                 {
                     throw new InvalidOperationException(
-                        $"{context} uses insecure HTTP: {url}. Only HTTPS URLs are permitted.");
+                        $"{context} uses insecure HTTP: {url}. Only HTTPS URLs are permitted."
+                    );
                 }
 
                 throw new InvalidOperationException(
-                    $"{context} is invalid: {url}. Only HTTPS CDN URLs or attachment:// URIs are permitted.");
+                    $"{context} is invalid: {url}. Only HTTPS CDN URLs or attachment:// URIs are permitted."
+                );
             }
         }
 
@@ -93,8 +99,8 @@ namespace WabbitBot.DiscBot.App.Utilities
         /// <returns>True if it's an attachment reference</returns>
         public static bool IsAttachmentUrl(string? url)
         {
-            return !string.IsNullOrWhiteSpace(url) &&
-                url.StartsWith("attachment://", StringComparison.OrdinalIgnoreCase);
+            return !string.IsNullOrWhiteSpace(url)
+                && url.StartsWith("attachment://", StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>
@@ -104,9 +110,9 @@ namespace WabbitBot.DiscBot.App.Utilities
         /// <returns>True if it's a CDN URL</returns>
         public static bool IsCdnUrl(string? url)
         {
-            return !string.IsNullOrWhiteSpace(url) &&
-                url.StartsWith("https://", StringComparison.OrdinalIgnoreCase) &&
-                Uri.TryCreate(url, UriKind.Absolute, out _);
+            return !string.IsNullOrWhiteSpace(url)
+                && url.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
+                && Uri.TryCreate(url, UriKind.Absolute, out _);
         }
     }
 }

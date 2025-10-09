@@ -13,6 +13,7 @@ namespace WabbitBot.Core.Common.Database.Tests
     public sealed class PgSqlCrudTests
     {
         private readonly PgSqlFixture _fx;
+
         public PgSqlCrudTests(PgSqlFixture fx) => _fx = fx;
 
         [Fact]
@@ -20,16 +21,17 @@ namespace WabbitBot.Core.Common.Database.Tests
         {
             if (!_fx.Available)
             {
-                throw new InvalidOperationException("Docker not available: start Docker Desktop or ensure Docker Engine is running to execute container-backed integration tests.");
+                throw new InvalidOperationException(
+                    "Docker not available: start Docker Desktop or ensure Docker Engine is running to execute"
+                        + " container -backed integration tests."
+                );
             }
 
             var dataSourceBuilder = new NpgsqlDataSourceBuilder(_fx.ConnectionString);
             dataSourceBuilder.EnableDynamicJson();
             await using var dataSource = dataSourceBuilder.Build();
 
-            var options = new DbContextOptionsBuilder<TestPlayerDbContext>()
-                .UseNpgsql(dataSource)
-                .Options;
+            var options = new DbContextOptionsBuilder<TestPlayerDbContext>().UseNpgsql(dataSource).Options;
 
             await using var db = new TestPlayerDbContext(options);
             await db.Database.EnsureCreatedAsync();
@@ -56,5 +58,3 @@ namespace WabbitBot.Core.Common.Database.Tests
         }
     }
 }
-
-

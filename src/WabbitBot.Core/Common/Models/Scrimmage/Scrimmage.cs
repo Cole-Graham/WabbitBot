@@ -69,7 +69,6 @@ namespace WabbitBot.Core.Common.Models.Scrimmage
         public DateTime? Team2ProvenPotentialAppliedAt { get; set; }
 
         public override Domain Domain => Domain.Scrimmage;
-
     }
 
     [EntityMetadata(
@@ -142,7 +141,7 @@ namespace WabbitBot.Core.Common.Models.Scrimmage
         InProgress,
         Completed,
         Cancelled,
-        Forfeited
+        Forfeited,
     }
 
     [EntityMetadata(

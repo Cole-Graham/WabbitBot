@@ -2,15 +2,15 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Caching.Distributed;
+using WabbitBot.Common.Configuration;
+using WabbitBot.Common.Data.Interfaces;
+using WabbitBot.Common.Data.Service;
+using WabbitBot.Common.Events.Interfaces;
+using WabbitBot.Common.Models;
 using WabbitBot.Core.Common.Models.Common;
 using WabbitBot.Core.Common.Models.Scrimmage;
-using WabbitBot.Common.Data.Service;
-using WabbitBot.Common.Data.Interfaces;
-using WabbitBot.Common.Configuration;
-using WabbitBot.Common.Models;
 using WabbitBot.Core.Common.Services;
-using WabbitBot.Common.Events.Interfaces;
-using Microsoft.Extensions.Caching.Distributed;
 
 namespace WabbitBot.Core.Scrimmages
 {
@@ -31,7 +31,6 @@ namespace WabbitBot.Core.Scrimmages
             private const double MAX_SCALING_FACTOR = 1.0;
 
             // Database access is now through CoreService static accessors
-
 
             /// <summary>
             /// Gets all team ratings for a specific game size.
@@ -58,11 +57,14 @@ namespace WabbitBot.Core.Scrimmages
                 }
                 catch (Exception ex)
                 {
-                    await CoreService.ErrorHandler.CaptureAsync(ex, "Failed to get all team ratings", nameof(GetAllTeamRatingsAsync));
+                    await CoreService.ErrorHandler.CaptureAsync(
+                        ex,
+                        "Failed to get all team ratings",
+                        nameof(GetAllTeamRatingsAsync)
+                    );
                     return new Dictionary<string, double>();
                 }
             }
-
 
             private static ScrimmageOptions GetScrimmageDbConfig()
             {
@@ -121,19 +123,21 @@ namespace WabbitBot.Core.Scrimmages
                 // Map percentile to x in range [1, 10]
                 double x = percentile - 89;
 
-                double k = SIGMOID_GROWTH_RATE;  // Growth rate
-                double x0 = SIGMOID_MIDPOINT;    // Midpoint
+                double k = SIGMOID_GROWTH_RATE; // Growth rate
+                double x0 = SIGMOID_MIDPOINT; // Midpoint
 
                 double raw = 1.0 / (1.0 + Math.Exp(-k * (x - x0)));
                 double minRaw = 1.0 / (1.0 + Math.Exp(-k * (1.0 - x0)));
                 double maxRaw = 1.0 / (1.0 + Math.Exp(-k * (10.0 - x0)));
 
-                double scaled = (raw - minRaw) / (maxRaw - minRaw);  // Normalize to [0, 1]
-                return MIN_SCALING_FACTOR + scaled * (MAX_SCALING_FACTOR - MIN_SCALING_FACTOR);  // Scale to [0.1, 1.0]
+                double scaled = (raw - minRaw) / (maxRaw - minRaw); // Normalize to [0, 1]
+                return MIN_SCALING_FACTOR + scaled * (MAX_SCALING_FACTOR - MIN_SCALING_FACTOR); // Scale to [0.1, 1.0]
             }
 
             #region CalculateAllDistributionScoresAsync
-            public static async Task<List<(Guid, Dictionary<Guid, double>)>> CalculateAllDistributionScoresAsync(TeamSize teamSize)
+            public static async Task<List<(Guid, Dictionary<Guid, double>)>> CalculateAllDistributionScoresAsync(
+                TeamSize teamSize
+            )
             {
                 try
                 {
@@ -156,11 +160,13 @@ namespace WabbitBot.Core.Scrimmages
                         else
                         {
                             // Fallback: calculate on-demand using recent opponent encounters
-                            var recentEncounters = team.ScrimmageTeamStats[teamSize].OpponentEncounters?
-                                .Where(oe => oe.TeamSize == teamSize)
-                                .OrderByDescending(oe => oe.EncounteredAt)
-                                .Take(50) // Last 50 encounters for performance
-                                .ToList() ?? new List<TeamOpponentEncounter>();
+                            var recentEncounters =
+                                team.ScrimmageTeamStats[teamSize]
+                                    .OpponentEncounters?.Where(oe => oe.TeamSize == teamSize)
+                                    .OrderByDescending(oe => oe.EncounteredAt)
+                                    .Take(50) // Last 50 encounters for performance
+                                    .ToList()
+                                ?? new List<TeamOpponentEncounter>();
 
                             if (recentEncounters.Any())
                             {
@@ -184,7 +190,10 @@ namespace WabbitBot.Core.Scrimmages
 
                                 // Calculate bonus
                                 var uniqueBonus = Math.Min(uniqueOpponents * 0.1, 1.0);
-                                var repeatPenalty = totalEncounters > uniqueOpponents ? (totalEncounters - uniqueOpponents) * 0.05 : 0.0;
+                                var repeatPenalty =
+                                    totalEncounters > uniqueOpponents
+                                        ? (totalEncounters - uniqueOpponents) * 0.05
+                                        : 0.0;
                                 var bonus = Math.Max(uniqueBonus - repeatPenalty, 0.0);
 
                                 teamVarietyScores[team.Id] = (normalizedEntropy * 0.7) + (bonus * 0.3);
@@ -204,9 +213,11 @@ namespace WabbitBot.Core.Scrimmages
                     foreach (var team in allTeams.Data ?? Enumerable.Empty<Team>())
                     {
                         // Count total opponent encounters for this team and team size
-                        var encounterCount = team.ScrimmageTeamStats[teamSize].OpponentEncounters?
-                            .Where(oe => oe.TeamSize == teamSize)
-                            .Count() ?? 0;
+                        var encounterCount =
+                            team.ScrimmageTeamStats[teamSize]
+                                .OpponentEncounters?.Where(oe => oe.TeamSize == teamSize)
+                                .Count()
+                            ?? 0;
                         teamEncounterCounts[team.Id] = encounterCount;
                     }
 
@@ -225,19 +236,21 @@ namespace WabbitBot.Core.Scrimmages
                             teamVarietyScore,
                             averageVarietyScore,
                             teamEncounters,
-                            averageEncounters);
+                            averageEncounters
+                        );
 
-                        distributions.Add((team.Id, new Dictionary<Guid, double> {
-                            { team.Id, varietyBonus }
-                        }));
+                        distributions.Add((team.Id, new Dictionary<Guid, double> { { team.Id, varietyBonus } }));
                     }
 
                     return distributions;
                 }
                 catch (Exception ex)
                 {
-                    await CoreService.ErrorHandler.CaptureAsync(ex, "Failed to calculate all team variety scores", nameof(
-                        CalculateAllDistributionScoresAsync));
+                    await CoreService.ErrorHandler.CaptureAsync(
+                        ex,
+                        "Failed to calculate all team variety scores",
+                        nameof(CalculateAllDistributionScoresAsync)
+                    );
                     throw;
                 }
             }
@@ -250,7 +263,8 @@ namespace WabbitBot.Core.Scrimmages
             private static double CalculateShannonEntropy(IEnumerable<int> frequencies)
             {
                 var total = frequencies.Sum();
-                if (total == 0) return 0.0;
+                if (total == 0)
+                    return 0.0;
 
                 double entropy = 0.0;
                 foreach (var frequency in frequencies)
@@ -272,7 +286,8 @@ namespace WabbitBot.Core.Scrimmages
                 double teamVarietyEntropy,
                 double averageVarietyEntropy,
                 int teamMatchesPlayed,
-                double averageMatchesPlayed)
+                double averageMatchesPlayed
+            )
             {
                 // Calculate how far the team's variety entropy is from the average
                 double entropyDifference = teamVarietyEntropy - averageVarietyEntropy;
@@ -287,14 +302,14 @@ namespace WabbitBot.Core.Scrimmages
                 return relativeDiff * (1 - gamesPlayedFactor);
             }
 
-
             /// <summary>
             /// Calculates normalized weights for a team's opponents based on rating gaps and match counts.
             /// </summary>
             private static Dictionary<Guid, double> CalculateOpponentWeights(
-            double teamRating,
-            Dictionary<Guid, (int Count, double Rating)> opponentMatches,
-            (double Max, double Min) ratingRange)
+                double teamRating,
+                Dictionary<Guid, (int Count, double Rating)> opponentMatches,
+                (double Max, double Min) ratingRange
+            )
             {
                 var weighted = new Dictionary<Guid, double>();
                 double total = 0;
@@ -406,13 +421,15 @@ namespace WabbitBot.Core.Scrimmages
                 double averageVarietyEntropy,
                 int teamMatchesPlayed,
                 double averageMatchesPlayed,
-                double? playerPercentile = null)
+                double? playerPercentile = null
+            )
             {
                 // Calculate how far the team's variety entropy is from the average
                 double entropyDifference = teamVarietyEntropy - averageVarietyEntropy;
 
                 // Bonus scales proportionally with difference from average
-                double relativeDiff = entropyDifference / (Math.Abs(averageVarietyEntropy) == 0 ? 1 : Math.Abs(averageVarietyEntropy));
+                double relativeDiff =
+                    entropyDifference / (Math.Abs(averageVarietyEntropy) == 0 ? 1 : Math.Abs(averageVarietyEntropy));
 
                 // Scale the bonus based on games played relative to average
                 double gamesPlayedRatio = Math.Min(teamMatchesPlayed / averageMatchesPlayed, 1.0);
@@ -420,7 +437,8 @@ namespace WabbitBot.Core.Scrimmages
                 // Apply quadratic scaling based on games played relative to average
                 // Formula: min_scaling_factor + (1.0 - min_scaling_factor) * games_played_ratio²
                 double minScalingFactor = 0.5; // 50% of the max bonus
-                double scalingFactor = minScalingFactor + (1.0 - minScalingFactor) * gamesPlayedRatio * gamesPlayedRatio;
+                double scalingFactor =
+                    minScalingFactor + (1.0 - minScalingFactor) * gamesPlayedRatio * gamesPlayedRatio;
 
                 // Apply the scaling factor to the relative difference
                 double scaledDiff = relativeDiff * scalingFactor;
@@ -479,7 +497,10 @@ namespace WabbitBot.Core.Scrimmages
                 }
                 // Return the bonus between the minimum and maximum bonus limits
                 return Math.Clamp(
-                    baseBonus, GetScrimmageDbConfig().MinVarietyBonus, GetScrimmageDbConfig().MaxVarietyBonus);
+                    baseBonus,
+                    GetScrimmageDbConfig().MinVarietyBonus,
+                    GetScrimmageDbConfig().MaxVarietyBonus
+                );
             }
             #endregion
 
@@ -522,7 +543,6 @@ namespace WabbitBot.Core.Scrimmages
 
                 return allRatings;
             }
-
 
             // TODO: Distinguish methods which need this for calculating needing variety score.
             // private static async Task<Dictionary<Guid, double>> GetTeamOpponentDistributionAsync(
@@ -663,9 +683,9 @@ namespace WabbitBot.Core.Scrimmages
 
                 // Fetch matches from database using TeamId
                 var matchesResult = await CoreService.Matches.GetAllAsync(DatabaseComponent.Repository);
-                return matchesResult.Data?
-                    .Where(m => (m.Team1Id == teamId || m.Team2Id == teamId) && m.CompletedAt >= startDate)
-                    .Count() ?? 0;
+                return matchesResult
+                        .Data?.Where(m => (m.Team1Id == teamId || m.Team2Id == teamId) && m.CompletedAt >= startDate)
+                        .Count() ?? 0;
             }
 
             /// <summary>
@@ -723,8 +743,6 @@ namespace WabbitBot.Core.Scrimmages
             //         throw;
             //     }
             // }
-
-
 
             /// <summary>
             /// Calculates the rating change for a match using the ELO formula with individual multipliers.
@@ -839,8 +857,6 @@ namespace WabbitBot.Core.Scrimmages
             //     }
             // }
 
-
-
             /// <summary>
             /// Calculates catch-up bonus for a player below the target rating.
             /// Matches Python implementation: exponential decay based on distance from target.
@@ -850,7 +866,12 @@ namespace WabbitBot.Core.Scrimmages
             /// <param name="threshold">Rating difference threshold before bonus applies</param>
             /// <param name="maxBonus">Maximum bonus multiplier</param>
             /// <returns>Catch-up bonus multiplier (0.0 to maxBonus)</returns>
-            private static double CalculateCatchUpBonus(double playerRating, double targetRating, double threshold, double maxBonus)
+            private static double CalculateCatchUpBonus(
+                double playerRating,
+                double targetRating,
+                double threshold,
+                double maxBonus
+            )
             {
                 if (playerRating >= targetRating)
                     return 0.0;
@@ -876,9 +897,10 @@ namespace WabbitBot.Core.Scrimmages
                     // Fetch recent matches directly from database
                     var since = DateTime.UtcNow.AddDays(-GetScrimmageDbConfig().VarietyWindowDays);
                     var matchesResult = await CoreService.Matches.GetAllAsync(DatabaseComponent.Repository);
-                    var totalGames = matchesResult.Data?
-                        .Where(m => (m.Team1Id == teamId || m.Team2Id == teamId) && m.CompletedAt >= since)
-                        .Count() ?? 0;
+                    var totalGames =
+                        matchesResult
+                            .Data?.Where(m => (m.Team1Id == teamId || m.Team2Id == teamId) && m.CompletedAt >= since)
+                            .Count() ?? 0;
 
                     // Calculate confidence based on number of games played
                     // Uses exponential decay formula: confidence = max_confidence * (1 - e^(-k * games_played / max_confidence_games))
@@ -898,7 +920,11 @@ namespace WabbitBot.Core.Scrimmages
                 }
                 catch (Exception ex)
                 {
-                    await CoreService.ErrorHandler.CaptureAsync(ex, "Failed to calculate confidence", nameof(CalculateConfidenceAsync));
+                    await CoreService.ErrorHandler.CaptureAsync(
+                        ex,
+                        "Failed to calculate confidence",
+                        nameof(CalculateConfidenceAsync)
+                    );
                     throw;
                 }
             }

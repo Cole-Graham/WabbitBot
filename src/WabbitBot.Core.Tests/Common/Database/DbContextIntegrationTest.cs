@@ -15,7 +15,9 @@ namespace WabbitBot.Core.Common.Database.Tests
     {
         public DbSet<Player> Players => Set<Player>();
 
-        public PlainContext(DbContextOptions<PlainContext> options) : base(options) { }
+        public PlainContext(DbContextOptions<PlainContext> options)
+            : base(options) { }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             // Keep default conventions; no complex navigations involved for Player
@@ -54,5 +56,3 @@ namespace WabbitBot.Core.Common.Database.Tests
         }
     }
 }
-
-

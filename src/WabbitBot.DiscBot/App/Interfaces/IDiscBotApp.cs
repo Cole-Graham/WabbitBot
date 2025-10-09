@@ -5,8 +5,5 @@ namespace WabbitBot.DiscBot.App.Interfaces
     /// Apps are library-agnostic and communicate only via events through DiscBotService.EventBus.
     /// Apps must not call DSharpPlus or perform database operations directly.
     /// </summary>
-    public interface IDiscBotApp
-    {
-    }
+    public interface IDiscBotApp { }
 }
-

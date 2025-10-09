@@ -13,12 +13,14 @@ namespace WabbitBot.Common.Data
     {
         private static readonly ConcurrentDictionary<Type, object> _adapters = new();
 
-        public static void RegisterAdapter<TEntity>(IRepositoryAdapter<TEntity> adapter) where TEntity : Entity
+        public static void RegisterAdapter<TEntity>(IRepositoryAdapter<TEntity> adapter)
+            where TEntity : Entity
         {
             _adapters[typeof(TEntity)] = adapter ?? throw new ArgumentNullException(nameof(adapter));
         }
 
-        public static IRepositoryAdapter<TEntity>? GetAdapter<TEntity>() where TEntity : Entity
+        public static IRepositoryAdapter<TEntity>? GetAdapter<TEntity>()
+            where TEntity : Entity
         {
             if (_adapters.TryGetValue(typeof(TEntity), out var adapter) && adapter is IRepositoryAdapter<TEntity> typed)
             {
@@ -28,5 +30,3 @@ namespace WabbitBot.Common.Data
         }
     }
 }
-
-

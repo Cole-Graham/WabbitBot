@@ -11,21 +11,24 @@ namespace WabbitBot.Common.Events.Interfaces
         /// </summary>
         /// <typeparam name="TEvent">The type of event to publish</typeparam>
         /// <param name="event">The event instance to publish</param>
-        ValueTask PublishAsync<TEvent>(TEvent @event) where TEvent : class, IEvent;
+        ValueTask PublishAsync<TEvent>(TEvent @event)
+            where TEvent : class, IEvent;
 
         /// <summary>
         /// Subscribes a handler to a specific type of event within Core.
         /// </summary>
         /// <typeparam name="TEvent">The type of event to subscribe to</typeparam>
         /// <param name="handler">The handler function to be called when the event occurs</param>
-        void Subscribe<TEvent>(Func<TEvent, Task> handler) where TEvent : class, IEvent;
+        void Subscribe<TEvent>(Func<TEvent, Task> handler)
+            where TEvent : class, IEvent;
 
         /// <summary>
         /// Unsubscribes a handler from a specific type of event within Core.
         /// </summary>
         /// <typeparam name="TEvent">The type of event to unsubscribe from</typeparam>
         /// <param name="handler">The handler function to remove</param>
-        void Unsubscribe<TEvent>(Func<TEvent, Task> handler) where TEvent : class, IEvent;
+        void Unsubscribe<TEvent>(Func<TEvent, Task> handler)
+            where TEvent : class, IEvent;
 
         /// <summary>
         /// Makes a request and waits for a response through the event bus.

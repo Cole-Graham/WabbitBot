@@ -1,4 +1,3 @@
-
 using System.Threading.Tasks;
 
 namespace WabbitBot.Common.ErrorService;
@@ -10,7 +9,9 @@ public partial class ErrorService
     {
         if (context.Severity >= ErrorSeverity.Error)
         {
-            Console.WriteLine($"[NOTIFICATION] Notifying admin of {context.Severity} error in {context.OperationName}.");
+            Console.WriteLine(
+                $"[NOTIFICATION] Notifying admin of {context.Severity} error in {context.OperationName}."
+            );
         }
         await Task.CompletedTask;
     }

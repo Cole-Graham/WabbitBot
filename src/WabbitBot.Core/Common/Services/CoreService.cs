@@ -2,10 +2,10 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
-using WabbitBot.Common.Events.Interfaces;
-using WabbitBot.Core.Common.Database;
 using WabbitBot.Common.ErrorService;
+using WabbitBot.Common.Events.Interfaces;
 using WabbitBot.Common.Models;
+using WabbitBot.Core.Common.Database;
 
 namespace WabbitBot.Core.Common.Services
 {
@@ -27,7 +27,8 @@ namespace WabbitBot.Core.Common.Services
         /// Gets the shared FileSystemService instance.
         /// Must be initialized via InitializeFileSystemService before use.
         /// </summary>
-        public static FileSystemService FileSystem => _fileSystemService ?? throw new InvalidOperationException("FileSystemService has not been initialized");
+        public static FileSystemService FileSystem =>
+            _fileSystemService ?? throw new InvalidOperationException("FileSystemService has not been initialized");
 
         // Note: DbContext access is now handled via static WabbitBotDbContextProvider
         // instead of DI-injected factory. See WabbitBotDbContextProviderAdapter for
@@ -53,14 +54,13 @@ namespace WabbitBot.Core.Common.Services
         }
 
         // Testability Hooks
-        internal static void SetTestServices(
-            ICoreEventBus eventBus,
-            IErrorService errorHandler)
+        internal static void SetTestServices(ICoreEventBus eventBus, IErrorService errorHandler)
         {
-            _lazyEventBus = new Lazy<ICoreEventBus>(
-                () => eventBus, LazyThreadSafetyMode.ExecutionAndPublication);
+            _lazyEventBus = new Lazy<ICoreEventBus>(() => eventBus, LazyThreadSafetyMode.ExecutionAndPublication);
             _lazyErrorHandler = new Lazy<IErrorService>(
-                () => errorHandler, LazyThreadSafetyMode.ExecutionAndPublication);
+                () => errorHandler,
+                LazyThreadSafetyMode.ExecutionAndPublication
+            );
         }
 
         // Test hook for DbContext removed - tests should use WabbitBotDbContextProvider.Initialize()
@@ -72,7 +72,8 @@ namespace WabbitBot.Core.Common.Services
         /// <summary>
         /// Publishes an event with basic null validation
         /// </summary>
-        public static Task PublishAsync<TEvent>(TEvent evt) where TEvent : class, IEvent
+        public static Task PublishAsync<TEvent>(TEvent evt)
+            where TEvent : class, IEvent
         {
             ArgumentNullException.ThrowIfNull(evt);
             return EventBus.PublishAsync(evt).AsTask();

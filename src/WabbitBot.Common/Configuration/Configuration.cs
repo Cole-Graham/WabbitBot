@@ -1,7 +1,7 @@
 // Modern .NET Configuration System for WabbitBot
-using WabbitBot.Common.Events.Interfaces;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
+using WabbitBot.Common.Events.Interfaces;
 
 namespace WabbitBot.Common.Configuration
 {
@@ -12,7 +12,8 @@ namespace WabbitBot.Common.Configuration
     {
         string GetToken();
         string GetDatabasePath();
-        T GetSection<T>(string sectionName) where T : class, new();
+        T GetSection<T>(string sectionName)
+            where T : class, new();
         void ValidateConfiguration();
     }
 
@@ -28,9 +29,12 @@ namespace WabbitBot.Common.Configuration
         }
 
         public string GetToken() => Environment.GetEnvironmentVariable("WABBITBOT_TOKEN") ?? _botOptions.Token;
-        public string GetDatabasePath() => Environment.GetEnvironmentVariable("WABBITBOT_DATABASE_PATH") ?? _botOptions.Database.Path;
 
-        public T GetSection<T>(string sectionName) where T : class, new()
+        public string GetDatabasePath() =>
+            Environment.GetEnvironmentVariable("WABBITBOT_DATABASE_PATH") ?? _botOptions.Database.Path;
+
+        public T GetSection<T>(string sectionName)
+            where T : class, new()
         {
             var section = _configuration.GetSection(sectionName);
             var result = new T();
@@ -55,13 +59,22 @@ namespace WabbitBot.Common.Configuration
                 throw new InvalidOperationException("K-factor must be positive");
 
             // Validate roster size ranges
-            if (_botOptions.Scrimmage.RosterSizeRanges.Solo.Min <= 0 || _botOptions.Scrimmage.RosterSizeRanges.Solo.Max <= 0)
+            if (
+                _botOptions.Scrimmage.RosterSizeRanges.Solo.Min <= 0
+                || _botOptions.Scrimmage.RosterSizeRanges.Solo.Max <= 0
+            )
                 throw new InvalidOperationException("Solo roster size range must be positive");
 
-            if (_botOptions.Scrimmage.RosterSizeRanges.Duo.Min <= 0 || _botOptions.Scrimmage.RosterSizeRanges.Duo.Max <= 0)
+            if (
+                _botOptions.Scrimmage.RosterSizeRanges.Duo.Min <= 0
+                || _botOptions.Scrimmage.RosterSizeRanges.Duo.Max <= 0
+            )
                 throw new InvalidOperationException("Duo roster size range must be positive");
 
-            if (_botOptions.Scrimmage.RosterSizeRanges.Squad.Min <= 0 || _botOptions.Scrimmage.RosterSizeRanges.Squad.Max <= 0)
+            if (
+                _botOptions.Scrimmage.RosterSizeRanges.Squad.Min <= 0
+                || _botOptions.Scrimmage.RosterSizeRanges.Squad.Max <= 0
+            )
                 throw new InvalidOperationException("Squad roster size range must be positive");
 
             if (_botOptions.Scrimmage.RosterSizeRanges.Solo.Min > _botOptions.Scrimmage.RosterSizeRanges.Solo.Max)
@@ -118,7 +131,8 @@ namespace WabbitBot.Common.Configuration
         {
             lock (_lock)
             {
-                _configurationService = configurationService ?? throw new ArgumentNullException(nameof(configurationService));
+                _configurationService =
+                    configurationService ?? throw new ArgumentNullException(nameof(configurationService));
             }
         }
 
@@ -126,12 +140,15 @@ namespace WabbitBot.Common.Configuration
         {
             if (_configurationService is null)
             {
-                throw new InvalidOperationException("Configuration service has not been initialized. Call Initialize() first.");
+                throw new InvalidOperationException(
+                    "Configuration service has not been initialized. Call Initialize() first."
+                );
             }
             return _configurationService;
         }
 
-        public static T GetSection<T>(string sectionName) where T : class, new()
+        public static T GetSection<T>(string sectionName)
+            where T : class, new()
         {
             return GetConfigurationService().GetSection<T>(sectionName);
         }
@@ -140,7 +157,8 @@ namespace WabbitBot.Common.Configuration
     public record BotConfigurationChangedEvent(
         string Property,
         object? NewValue,
-        EventBusType EventBusType = EventBusType.Global) : IEvent
+        EventBusType EventBusType = EventBusType.Global
+    ) : IEvent
     {
         public Guid EventId { get; init; } = Guid.NewGuid();
         public DateTime Timestamp { get; init; } = DateTime.UtcNow;

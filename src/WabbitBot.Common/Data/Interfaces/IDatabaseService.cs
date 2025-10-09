@@ -9,7 +9,8 @@ namespace WabbitBot.Common.Data.Interfaces
     /// Interface for database services that handle CRUD operations for entities
     /// Supports different database components (Repository, Cache, Archive)
     /// </summary>
-    public interface IDatabaseService<TEntity> where TEntity : Entity
+    public interface IDatabaseService<TEntity>
+        where TEntity : Entity
     {
         // Core CRUD operations
         Task<Result<TEntity>> CreateAsync(TEntity entity, DatabaseComponent component);
@@ -22,7 +23,11 @@ namespace WabbitBot.Common.Data.Interfaces
         Task<Result<TEntity?>> GetByStringIdAsync(string id, DatabaseComponent component);
         Task<Result<TEntity?>> GetByNameAsync(string name, DatabaseComponent component);
         Task<Result<IEnumerable<TEntity>>> GetAllAsync(DatabaseComponent component);
-        Task<Result<IEnumerable<TEntity>>> GetByDateRangeAsync(DateTime startDate, DateTime endDate, DatabaseComponent component);
+        Task<Result<IEnumerable<TEntity>>> GetByDateRangeAsync(
+            DateTime startDate,
+            DateTime endDate,
+            DatabaseComponent component
+        );
     }
 
     /// <summary>
@@ -32,6 +37,6 @@ namespace WabbitBot.Common.Data.Interfaces
     {
         Repository,
         Cache,
-        Archive
+        Archive,
     }
 }

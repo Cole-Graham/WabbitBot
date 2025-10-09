@@ -8,7 +8,8 @@ namespace WabbitBot.Common.Data.Interfaces
     /// Provider-agnostic repository adapter used by DatabaseService to perform persistence operations.
     /// Implementations live in higher layers (e.g., Core via EF).
     /// </summary>
-    public interface IRepositoryAdapter<TEntity> where TEntity : Entity
+    public interface IRepositoryAdapter<TEntity>
+        where TEntity : Entity
     {
         Task<TEntity?> GetByIdAsync(object id);
         Task<bool> ExistsAsync(object id);
@@ -21,5 +22,3 @@ namespace WabbitBot.Common.Data.Interfaces
         Task<TEntity?> GetByNameAsync(string name);
     }
 }
-
-

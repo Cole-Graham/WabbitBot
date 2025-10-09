@@ -11,9 +11,9 @@ namespace WabbitBot.Core.Common.Database
     /// EF Core implementation of IRepositoryAdapter using WabbitBotDbContext.
     /// Uses static WabbitBotDbContextProvider for database access (no runtime DI).
     /// </summary>
-    public class EfRepositoryAdapter<TEntity> : IRepositoryAdapter<TEntity> where TEntity : Entity
+    public class EfRepositoryAdapter<TEntity> : IRepositoryAdapter<TEntity>
+        where TEntity : Entity
     {
-
         public async Task<TEntity?> GetByIdAsync(object id)
         {
             await using var db = WabbitBotDbContextProvider.CreateDbContext();
@@ -70,7 +70,8 @@ namespace WabbitBot.Core.Common.Database
                 await using var db = WabbitBotDbContextProvider.CreateDbContext();
                 var set = db.Set<TEntity>();
                 var entity = await set.FindAsync(id);
-                if (entity is null) return Result<TEntity>.Failure("Entity not found");
+                if (entity is null)
+                    return Result<TEntity>.Failure("Entity not found");
                 set.Remove(entity);
                 await db.SaveChangesAsync();
                 return Result<TEntity>.CreateSuccess(entity);
@@ -85,11 +86,7 @@ namespace WabbitBot.Core.Common.Database
         {
             await using var db = WabbitBotDbContextProvider.CreateDbContext();
             // Use EF.Property to avoid reflection and support entities without a compile-time Name member
-            return await db.Set<TEntity>()
-                .Where(e => EF.Property<string>(e, "Name") == name)
-                .FirstOrDefaultAsync();
+            return await db.Set<TEntity>().Where(e => EF.Property<string>(e, "Name") == name).FirstOrDefaultAsync();
         }
     }
 }
-
-

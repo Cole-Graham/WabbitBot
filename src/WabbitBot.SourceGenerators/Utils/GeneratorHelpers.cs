@@ -1,7 +1,7 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System.Linq;
 using System.Text;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using WabbitBot.Generator.Shared;
 using WabbitBot.Generator.Shared.Utils;
 
@@ -22,8 +22,9 @@ namespace WabbitBot.SourceGenerators.Utils
             if (string.IsNullOrEmpty(snakeCase))
                 return snakeCase;
 
-            return string.Concat(snakeCase.Split('_').Select(p =>
-                char.ToUpperInvariant(p[0]) + p.Substring(1).ToLowerInvariant()));
+            return string.Concat(
+                snakeCase.Split('_').Select(p => char.ToUpperInvariant(p[0]) + p.Substring(1).ToLowerInvariant())
+            );
         }
 
         /// <summary>
@@ -33,22 +34,28 @@ namespace WabbitBot.SourceGenerators.Utils
         public static string NormalizeServicePropertyName(string name)
         {
             // Respect exact PascalCase provided; ensure first letter is uppercase
-            if (string.IsNullOrEmpty(name)) return name;
+            if (string.IsNullOrEmpty(name))
+                return name;
             return char.ToUpperInvariant(name[0]) + name.Substring(1);
         }
+
         /// <summary>
         /// Gets the event bus type from a symbol
         /// </summary>
         public static string GetEventBusType(INamedTypeSymbol classSymbol)
         {
             // Look for EventBoundary attribute
-            var eventBoundaryAttr = classSymbol.GetAttributes()
+            var eventBoundaryAttr = classSymbol
+                .GetAttributes()
                 .FirstOrDefault(attr => attr.AttributeClass?.Name.Contains("EventBoundary") == true);
 
             if (eventBoundaryAttr != null)
             {
                 // Extract EventBusType from attribute arguments
-                var busType = AttributeExtractor.GetAttributeEnumArgument<EventBusType>(eventBoundaryAttr, "EventBusType");
+                var busType = AttributeExtractor.GetAttributeEnumArgument<EventBusType>(
+                    eventBoundaryAttr,
+                    "EventBusType"
+                );
                 if (busType.HasValue)
                 {
                     return busType.Value.ToString();
@@ -70,7 +77,7 @@ namespace WabbitBot.SourceGenerators.Utils
                 "DiscBot" => "IDiscordEventBus",
                 "Discord" => "IGlobalEventBus",
                 "Global" => "IGlobalEventBus",
-                _ => "ICoreEventBus"
+                _ => "ICoreEventBus",
             };
         }
 
@@ -85,20 +92,24 @@ namespace WabbitBot.SourceGenerators.Utils
                 "DiscBot" => "EventBus", // Uses the EventBus property from base class
                 "Discord" => "EventBus", // Uses the EventBus property from base class
                 "Global" => "EventBus", // Uses the EventBus property from base class
-                _ => "CoreEventBus.Instance"
+                _ => "CoreEventBus.Instance",
             };
         }
 
         /// <summary>
         /// Gets event handler methods from a class declaration
         /// </summary>
-        public static IEnumerable<MethodDeclarationSyntax> GetEventHandlerMethods(ClassDeclarationSyntax classDeclaration)
+        public static IEnumerable<MethodDeclarationSyntax> GetEventHandlerMethods(
+            ClassDeclarationSyntax classDeclaration
+        )
         {
-            return classDeclaration.Members
-                .OfType<MethodDeclarationSyntax>()
-                .Where(method => method.AttributeLists
-                    .SelectMany(attrList => attrList.Attributes)
-                    .Any(attr => attr.Name.ToString().Contains("EventHandler")));
+            return classDeclaration
+                .Members.OfType<MethodDeclarationSyntax>()
+                .Where(method =>
+                    method
+                        .AttributeLists.SelectMany(attrList => attrList.Attributes)
+                        .Any(attr => attr.Name.ToString().Contains("EventHandler"))
+                );
         }
 
         /// <summary>
@@ -141,7 +152,7 @@ namespace WabbitBot.SourceGenerators.Utils
                 $"{className}Created",
                 $"{className}Updated",
                 $"{className}Deleted",
-                $"{className}StatusChanged"
+                $"{className}StatusChanged",
             };
         }
 
@@ -156,7 +167,11 @@ namespace WabbitBot.SourceGenerators.Utils
         /// <summary>
         /// Creates a StringBuilder with standard using statements
         /// </summary>
-        public static StringBuilder CreateSourceBuilder(string className, string description, params string[] additionalUsings)
+        public static StringBuilder CreateSourceBuilder(
+            string className,
+            string description,
+            params string[] additionalUsings
+        )
         {
             var builder = new StringBuilder();
 
@@ -173,7 +188,7 @@ namespace WabbitBot.SourceGenerators.Utils
                 "using System;",
                 "using System.Threading.Tasks;",
                 "using WabbitBot.Common.Events;",
-                "using WabbitBot.Common.Events.Interfaces;"
+                "using WabbitBot.Common.Events.Interfaces;",
             };
 
             usings.AddRange(additionalUsings);

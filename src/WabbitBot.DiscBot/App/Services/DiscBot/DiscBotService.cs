@@ -1,9 +1,8 @@
 using DSharpPlus;
-using WabbitBot.Common.Events.Interfaces;
 using WabbitBot.Common.ErrorService;
+using WabbitBot.Common.Events.Interfaces;
 using WabbitBot.Common.Models;
 using WabbitBot.DiscBot.App;
-
 
 namespace WabbitBot.DiscBot.App.Services.DiscBot
 {
@@ -36,27 +35,28 @@ namespace WabbitBot.DiscBot.App.Services.DiscBot
             ArgumentNullException.ThrowIfNull(eventBus);
             ArgumentNullException.ThrowIfNull(errorHandler);
 
-            _lazyEventBus = new Lazy<IDiscBotEventBus>(
-                () => eventBus, LazyThreadSafetyMode.ExecutionAndPublication);
+            _lazyEventBus = new Lazy<IDiscBotEventBus>(() => eventBus, LazyThreadSafetyMode.ExecutionAndPublication);
             _lazyErrorHandler = new Lazy<IErrorService>(
-                () => errorHandler, LazyThreadSafetyMode.ExecutionAndPublication);
+                () => errorHandler,
+                LazyThreadSafetyMode.ExecutionAndPublication
+            );
         }
 
         // Testability Hooks
-        internal static void SetTestServices(
-            IDiscBotEventBus eventBus,
-            IErrorService errorHandler)
+        internal static void SetTestServices(IDiscBotEventBus eventBus, IErrorService errorHandler)
         {
-            _lazyEventBus = new Lazy<IDiscBotEventBus>(
-                () => eventBus, LazyThreadSafetyMode.ExecutionAndPublication);
+            _lazyEventBus = new Lazy<IDiscBotEventBus>(() => eventBus, LazyThreadSafetyMode.ExecutionAndPublication);
             _lazyErrorHandler = new Lazy<IErrorService>(
-                () => errorHandler, LazyThreadSafetyMode.ExecutionAndPublication);
+                () => errorHandler,
+                LazyThreadSafetyMode.ExecutionAndPublication
+            );
         }
 
         /// <summary>
         /// Publishes an event with basic null validation
         /// </summary>
-        public static Task PublishAsync<TEvent>(TEvent evt) where TEvent : class, IEvent
+        public static Task PublishAsync<TEvent>(TEvent evt)
+            where TEvent : class, IEvent
         {
             ArgumentNullException.ThrowIfNull(evt);
             return EventBus.PublishAsync(evt).AsTask();

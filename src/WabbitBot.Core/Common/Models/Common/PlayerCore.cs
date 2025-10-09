@@ -1,12 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using WabbitBot.Common.Configuration;
 using WabbitBot.Common.Data.Interfaces;
 using WabbitBot.Common.Data.Service;
 using WabbitBot.Common.Models;
-using WabbitBot.Core.Common.Services;
-using WabbitBot.Common.Configuration;
 using WabbitBot.Core.Common.Interfaces;
+using WabbitBot.Core.Common.Services;
 
 namespace WabbitBot.Core.Common.Models.Common
 {
@@ -17,6 +17,7 @@ namespace WabbitBot.Core.Common.Models.Common
 
         /// <inheritdoc />
         public Task ValidateAsync() => Task.CompletedTask;
+
         public static Player InitializeDefaults(Player player)
         {
             player.CreatedAt = player.CreatedAt == default ? DateTime.UtcNow : player.CreatedAt;
@@ -31,9 +32,10 @@ namespace WabbitBot.Core.Common.Models.Common
         {
             var initialized = InitializeDefaults(player);
             var createResult = await CoreService.Players.CreateAsync(initialized, DatabaseComponent.Repository);
-            return createResult.Success ? Result<Player>.CreateSuccess(createResult.Data!) : Result<Player>.Failure(createResult.ErrorMessage ?? "Failed to create player");
+            return createResult.Success
+                ? Result<Player>.CreateSuccess(createResult.Data!)
+                : Result<Player>.Failure(createResult.ErrorMessage ?? "Failed to create player");
         }
-
 
         public static class Validation
         {
@@ -67,7 +69,9 @@ namespace WabbitBot.Core.Common.Models.Common
             var updateCache = await CoreService.Players.UpdateAsync(player, DatabaseComponent.Cache);
             return updateRepo.Success && updateCache.Success
                 ? Result.CreateSuccess()
-                : Result.Failure($"Failed to update player last active: {updateRepo.ErrorMessage} / {updateCache.ErrorMessage}");
+                : Result.Failure(
+                    $"Failed to update player last active: {updateRepo.ErrorMessage} / {updateCache.ErrorMessage}"
+                );
         }
 
         public async Task<Result> ArchiveAsync(Guid playerId)
@@ -104,7 +108,8 @@ namespace WabbitBot.Core.Common.Models.Common
             {
                 player.TeamIds.Add(teamId);
                 var update = await CoreService.Players.UpdateAsync(player, DatabaseComponent.Repository);
-                if (!update.Success) return Result.Failure(update.ErrorMessage ?? "Failed to add team");
+                if (!update.Success)
+                    return Result.Failure(update.ErrorMessage ?? "Failed to add team");
             }
             return Result.CreateSuccess();
         }
@@ -119,8 +124,9 @@ namespace WabbitBot.Core.Common.Models.Common
             var player = playerResult.Data;
             player.TeamIds.Remove(teamId);
             var update = await CoreService.Players.UpdateAsync(player, DatabaseComponent.Repository);
-            return update.Success ? Result.CreateSuccess() : Result.Failure(update.ErrorMessage ?? "Failed to remove team");
+            return update.Success
+                ? Result.CreateSuccess()
+                : Result.Failure(update.ErrorMessage ?? "Failed to remove team");
         }
     }
 }
-

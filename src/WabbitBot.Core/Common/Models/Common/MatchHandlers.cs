@@ -1,11 +1,10 @@
+using WabbitBot.Common.Configuration;
 using WabbitBot.Common.Data.Interfaces;
+using WabbitBot.Common.Events.Core;
 using WabbitBot.Common.Models;
 using WabbitBot.Core.Common.Models.Common;
 using WabbitBot.Core.Common.Models.Scrimmage;
 using WabbitBot.Core.Common.Services;
-using WabbitBot.Common.Events.Core;
-using WabbitBot.Common.Configuration;
-
 
 namespace WabbitBot.Core.Scrimmages
 {
@@ -27,7 +26,8 @@ namespace WabbitBot.Core.Scrimmages
         {
             // Get scrimmage channel from config
             var scrimmageChannelConfig = ConfigurationProvider
-                .GetSection<ChannelsOptions>(ChannelsOptions.SectionName).ScrimmageChannel;
+                .GetSection<ChannelsOptions>(ChannelsOptions.SectionName)
+                .ScrimmageChannel;
             if (scrimmageChannelConfig is null)
             {
                 return Result.Failure("Scrimmage channel not found");

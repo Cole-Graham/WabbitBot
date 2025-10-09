@@ -8,7 +8,8 @@ using WabbitBot.Common.Models;
 
 namespace WabbitBot.Common.Data.Service
 {
-    public class InMemoryLruCacheProvider<TEntity> : ICacheProvider<TEntity> where TEntity : Entity
+    public class InMemoryLruCacheProvider<TEntity> : ICacheProvider<TEntity>
+        where TEntity : Entity
     {
         private class CacheEntry
         {
@@ -75,11 +76,7 @@ namespace WabbitBot.Common.Data.Service
         public Task<IEnumerable<TEntity>> GetAllAsync()
         {
             var now = DateTime.UtcNow;
-            var items = _cache
-                .Where(kv => !kv.Value.IsExpired)
-                .Select(kv => kv.Value.Value)
-                .ToArray()
-            ;
+            var items = _cache.Where(kv => !kv.Value.IsExpired).Select(kv => kv.Value.Value).ToArray();
             return Task.FromResult<IEnumerable<TEntity>>(items);
         }
 
@@ -95,5 +92,3 @@ namespace WabbitBot.Common.Data.Service
         }
     }
 }
-
-

@@ -1,5 +1,5 @@
-using WabbitBot.Common.Events.Interfaces;
 using WabbitBot.Common.Attributes;
+using WabbitBot.Common.Events.Interfaces;
 
 namespace WabbitBot.Core.Common.Events;
 
@@ -7,18 +7,15 @@ namespace WabbitBot.Core.Common.Events;
 /// Core-owned match events that cross project boundaries.
 /// Source generators will copy these to DiscBot in step 6.
 /// </summary>
-
 /// <summary>
 /// Core event indicating a match has been created.
 /// Published locally within Core when match is created.
 /// </summary>
 [EventGenerator(
     pubTargetClass: "WabbitBot.Core.Common.Models.Common.MatchCore",
-    subTargetClasses: ["WabbitBot.DiscBot.App.Handlers.MatchHandler"])]
-public record ScrimmageMatchCreated(
-    ulong ScrimmageChannelId,
-    Guid MatchId
-) : IEvent
+    subTargetClasses: ["WabbitBot.DiscBot.App.Handlers.MatchHandler"]
+)]
+public record ScrimmageMatchCreated(ulong ScrimmageChannelId, Guid MatchId) : IEvent
 {
     public Guid EventId { get; init; } = Guid.NewGuid();
     public DateTime Timestamp { get; init; } = DateTime.UtcNow;

@@ -19,7 +19,9 @@ namespace WabbitBot.Common.Data.Schema.Migrations
             try
             {
                 // Create Games table
-                await QueryUtil.ExecuteNonQueryAsync(conn, @"
+                await QueryUtil.ExecuteNonQueryAsync(
+                    conn,
+                    @"
                     CREATE TABLE IF NOT EXISTS Games (
                         Id TEXT PRIMARY KEY,
                         MatchId TEXT NOT NULL,
@@ -36,11 +38,19 @@ namespace WabbitBot.Common.Data.Schema.Migrations
                         UpdatedAt DATETIME NOT NULL,
                         SchemaVersion INTEGER NOT NULL DEFAULT 1,
                         FOREIGN KEY (MatchId) REFERENCES Matches(Id)
-                    )", new { }, transaction);
+                    )",
+                    new { },
+                    transaction
+                );
 
                 // Create index on MatchId for faster lookups
-                await QueryUtil.ExecuteNonQueryAsync(conn, @"
-                    CREATE INDEX IF NOT EXISTS idx_games_matchid ON Games(MatchId)", new { }, transaction);
+                await QueryUtil.ExecuteNonQueryAsync(
+                    conn,
+                    @"
+                    CREATE INDEX IF NOT EXISTS idx_games_matchid ON Games(MatchId)",
+                    new { },
+                    transaction
+                );
 
                 transaction.Commit();
             }

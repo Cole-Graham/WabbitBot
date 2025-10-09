@@ -2,10 +2,10 @@ using System;
 using System.Threading.Tasks;
 using DSharpPlus;
 using DSharpPlus.Entities;
-using WabbitBot.Common.Models;
 using WabbitBot.Common.Data.Interfaces;
-using WabbitBot.Core.Common.Services;
 using WabbitBot.Common.Data.Service;
+using WabbitBot.Common.Models;
+using WabbitBot.Core.Common.Services;
 
 namespace WabbitBot.DiscBot.App.Renderers
 {
@@ -14,13 +14,16 @@ namespace WabbitBot.DiscBot.App.Renderers
         public static async Task<Result> RenderScrimmageChallengeAsync(
             DiscordClient client,
             DiscordChannel channel,
-            Guid scrimmageId)
+            Guid scrimmageId
+        )
         {
             try
             {
                 // Get scrimmage challenge
-                var scrimmageChallenge = await CoreService.ScrimmageChallenges
-                    .GetByIdAsync(scrimmageId, DatabaseComponent.Repository);
+                var scrimmageChallenge = await CoreService.ScrimmageChallenges.GetByIdAsync(
+                    scrimmageId,
+                    DatabaseComponent.Repository
+                );
 
                 // TODO: Implement rendering logic
                 return new Result(true, "Rendering not yet implemented");

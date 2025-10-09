@@ -1,15 +1,15 @@
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
-using WabbitBot.Common.Configuration;
-using WabbitBot.Common.Models;
-using WabbitBot.Common.Data.Utilities;
 using WabbitBot.Common.Attributes;
-using WabbitBot.Core.Common.Events;
-using WabbitBot.Core.Common.BotCore;
-using WabbitBot.Core.Common.Services;
+using WabbitBot.Common.Configuration;
+using WabbitBot.Common.Data.Utilities;
 using WabbitBot.Common.ErrorService;
-using WabbitBot.Core.Common.Models.Common;
 using WabbitBot.Common.Events.Interfaces;
+using WabbitBot.Common.Models;
+using WabbitBot.Core.Common.BotCore;
+using WabbitBot.Core.Common.Events;
+using WabbitBot.Core.Common.Models.Common;
+using WabbitBot.Core.Common.Services;
 
 namespace WabbitBot.Core.Common.Commands;
 
@@ -23,7 +23,7 @@ public partial class ConfigurationCommands
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
     };
     private static readonly ICoreEventBus _eventBus = CoreEventBus.Instance;
 
@@ -72,10 +72,7 @@ public partial class ConfigurationCommands
         if (saveResult.Success)
         {
             // Publish specific server ID set event (primitive-only payloads)
-            await _eventBus.PublishAsync(new ServerIdSetEvent(
-                serverId,
-                previousServerId?.ToString()
-            ));
+            await _eventBus.PublishAsync(new ServerIdSetEvent(serverId, previousServerId?.ToString()));
         }
 
         return saveResult;
@@ -119,7 +116,9 @@ public partial class ConfigurationCommands
                 config.Channels.ScrimmageChannel = channelId;
                 break;
             default:
-                return Result<BotOptions>.Failure($"Unknown channel type: {channelType}. Valid types: bot, replay, deck, signup, standings, scrimmage");
+                return Result<BotOptions>.Failure(
+                    $"Unknown channel type: {channelType}. Valid types: bot, replay, deck, signup, standings, scrimmage"
+                );
         }
 
         var saveResult = await SaveConfigurationAsync(config);
@@ -127,11 +126,7 @@ public partial class ConfigurationCommands
         if (saveResult.Success)
         {
             // Publish specific channel configured event (primitive-only payloads)
-            await _eventBus.PublishAsync(new ChannelConfiguredEvent(
-                channelType,
-                channelId,
-                previousChannelId
-            ));
+            await _eventBus.PublishAsync(new ChannelConfiguredEvent(channelType, channelId, previousChannelId));
         }
 
         return saveResult;
@@ -163,7 +158,9 @@ public partial class ConfigurationCommands
                 config.Roles.Moderator = roleId;
                 break;
             default:
-                return Result<BotOptions>.Failure($"Unknown role type: {roleType}. Valid types: whitelisted, admin, moderator");
+                return Result<BotOptions>.Failure(
+                    $"Unknown role type: {roleType}. Valid types: whitelisted, admin, moderator"
+                );
         }
 
         var saveResult = await SaveConfigurationAsync(config);
@@ -171,11 +168,7 @@ public partial class ConfigurationCommands
         if (saveResult.Success)
         {
             // Publish specific role configured event (primitive-only payloads)
-            await _eventBus.PublishAsync(new RoleConfiguredEvent(
-                roleType,
-                roleId,
-                previousRoleId
-            ));
+            await _eventBus.PublishAsync(new RoleConfiguredEvent(roleType, roleId, previousRoleId));
         }
 
         return saveResult;
@@ -231,8 +224,13 @@ public partial class ConfigurationCommands
             if (backupPath != null)
             {
                 await WabbitBot.Core.Common.Services.CoreService.ErrorHandler.HandleAsync(
-                    new ErrorContext($"Configuration backup created: {backupPath}", ErrorSeverity.Information, nameof(SaveConfigurationAsync)),
-                    ErrorComponent.Logging);
+                    new ErrorContext(
+                        $"Configuration backup created: {backupPath}",
+                        ErrorSeverity.Information,
+                        nameof(SaveConfigurationAsync)
+                    ),
+                    ErrorComponent.Logging
+                );
             }
 
             // Save configuration using the persistence service
@@ -243,10 +241,7 @@ public partial class ConfigurationCommands
             }
 
             // Publish configuration changed event (primitive + simple types)
-            await _eventBus.PublishAsync(new ConfigurationChangedEvent(
-                config,
-                "Save"
-            ));
+            await _eventBus.PublishAsync(new ConfigurationChangedEvent(config, "Save"));
 
             return Result<BotOptions>.CreateSuccess(config, "Configuration saved successfully");
         }
@@ -257,5 +252,4 @@ public partial class ConfigurationCommands
     }
 
     #endregion
-
 }

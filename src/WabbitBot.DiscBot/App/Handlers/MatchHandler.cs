@@ -1,18 +1,17 @@
+using System.Text.RegularExpressions;
 using DSharpPlus;
 using DSharpPlus.Entities;
 using DSharpPlus.EventArgs;
 using WabbitBot.Common.Attributes;
+using WabbitBot.Common.Data.Interfaces;
 using WabbitBot.Common.Models;
+using WabbitBot.Core.Common.Events;
 using WabbitBot.Core.Common.Models.Common;
 using WabbitBot.Core.Common.Services;
-using WabbitBot.Common.Data.Interfaces;
-using WabbitBot.Core.Common.Events;
+using WabbitBot.DiscBot.App.Events;
 using WabbitBot.DiscBot.App.Handlers;
 using WabbitBot.DiscBot.App.Renderers;
-using WabbitBot.DiscBot.App.Events;
 using WabbitBot.DiscBot.App.Services.DiscBot;
-using System.Text.RegularExpressions;
-
 
 /// <summary>
 /// Handles button and component interactions for match flows.
@@ -28,13 +27,15 @@ namespace WabbitBot.DiscBot.App.Handlers
     /// </summary>
     public partial class MatchHandler
     {
-
         /// <summary>
         /// Handles button interactions (accept/decline challenge, confirm selections).
         /// Returns Result indicating success/failure for immediate feedback.
         /// Publishes events for cross-boundary communication.
         /// </summary>
-        public static async Task<Result> HandleButtonInteractionAsync(DiscordClient client, ComponentInteractionCreatedEventArgs args)
+        public static async Task<Result> HandleButtonInteractionAsync(
+            DiscordClient client,
+            ComponentInteractionCreatedEventArgs args
+        )
         {
             var interaction = args.Interaction;
             var customId = interaction.Data.CustomId;
@@ -54,7 +55,8 @@ namespace WabbitBot.DiscBot.App.Handlers
                 await DiscBotService.ErrorHandler.CaptureAsync(
                     ex,
                     $"Failed to handle button interaction: {customId}",
-                    nameof(HandleButtonInteractionAsync));
+                    nameof(HandleButtonInteractionAsync)
+                );
 
                 // Try to respond with error - may fail if response was already sent
                 try
@@ -63,7 +65,8 @@ namespace WabbitBot.DiscBot.App.Handlers
                         DiscordInteractionResponseType.ChannelMessageWithSource,
                         new DiscordInteractionResponseBuilder()
                             .WithContent("An error occurred while processing your interaction. Please try again.")
-                            .AsEphemeral());
+                            .AsEphemeral()
+                    );
                 }
                 catch
                 {
@@ -79,7 +82,10 @@ namespace WabbitBot.DiscBot.App.Handlers
         /// Returns Result indicating success/failure for immediate feedback.
         /// Publishes events for cross-boundary communication.
         /// </summary>
-        public static async Task<Result> HandleSelectMenuInteractionAsync(DiscordClient client, ComponentInteractionCreatedEventArgs args)
+        public static async Task<Result> HandleSelectMenuInteractionAsync(
+            DiscordClient client,
+            ComponentInteractionCreatedEventArgs args
+        )
         {
             var interaction = args.Interaction;
             var customId = interaction.Data.CustomId;
@@ -99,7 +105,8 @@ namespace WabbitBot.DiscBot.App.Handlers
                 await DiscBotService.ErrorHandler.CaptureAsync(
                     ex,
                     $"Failed to handle select menu interaction: {customId}",
-                    nameof(HandleSelectMenuInteractionAsync));
+                    nameof(HandleSelectMenuInteractionAsync)
+                );
 
                 // Try to respond with error - may fail if response was already sent
                 try
@@ -108,7 +115,8 @@ namespace WabbitBot.DiscBot.App.Handlers
                         DiscordInteractionResponseType.ChannelMessageWithSource,
                         new DiscordInteractionResponseBuilder()
                             .WithContent("An error occurred while processing your selection. Please try again.")
-                            .AsEphemeral());
+                            .AsEphemeral()
+                    );
                 }
                 catch
                 {
@@ -138,7 +146,8 @@ namespace WabbitBot.DiscBot.App.Handlers
                 await DiscBotService.ErrorHandler.CaptureAsync(
                     ex,
                     $"Failed to handle modal submission: {customId}",
-                    nameof(HandleModalSubmitAsync));
+                    nameof(HandleModalSubmitAsync)
+                );
 
                 // Try to respond with error - may fail if response was already sent
                 try
@@ -147,7 +156,8 @@ namespace WabbitBot.DiscBot.App.Handlers
                         DiscordInteractionResponseType.ChannelMessageWithSource,
                         new DiscordInteractionResponseBuilder()
                             .WithContent("An error occurred while processing your submission. Please try again.")
-                            .AsEphemeral());
+                            .AsEphemeral()
+                    );
                 }
                 catch
                 {
@@ -177,23 +187,18 @@ namespace WabbitBot.DiscBot.App.Handlers
             {
                 await interaction.CreateResponseAsync(
                     DiscordInteractionResponseType.ChannelMessageWithSource,
-                    new DiscordInteractionResponseBuilder()
-                        .WithContent("Invalid match ID.")
-                        .AsEphemeral());
+                    new DiscordInteractionResponseBuilder().WithContent("Invalid match ID.").AsEphemeral()
+                );
                 return Result.Failure("Invalid match ID");
             }
 
             // Get selected values from dropdown
             var selections = interaction.Data.Values.ToArray();
 
-            await interaction.CreateResponseAsync(
-                DiscordInteractionResponseType.DeferredMessageUpdate);
+            await interaction.CreateResponseAsync(DiscordInteractionResponseType.DeferredMessageUpdate);
 
             // Publish PlayerMapBanSelected (DiscBot-local) for App to handle
-            await DiscBotService.PublishAsync(new PlayerMapBanSelected(
-                matchId,
-                interaction.User.Id,
-                selections));
+            await DiscBotService.PublishAsync(new PlayerMapBanSelected(matchId, interaction.User.Id, selections));
 
             return Result.CreateSuccess("Map ban selection recorded");
         }
@@ -206,23 +211,18 @@ namespace WabbitBot.DiscBot.App.Handlers
             {
                 await interaction.CreateResponseAsync(
                     DiscordInteractionResponseType.ChannelMessageWithSource,
-                    new DiscordInteractionResponseBuilder()
-                        .WithContent("Invalid match ID.")
-                        .AsEphemeral());
+                    new DiscordInteractionResponseBuilder().WithContent("Invalid match ID.").AsEphemeral()
+                );
                 return Result.Failure("Invalid match ID");
             }
 
             // TODO: Retrieve current selections from DM message state or cache
             var selections = Array.Empty<string>(); // Placeholder
 
-            await interaction.CreateResponseAsync(
-                DiscordInteractionResponseType.DeferredMessageUpdate);
+            await interaction.CreateResponseAsync(DiscordInteractionResponseType.DeferredMessageUpdate);
 
             // Publish PlayerMapBanConfirmed (DiscBot-local) for App to handle
-            await DiscBotService.PublishAsync(new PlayerMapBanConfirmed(
-                matchId,
-                interaction.User.Id,
-                selections));
+            await DiscBotService.PublishAsync(new PlayerMapBanConfirmed(matchId, interaction.User.Id, selections));
 
             return Result.CreateSuccess("Map ban confirmed");
         }
@@ -246,18 +246,19 @@ namespace WabbitBot.DiscBot.App.Handlers
                     await DiscBotService.ErrorHandler.CaptureAsync(
                         new InvalidOperationException("No guilds available"),
                         "Cannot create match thread - no guilds",
-                        nameof(HandleScrimThreadCreateRequestedAsync));
+                        nameof(HandleScrimThreadCreateRequestedAsync)
+                    );
                     return Result.Failure("No guilds available");
                 }
 
-                var channel = guild.Channels.Values
-                    .FirstOrDefault(c => c.Type == DiscordChannelType.Text);
+                var channel = guild.Channels.Values.FirstOrDefault(c => c.Type == DiscordChannelType.Text);
                 if (channel is null)
                 {
                     await DiscBotService.ErrorHandler.CaptureAsync(
                         new InvalidOperationException("No text channels available"),
                         "Cannot create match thread - no text channels",
-                        nameof(HandleScrimThreadCreateRequestedAsync));
+                        nameof(HandleScrimThreadCreateRequestedAsync)
+                    );
                     return Result.Failure("No text channels available");
                 }
 
@@ -267,32 +268,37 @@ namespace WabbitBot.DiscBot.App.Handlers
                 {
                     return Result.Failure("Match not found");
                 }
-                var selectedTeam1Players = match.Data!.Team1PlayerIds
-                    .Select(id => CoreService.Players
-                    .GetByIdAsync(id, DatabaseComponent.Repository).Result.Data!).ToList();
-                var selectedTeam2Players = match.Data!.Team2PlayerIds
-                    .Select(id => CoreService.Players
-                    .GetByIdAsync(id, DatabaseComponent.Repository).Result.Data!).ToList();
+                var selectedTeam1Players = match
+                    .Data!.Team1PlayerIds.Select(id =>
+                        CoreService.Players.GetByIdAsync(id, DatabaseComponent.Repository).Result.Data!
+                    )
+                    .ToList();
+                var selectedTeam2Players = match
+                    .Data!.Team2PlayerIds.Select(id =>
+                        CoreService.Players.GetByIdAsync(id, DatabaseComponent.Repository).Result.Data!
+                    )
+                    .ToList();
 
                 // Call renderer with concrete parameters
                 var challengerBuilder = new DiscordMessageBuilder();
                 var opponentBuilder = new DiscordMessageBuilder();
-                return await Renderers.MatchRenderer
-                    .RenderMatchContainerAsync(
-                        client,
-                        channel,
-                        challengerBuilder,
-                        opponentBuilder,
-                        selectedTeam1Players,
-                        selectedTeam2Players,
-                        evt.MatchId);
+                return await Renderers.MatchRenderer.RenderMatchContainerAsync(
+                    client,
+                    channel,
+                    challengerBuilder,
+                    opponentBuilder,
+                    selectedTeam1Players,
+                    selectedTeam2Players,
+                    evt.MatchId
+                );
             }
             catch (Exception ex)
             {
                 await DiscBotService.ErrorHandler.CaptureAsync(
                     ex,
                     $"Failed to handle match thread create request for {evt.MatchId}",
-                    nameof(HandleScrimThreadCreateRequestedAsync));
+                    nameof(HandleScrimThreadCreateRequestedAsync)
+                );
                 return Result.Failure($"Failed to create match thread: {ex.Message}");
             }
         }
@@ -314,7 +320,8 @@ namespace WabbitBot.DiscBot.App.Handlers
                     await DiscBotService.ErrorHandler.CaptureAsync(
                         new InvalidOperationException($"Channel {evt.ChannelId} not found"),
                         "Cannot create match container - thread not found",
-                        nameof(HandleMatchContainerRequestedAsync));
+                        nameof(HandleMatchContainerRequestedAsync)
+                    );
                     return Result.Failure("Channel not found");
                 }
                 if (team1thread is null)
@@ -322,7 +329,8 @@ namespace WabbitBot.DiscBot.App.Handlers
                     await DiscBotService.ErrorHandler.CaptureAsync(
                         new InvalidOperationException($"Team 1 thread {evt.Team1ThreadId} not found"),
                         "Cannot create match container - team 1 thread not found",
-                        nameof(HandleMatchContainerRequestedAsync));
+                        nameof(HandleMatchContainerRequestedAsync)
+                    );
                     return Result.Failure("Team 1 thread not found");
                 }
                 if (team2thread is null)
@@ -330,7 +338,8 @@ namespace WabbitBot.DiscBot.App.Handlers
                     await DiscBotService.ErrorHandler.CaptureAsync(
                         new InvalidOperationException($"Team 2 thread {evt.Team2ThreadId} not found"),
                         "Cannot create match container - team 2 thread not found",
-                        nameof(HandleMatchContainerRequestedAsync));
+                        nameof(HandleMatchContainerRequestedAsync)
+                    );
                     return Result.Failure("Team 2 thread not found");
                 }
                 var match = await CoreService.Matches.GetByIdAsync(evt.MatchId, DatabaseComponent.Repository);
@@ -370,15 +379,17 @@ namespace WabbitBot.DiscBot.App.Handlers
                     opponentBuilder,
                     selectedTeam1Players,
                     selectedTeam2Players,
-                    evt.MatchId);
+                    evt.MatchId
+                );
             }
             catch (Exception ex)
             {
                 await DiscBotService.ErrorHandler.CaptureAsync(
                     ex,
-                    $"Failed to handle match container request for {evt.MatchId} " +
-                    $"in channel {evt.ChannelId} and threads {evt.Team1ThreadId} and {evt.Team2ThreadId}",
-                    nameof(HandleMatchContainerRequestedAsync));
+                    $"Failed to handle match container request for {evt.MatchId} "
+                        + $"in channel {evt.ChannelId} and threads {evt.Team1ThreadId} and {evt.Team2ThreadId}",
+                    nameof(HandleMatchContainerRequestedAsync)
+                );
                 return Result.Failure($"Failed to create match container: {ex.Message}");
             }
         }
@@ -398,7 +409,8 @@ namespace WabbitBot.DiscBot.App.Handlers
                 await DiscBotService.ErrorHandler.CaptureAsync(
                     ex,
                     $"Failed to handle map ban DM update request for match {evt.MatchId}, player {evt.PlayerId}",
-                    nameof(HandleMapBanDmUpdateRequestedAsync));
+                    nameof(HandleMapBanDmUpdateRequestedAsync)
+                );
                 return Result.Failure($"Failed to update map ban DM: {ex.Message}");
             }
         }
@@ -418,7 +430,8 @@ namespace WabbitBot.DiscBot.App.Handlers
                 await DiscBotService.ErrorHandler.CaptureAsync(
                     ex,
                     $"Failed to handle map ban DM confirm request for match {evt.MatchId}, player {evt.PlayerId}",
-                    nameof(HandleMapBanDmConfirmRequestedAsync));
+                    nameof(HandleMapBanDmConfirmRequestedAsync)
+                );
                 return Result.Failure($"Failed to confirm map ban DM: {ex.Message}");
             }
         }

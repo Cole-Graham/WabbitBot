@@ -10,7 +10,8 @@ namespace WabbitBot.Common.Data.Service;
 /// Cache operations for DatabaseService using in-memory ConcurrentDictionary
 /// Provides fast access to recently used entities with LRU eviction
 /// </summary>
-public partial class DatabaseService<TEntity> where TEntity : Entity
+public partial class DatabaseService<TEntity>
+    where TEntity : Entity
 {
     /// <summary>
     /// No-op. Cache is provided via ICacheProvider and configured by generator/startup.

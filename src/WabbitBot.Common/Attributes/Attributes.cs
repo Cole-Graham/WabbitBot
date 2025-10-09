@@ -1,7 +1,6 @@
 using System;
 using WabbitBot.Common.Events.Interfaces;
 
-
 namespace WabbitBot.Common.Attributes
 {
     /// <summary>
@@ -46,7 +45,7 @@ namespace WabbitBot.Common.Attributes
         /// <summary>
         /// Publish to both local and Global event buses (dual-publish).
         /// </summary>
-        Both = Local | Global
+        Both = Local | Global,
     }
 
     #region Event Generator
@@ -55,9 +54,7 @@ namespace WabbitBot.Common.Attributes
     /// Applied to event record/class definitions to generate supporting infrastructure.
     /// </summary>
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
-    public class EventGeneratorAttribute(
-        string? pubTargetClass = null,
-        string[]? subTargetClasses = null) : Attribute
+    public class EventGeneratorAttribute(string? pubTargetClass = null, string[]? subTargetClasses = null) : Attribute
     {
         /// <summary>
         /// The fully qualified class name where the publisher method should be generated.
@@ -89,7 +86,7 @@ namespace WabbitBot.Common.Attributes
     [AttributeUsage(AttributeTargets.All, AllowMultiple = false)]
     public class SuppressGenerationAttribute(string? reason = null) : Attribute
     {
-        public string? Reason { get; } = reason;  // Optional for docs
+        public string? Reason { get; } = reason; // Optional for docs
     }
     #endregion
 }

@@ -47,17 +47,15 @@ namespace WabbitBot.Common.Data.Schema
 
         private async Task CreateSchemaVersionTableAsync()
         {
-            var sql = $@"
+            var sql =
+                $@"
                 CREATE TABLE IF NOT EXISTS {_schemaVersionTable} (
                     Version INTEGER PRIMARY KEY,
                     AppliedAt DATETIME NOT NULL,
                     Description TEXT NOT NULL
                 )";
 
-            await QueryUtil.ExecuteNonQueryAsync(
-                await _connection.GetConnectionAsync(),
-                sql
-            );
+            await QueryUtil.ExecuteNonQueryAsync(await _connection.GetConnectionAsync(), sql);
         }
 
         private async Task ApplyMigrationsAsync()
@@ -77,16 +75,14 @@ namespace WabbitBot.Common.Data.Schema
         private async Task<int> GetCurrentVersionAsync()
         {
             var sql = $"SELECT COALESCE(MAX(Version), 0) FROM {_schemaVersionTable}";
-            var result = await QueryUtil.ExecuteScalarAsync<int>(
-                await _connection.GetConnectionAsync(),
-                sql
-            );
+            var result = await QueryUtil.ExecuteScalarAsync<int>(await _connection.GetConnectionAsync(), sql);
             return result;
         }
 
         private async Task RecordMigrationAsync(IMigration migration)
         {
-            var sql = $@"
+            var sql =
+                $@"
                 INSERT INTO {_schemaVersionTable} (Version, AppliedAt, Description)
                 VALUES (@Version, @AppliedAt, @Description)";
 
@@ -97,7 +93,7 @@ namespace WabbitBot.Common.Data.Schema
                 {
                     migration.Order,
                     AppliedAt = DateTime.UtcNow,
-                    migration.Description
+                    migration.Description,
                 }
             );
         }

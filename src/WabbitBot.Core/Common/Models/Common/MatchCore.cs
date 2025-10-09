@@ -1,16 +1,15 @@
-using WabbitBot.Core.Common.Services;
-using WabbitBot.Common.Events.Interfaces;
-using WabbitBot.Common.Data.Service;
-using WabbitBot.Common.Models;
 using WabbitBot.Common.Data.Interfaces;
+using WabbitBot.Common.Data.Service;
+using WabbitBot.Common.Events.Interfaces;
+using WabbitBot.Common.Models;
 using WabbitBot.Core.Common.Events;
 using WabbitBot.Core.Common.Interfaces;
+using WabbitBot.Core.Common.Services;
 
 namespace WabbitBot.Core.Common.Models.Common
 {
     public partial class MatchCore : IMatchCore
     {
-
         // No constructor by design - Entities accessed via CoreService static properties
 
         /// <inheritdoc />
@@ -18,6 +17,7 @@ namespace WabbitBot.Core.Common.Models.Common
 
         /// <inheritdoc />
         public Task ValidateAsync() => Task.CompletedTask;
+
         #region Factory
         public static partial class Factory
         {
@@ -27,7 +27,8 @@ namespace WabbitBot.Core.Common.Models.Common
                 Guid parentId,
                 MatchParentType parentType,
                 int bestOf = 1,
-                bool playToCompletion = false)
+                bool playToCompletion = false
+            )
             {
                 var match = new Match
                 {
@@ -45,11 +46,7 @@ namespace WabbitBot.Core.Common.Models.Common
 
             public static MatchStateSnapshot CreateMatchStateSnapshot(Guid matchId)
             {
-                return new MatchStateSnapshot
-                {
-                    MatchId = matchId,
-                    StartedAt = DateTime.UtcNow,
-                };
+                return new MatchStateSnapshot { MatchId = matchId, StartedAt = DateTime.UtcNow };
             }
 
             public static MatchStateSnapshot CreateMatchStateSnapshotFromOther(MatchStateSnapshot other)
@@ -222,15 +219,15 @@ namespace WabbitBot.Core.Common.Models.Common
         /// <param name="scrimmageId"></param>
         /// <param name="scrimmageChannelId"></param>
         /// <returns></returns>
-        public async Task<Result<Match>> CreateScrimmageMatchAsync(
-            Guid scrimmageId,
-            ulong scrimmageChannelId)
+        public async Task<Result<Match>> CreateScrimmageMatchAsync(Guid scrimmageId, ulong scrimmageChannelId)
         {
             try
             {
                 // 1) Load scrimmage
                 var scrimmageResult = await CoreService.Scrimmages.GetByIdAsync(
-                    scrimmageId, DatabaseComponent.Repository);
+                    scrimmageId,
+                    DatabaseComponent.Repository
+                );
                 if (!scrimmageResult.Success || scrimmageResult.Data is null)
                     return Result<Match>.Failure("Scrimmage not found");
 
@@ -242,7 +239,8 @@ namespace WabbitBot.Core.Common.Models.Common
                     scrimmage.TeamSize,
                     scrimmage.Id,
                     MatchParentType.Scrimmage,
-                    scrimmage.BestOf);
+                    scrimmage.BestOf
+                );
 
                 match.ChannelId = scrimmageChannelId;
 
@@ -278,30 +276,33 @@ namespace WabbitBot.Core.Common.Models.Common
                         return Result<Match>.Failure("Player not found");
                     team2Players.Add(playerResult.Data);
                 }
-                match.Participants.Add(new MatchParticipant
-                {
-                    MatchId = match.Id,
-                    Match = match,
-                    TeamId = team1.Id,
-                    Team = team1,
-                    PlayerIds = [.. scrimmage.Team1PlayerIds],
-                    Players = team1Players,
-                    TeamNumber = 1,
-                });
-                match.Participants.Add(new MatchParticipant
-                {
-                    MatchId = match.Id,
-                    Match = match,
-                    TeamId = team2.Id,
-                    Team = team2,
-                    PlayerIds = [.. scrimmage.Team2PlayerIds],
-                    Players = team2Players,
-                    TeamNumber = 2,
-                });
+                match.Participants.Add(
+                    new MatchParticipant
+                    {
+                        MatchId = match.Id,
+                        Match = match,
+                        TeamId = team1.Id,
+                        Team = team1,
+                        PlayerIds = [.. scrimmage.Team1PlayerIds],
+                        Players = team1Players,
+                        TeamNumber = 1,
+                    }
+                );
+                match.Participants.Add(
+                    new MatchParticipant
+                    {
+                        MatchId = match.Id,
+                        Match = match,
+                        TeamId = team2.Id,
+                        Team = team2,
+                        PlayerIds = [.. scrimmage.Team2PlayerIds],
+                        Players = team2Players,
+                        TeamNumber = 2,
+                    }
+                );
 
                 // 3) Persist
-                var createResult = await CoreService.Matches.CreateAsync(
-                    match, DatabaseComponent.Repository);
+                var createResult = await CoreService.Matches.CreateAsync(match, DatabaseComponent.Repository);
                 if (!createResult.Success || createResult.Data is null)
                     return Result<Match>.Failure("Failed to create match");
 
@@ -323,7 +324,10 @@ namespace WabbitBot.Core.Common.Models.Common
             catch (Exception ex)
             {
                 await CoreService.ErrorHandler.CaptureAsync(
-                    ex, "Failed to create match", nameof(CreateScrimmageMatchAsync));
+                    ex,
+                    "Failed to create match",
+                    nameof(CreateScrimmageMatchAsync)
+                );
                 return Result<Match>.Failure($"An unexpected error occurred while creating the match: {ex.Message}");
             }
         }
@@ -337,24 +341,33 @@ namespace WabbitBot.Core.Common.Models.Common
             catch (Exception ex)
             {
                 await CoreService.ErrorHandler.CaptureAsync(
-                    ex, "Failed to build opponent encounters", nameof(BuildOpponentEncountersAsync));
-                return Result<Match>.Failure($"An unexpected error occurred while building the opponent encounters: {ex.Message}");
+                    ex,
+                    "Failed to build opponent encounters",
+                    nameof(BuildOpponentEncountersAsync)
+                );
+                return Result<Match>.Failure(
+                    $"An unexpected error occurred while building the opponent encounters: {ex.Message}"
+                );
             }
         }
+
         /// <summary>
         /// Starts a match with full business logic orchestration
         /// </summary>
-        public async Task<Result> StartMatchAsync(Guid matchId, Guid team1Id, Guid team2Id, List<Guid> team1PlayerIds, List<Guid> team2PlayerIds)
+        public async Task<Result> StartMatchAsync(
+            Guid matchId,
+            Guid team1Id,
+            Guid team2Id,
+            List<Guid> team1PlayerIds,
+            List<Guid> team2PlayerIds
+        )
         {
             try
             {
-                var matchResult = await CoreService.Matches.GetByIdAsync(matchId,
-                    DatabaseComponent.Repository);
+                var matchResult = await CoreService.Matches.GetByIdAsync(matchId, DatabaseComponent.Repository);
                 if (!matchResult.Success)
                 {
-                    return Result.Failure(
-                        $"Failed to retrieve match: {matchResult.ErrorMessage}"
-                    );
+                    return Result.Failure($"Failed to retrieve match: {matchResult.ErrorMessage}");
                 }
                 var match = matchResult.Data;
 
@@ -387,10 +400,14 @@ namespace WabbitBot.Core.Common.Models.Common
                     JoinedAt = DateTime.UtcNow,
                 };
 
-                var participant1Result = await CoreService.MatchParticipants.CreateAsync(team1Participant,
-                    DatabaseComponent.Repository);
-                var participant2Result = await CoreService.MatchParticipants.CreateAsync(team2Participant,
-                    DatabaseComponent.Repository);
+                var participant1Result = await CoreService.MatchParticipants.CreateAsync(
+                    team1Participant,
+                    DatabaseComponent.Repository
+                );
+                var participant2Result = await CoreService.MatchParticipants.CreateAsync(
+                    team2Participant,
+                    DatabaseComponent.Repository
+                );
 
                 if (!participant1Result.Success || !participant2Result.Success)
                     return Result.Failure("Failed to create match participants.");
@@ -416,10 +433,14 @@ namespace WabbitBot.Core.Common.Models.Common
                     Won = false, // Will be updated when match completes
                 };
 
-                var encounter1Result = await CoreService.TeamOpponentEncounters.CreateAsync(encounter1,
-                    DatabaseComponent.Repository);
-                var encounter2Result = await CoreService.TeamOpponentEncounters.CreateAsync(encounter2,
-                    DatabaseComponent.Repository);
+                var encounter1Result = await CoreService.TeamOpponentEncounters.CreateAsync(
+                    encounter1,
+                    DatabaseComponent.Repository
+                );
+                var encounter2Result = await CoreService.TeamOpponentEncounters.CreateAsync(
+                    encounter2,
+                    DatabaseComponent.Repository
+                );
 
                 if (!encounter1Result.Success || !encounter2Result.Success)
                     return Result.Failure("Failed to create opponent encounters.");
@@ -437,23 +458,18 @@ namespace WabbitBot.Core.Common.Models.Common
                     GameNumber = 1,
                 };
 
-                var createGameResult = await CoreService.Games.CreateAsync(game,
-                    DatabaseComponent.Repository);
+                var createGameResult = await CoreService.Games.CreateAsync(game, DatabaseComponent.Repository);
                 if (!createGameResult.Success)
                     return Result.Failure("Failed to create the first game for the match.");
 
                 match.Games.Add(createGameResult.Data!);
 
-                var updateMatchRepoResult = await CoreService.Matches.UpdateAsync(match,
-                    DatabaseComponent.Repository);
-                var updateMatchCacheResult = await CoreService.Matches.UpdateAsync(match,
-                    DatabaseComponent.Cache);
+                var updateMatchRepoResult = await CoreService.Matches.UpdateAsync(match, DatabaseComponent.Repository);
+                var updateMatchCacheResult = await CoreService.Matches.UpdateAsync(match, DatabaseComponent.Cache);
 
                 if (!updateMatchRepoResult.Success || !updateMatchCacheResult.Success)
                 {
-                    return Result.Failure(
-                        "Failed to update match in repository or cache after game creation."
-                    );
+                    return Result.Failure("Failed to update match in repository or cache after game creation.");
                 }
 
                 // Publish Core-local event for match start
@@ -464,9 +480,7 @@ namespace WabbitBot.Core.Common.Models.Common
             catch (Exception ex)
             {
                 await CoreService.ErrorHandler.CaptureAsync(ex, "Failed to start match", nameof(StartMatchAsync));
-                return Result.Failure(
-                    $"An unexpected error occurred while starting the match: {ex.Message}"
-                );
+                return Result.Failure($"An unexpected error occurred while starting the match: {ex.Message}");
             }
         }
 
@@ -515,7 +529,8 @@ namespace WabbitBot.Core.Common.Models.Common
         public static double CalculateVarietyEntropyForTeam(Match match, Guid teamId)
         {
             var encounters = GetOpponentEncountersForTeam(match, teamId);
-            if (!encounters.Any()) return 0.0;
+            if (!encounters.Any())
+                return 0.0;
 
             var totalEncounters = encounters.Count;
             var uniqueOpponents = encounters.Select(e => e.OpponentId).Distinct().Count();
@@ -558,13 +573,10 @@ namespace WabbitBot.Core.Common.Models.Common
         {
             try
             {
-                var matchResult = await CoreService.Matches.GetByIdAsync(matchId,
-                    DatabaseComponent.Repository);
+                var matchResult = await CoreService.Matches.GetByIdAsync(matchId, DatabaseComponent.Repository);
                 if (!matchResult.Success)
                 {
-                    return Result.Failure(
-                        $"Failed to retrieve match: {matchResult.ErrorMessage}"
-                    );
+                    return Result.Failure($"Failed to retrieve match: {matchResult.ErrorMessage}");
                 }
                 var match = matchResult.Data;
 
@@ -589,14 +601,17 @@ namespace WabbitBot.Core.Common.Models.Common
                 {
                     participant.IsWinner = participant.TeamId == winnerId;
                     participant.UpdatedAt = DateTime.UtcNow;
-                    var updateParticipantResult = await CoreService.MatchParticipants.UpdateAsync(participant,
-                        DatabaseComponent.Repository);
+                    var updateParticipantResult = await CoreService.MatchParticipants.UpdateAsync(
+                        participant,
+                        DatabaseComponent.Repository
+                    );
                     if (!updateParticipantResult.Success)
                     {
                         // Log and continue, don't fail entire operation
-                        await CoreService.ErrorHandler.CaptureAsync(new Exception(
-                                $"Failed to update participant {participant.Id}: " +
-                                $"{updateParticipantResult.ErrorMessage}"
+                        await CoreService.ErrorHandler.CaptureAsync(
+                            new Exception(
+                                $"Failed to update participant {participant.Id}: "
+                                    + $"{updateParticipantResult.ErrorMessage}"
                             ),
                             "Match Completion Warning",
                             nameof(CompleteMatchAsync)
@@ -609,14 +624,17 @@ namespace WabbitBot.Core.Common.Models.Common
                 {
                     encounter.Won = encounter.TeamId == winnerId;
                     encounter.UpdatedAt = DateTime.UtcNow;
-                    var updateEncounterResult = await CoreService.TeamOpponentEncounters.UpdateAsync(encounter,
-                        DatabaseComponent.Repository);
+                    var updateEncounterResult = await CoreService.TeamOpponentEncounters.UpdateAsync(
+                        encounter,
+                        DatabaseComponent.Repository
+                    );
                     if (!updateEncounterResult.Success)
                     {
                         // Log and continue, don't fail entire operation
-                        await CoreService.ErrorHandler.CaptureAsync(new Exception(
-                                $"Failed to update opponent encounter {encounter.Id}: " +
-                                $"{updateEncounterResult.ErrorMessage}"
+                        await CoreService.ErrorHandler.CaptureAsync(
+                            new Exception(
+                                $"Failed to update opponent encounter {encounter.Id}: "
+                                    + $"{updateEncounterResult.ErrorMessage}"
                             ),
                             "Match Completion Warning",
                             nameof(CompleteMatchAsync)
@@ -625,16 +643,12 @@ namespace WabbitBot.Core.Common.Models.Common
                 }
 
                 // Update match and save
-                var updateMatchRepoResult = await CoreService.Matches.UpdateAsync(match,
-                    DatabaseComponent.Repository);
-                var updateMatchCacheResult = await CoreService.Matches.UpdateAsync(match,
-                    DatabaseComponent.Cache);
+                var updateMatchRepoResult = await CoreService.Matches.UpdateAsync(match, DatabaseComponent.Repository);
+                var updateMatchCacheResult = await CoreService.Matches.UpdateAsync(match, DatabaseComponent.Cache);
 
                 if (!updateMatchRepoResult.Success || !updateMatchCacheResult.Success)
                 {
-                    return Result.Failure(
-                        "Failed to update match in repository or cache after completion."
-                    );
+                    return Result.Failure("Failed to update match in repository or cache after completion.");
                 }
 
                 // Trigger variety statistics updates for participating teams
@@ -648,9 +662,7 @@ namespace WabbitBot.Core.Common.Models.Common
             catch (Exception ex)
             {
                 await CoreService.ErrorHandler.CaptureAsync(ex, "Failed to complete match", nameof(CompleteMatchAsync));
-                return Result.Failure(
-                    $"An unexpected error occurred while completing the match: {ex.Message}"
-                );
+                return Result.Failure($"An unexpected error occurred while completing the match: {ex.Message}");
             }
         }
 
@@ -666,13 +678,15 @@ namespace WabbitBot.Core.Common.Models.Common
 
                 foreach (var participant in match.Participants)
                 {
-                    var teamResult = await CoreService.Teams.GetByIdAsync(participant.TeamId,
-                        DatabaseComponent.Repository);
+                    var teamResult = await CoreService.Teams.GetByIdAsync(
+                        participant.TeamId,
+                        DatabaseComponent.Repository
+                    );
                     if (!teamResult.Success)
                     {
-                        await CoreService.ErrorHandler.CaptureAsync(new Exception(
-                                $"Failed to retrieve team {participant.TeamId}: " +
-                                $"{teamResult.ErrorMessage}"
+                        await CoreService.ErrorHandler.CaptureAsync(
+                            new Exception(
+                                $"Failed to retrieve team {participant.TeamId}: " + $"{teamResult.ErrorMessage}"
                             ),
                             "Variety Stats Update Warning",
                             nameof(UpdateTeamVarietyStatsAsync)
@@ -703,17 +717,20 @@ namespace WabbitBot.Core.Common.Models.Common
                         };
 
                         // Use _varietyStatsData from constructor
-                        var createResult = await CoreService.TeamVarietyStats.CreateAsync(varietyStats,
-                            DatabaseComponent.Repository);
+                        var createResult = await CoreService.TeamVarietyStats.CreateAsync(
+                            varietyStats,
+                            DatabaseComponent.Repository
+                        );
                         if (createResult.Success)
                         {
                             team.VarietyStats.Add(varietyStats);
                         }
                         else
                         {
-                            await CoreService.ErrorHandler.CaptureAsync(new Exception(
-                                    $"Failed to create variety stats for team {team.Id}: " +
-                                    $"{createResult.ErrorMessage}"
+                            await CoreService.ErrorHandler.CaptureAsync(
+                                new Exception(
+                                    $"Failed to create variety stats for team {team.Id}: "
+                                        + $"{createResult.ErrorMessage}"
                                 ),
                                 "Variety Stats Update Warning",
                                 nameof(UpdateTeamVarietyStatsAsync)
@@ -725,36 +742,40 @@ namespace WabbitBot.Core.Common.Models.Common
                     // Update variety stats using recent encounters
                     // Note: This still assumes team.RecentOpponents is available.
                     // The relational-refactoring plan will address this data structure.
-                    var recentEncounters = GetOpponentEncountersForTeam(match, team.Id)
-                        .Where(oe => oe.TeamSize == match.TeamSize)
-                        .OrderByDescending(oe => oe.EncounteredAt)
-                        .Take(100) // Use last 100 encounters for stats calculation
-                        .ToList() ?? new List<TeamOpponentEncounter>();
+                    var recentEncounters =
+                        GetOpponentEncountersForTeam(match, team.Id)
+                            .Where(oe => oe.TeamSize == match.TeamSize)
+                            .OrderByDescending(oe => oe.EncounteredAt)
+                            .Take(100) // Use last 100 encounters for stats calculation
+                            .ToList()
+                        ?? new List<TeamOpponentEncounter>();
 
                     TeamCore.ScrimmageStats.UpdateVarietyStats(varietyStats, recentEncounters);
                     varietyStats.LastUpdated = DateTime.UtcNow;
 
                     // Use _varietyStatsData and CoreService.Teams from constructor
-                    var updateVarietyResult = await CoreService.TeamVarietyStats.UpdateAsync(varietyStats,
-                        DatabaseComponent.Repository);
+                    var updateVarietyResult = await CoreService.TeamVarietyStats.UpdateAsync(
+                        varietyStats,
+                        DatabaseComponent.Repository
+                    );
                     if (!updateVarietyResult.Success)
                     {
-                        await CoreService.ErrorHandler.CaptureAsync(new Exception(
-                                $"Failed to update variety stats for team {team.Id}: " +
-                                $"{updateVarietyResult.ErrorMessage}"
+                        await CoreService.ErrorHandler.CaptureAsync(
+                            new Exception(
+                                $"Failed to update variety stats for team {team.Id}: "
+                                    + $"{updateVarietyResult.ErrorMessage}"
                             ),
                             "Variety Stats Update Warning",
                             nameof(UpdateTeamVarietyStatsAsync)
                         );
                     }
 
-                    var updateTeamResult = await CoreService.Teams.UpdateAsync(team,
-                        DatabaseComponent.Repository);
+                    var updateTeamResult = await CoreService.Teams.UpdateAsync(team, DatabaseComponent.Repository);
                     if (!updateTeamResult.Success)
                     {
-                        await CoreService.ErrorHandler.CaptureAsync(new Exception(
-                                $"Failed to update team {team.Id} variety stats: " +
-                                $"{updateTeamResult.ErrorMessage}"
+                        await CoreService.ErrorHandler.CaptureAsync(
+                            new Exception(
+                                $"Failed to update team {team.Id} variety stats: " + $"{updateTeamResult.ErrorMessage}"
                             ),
                             "Variety Stats Update Warning",
                             nameof(UpdateTeamVarietyStatsAsync)
@@ -764,7 +785,8 @@ namespace WabbitBot.Core.Common.Models.Common
             }
             catch (Exception ex)
             {
-                await CoreService.ErrorHandler.CaptureAsync(ex,
+                await CoreService.ErrorHandler.CaptureAsync(
+                    ex,
                     "Failed to update team variety stats",
                     nameof(UpdateTeamVarietyStatsAsync)
                 );

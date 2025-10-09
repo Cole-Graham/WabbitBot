@@ -2,26 +2,174 @@
 
 ## Overview
 
-WabbitBot uses the modern .NET configuration system with `IConfiguration` and the Options pattern. This provides a flexible, secure, and maintainable way to configure the bot.
+WabbitBot uses the modern .NET configuration system with `IConfiguration` and the Options pattern. This provides a 
+flexible, secure, and maintainable way to configure the bot.
 
 ## Configuration Files
 
 ### Primary Configuration
+
 - **`appsettings.json`** - Main configuration file with all bot settings
 - **`appsettings.Development.json`** - Development-specific overrides
-- **`appsettings.Production.json`** - Production-specific overrides
 
 ### Environment Variables
-For sensitive data and deployment flexibility, use environment variables:
+
+* **Local Development:** uses `dotnet user-secrets`
+* **Hosting on Cybrancee:** uses a `.env` file (loaded with `DotNetEnv`)
+
+```markdown
+## 🔐 Configuring Secrets & Environments (Local + Cybrancee)
+
+WabbitBot uses [ASP.NET Core configuration binding](https://learn.microsoft.com/aspnet/core/fundamentals/configuration) 
+to manage sensitive settings securely. During local development, secrets are stored safely using **User Secrets**, 
+and in deployment (on Cybrancee), they are loaded from a **`.env` file**.
+
+Configuration order:
+1. `appsettings.json` — base defaults  
+2. `appsettings.{Environment}.json` — optional overrides  
+3. **User Secrets** (local development only)  
+4. **.env file (Cybrancee hosting)** — environment-based secrets  
+
+Only **`WabbitBot.Host`** needs secrets.  
+
+---
+
+### 🧱 1. Initialize User Secrets (Local Development)
+
+Run these commands once in the host project:
 
 ```bash
-# Required
-WABBITBOT_TOKEN=your-discord-bot-token-here
+cd src/WabbitBot.Host
+dotnet user-secrets init
+````
 
-# Optional
-WABBITBOT_DATABASE_PATH=data/wabbitbot.db
-ASPNETCORE_ENVIRONMENT=Development
+This adds a `<UserSecretsId>` entry to your `.csproj` file:
+
+```xml
+<PropertyGroup>
+  <UserSecretsId>3c5e2e13-18ab-4a42-851b-9bfc70b83f73</UserSecretsId>
+</PropertyGroup>
 ```
+
+---
+
+### ⚙️ 2. Set Secrets for Local Development
+
+Set your local Discord token and database connection:
+
+```bash
+dotnet user-secrets set "Bot:Token" "your-local-discord-token" --project src/WabbitBot.Host/WabbitBot.Host.csproj
+
+dotnet user-secrets set "Bot:Database:ConnectionString" "Host=localhost;Database=wabbitbot;Username=wabbitbot;Password=devpw" --project src/WabbitBot.Host/WabbitBot.Host.csproj
+
+dotnet user-secrets set "ASPNETCORE_ENVIRONMENT" "Development" --project src/WabbitBot.Host/WabbitBot.Host.csproj
+```
+
+List current secrets:
+
+```bash
+dotnet user-secrets list --project src/WabbitBot.Host/WabbitBot.Host.csproj
+```
+
+These secrets are stored securely in:
+
+* **Windows:** `%APPDATA%\Microsoft\UserSecrets\<UserSecretsId>\secrets.json`
+* **Linux/macOS:** `~/.microsoft/usersecrets/<UserSecretsId>/secrets.json`
+
+Run the app locally:
+
+```bash
+$env:ASPNETCORE_ENVIRONMENT="Development"
+dotnet run --project src/WabbitBot.Host
+```
+
+ASP.NET Core automatically merges the `appsettings.*.json` files with your local user secrets.
+
+---
+
+### 🌐 3. Deploying on Cybrancee
+
+Cybrancee uses a `.env` file to store environment variables for your bot. This file should be placed in your root 
+project folder (`/src/WabbitBot.Host`) when uploading via SFTP or created in the Cybrancee panel.
+
+**Create a file named `.env`** with the following content:
+
+```
+ASPNETCORE_ENVIRONMENT=Development
+Bot__Token=your-discord-bot-token
+Bot__Database__ConnectionString=Host=localhost;Database=wabbitbot;Username=wabbitbot;Password=serverpw;
+```
+
+> **Note:** The double underscore `__` maps to nested JSON keys in ASP.NET Core (e.g., `Bot:Token`).
+
+---
+
+### 🧩 4. Loading the `.env` File in Code
+
+In your `Program.cs`, ensure this line appears near the top **before** the configuration builder:
+
+```csharp
+using DotNetEnv;
+
+Env.Load(); // Load variables from .env into the environment
+```
+
+Then ASP.NET Core automatically reads these variables during startup.
+
+---
+
+### 🧱 5. Starting the Bot on Cybrancee
+
+1. Open your **Cybrancee dashboard**.
+2. Select your **C# (Discord Bot)** server.
+3. Upload your published files (from `dotnet publish -c Release -o out/`).
+4. Upload the `.env` file into the same directory.
+5. Set the **Startup Command** to:
+
+   ```
+   dotnet WabbitBot.Host.dll
+   ```
+6. Start the server.
+   The `.env` file will load automatically, and the bot will connect using your `Bot__Token`.
+
+---
+
+### 🧹 6. Rotating or Clearing Local Secrets
+
+If you ever need to clear local secrets:
+
+```bash
+dotnet user-secrets remove "Bot:Token" --project src/WabbitBot.Host/WabbitBot.Host.csproj
+dotnet user-secrets clear --project src/WabbitBot.Host/WabbitBot.Host.csproj
+```
+
+---
+
+### ✅ Summary
+
+| Environment           | Secret Storage        | Example File/Command                        | Automatically Loaded |
+|-----------------------|-----------------------|---------------------------------------------|----------------------|
+| **Local Development** | `dotnet user-secrets` | `dotnet user-secrets set "Bot:Token" "..."` | ✅ Yes                |
+| **Cybrancee Hosting** | `.env` file           | `Bot__Token=...` in `.env`                  | ✅ With `Env.Load()`  |
+
+---
+
+### 🔒 Security Notes
+
+* Never commit `.env` or secrets to Git.
+* Reset your Discord token immediately if it’s ever exposed.
+* Keep `.env` file permissions restricted (read-only for your user).
+* User Secrets are encrypted per user and safe for local development.
+
+```
+
+---
+
+✅ This version removes all references to “Production,”  
+assumes **Cybrancee** is your deployment platform,  
+and uses the **exact file names and structure** from your repo (`src/WabbitBot.Host/...`).
+```
+
 
 ## Configuration Structure
 
@@ -30,7 +178,6 @@ The configuration is organized into logical sections:
 ```json
 {
   "Bot": {
-    "Token": "your-bot-token",
     "LogLevel": "Information",
     "ServerId": null,
     "Database": { ... },
@@ -45,48 +192,12 @@ The configuration is organized into logical sections:
 }
 ```
 
-## Feature-Specific Configuration
-
-### Scrimmage Settings
-- `MaxConcurrentScrimmages` - Maximum number of simultaneous scrimmages
-- `RatingSystem` - Rating algorithm ("elo")
-- `InitialRating` - Starting rating for new teams
-- `KFactor` - ELO sensitivity factor
-- `MatchTimeoutMinutes` - Time limit for matches
-- `MapBanCount` - Number of maps each team can ban
-- `BestOf` - Number of games per scrimmage
-
-### Tournament Settings
-- `DefaultFormat` - Tournament format ("single-elimination")
-- `BracketSize` - Number of teams in tournament
-- `BestOf` - Games per match
-- `AllowSpectators` - Whether spectators are allowed
-- `MatchTimeoutMinutes` - Time limit for matches
-- `MaxTournamentsPerDay` - Daily tournament limit
-
-### Match Settings
-- `MaxGamesPerMatch` - Maximum games in a single match
-- `DefaultBestOf` - Default games per match
-- `DeckCodeRequired` - Whether deck codes are mandatory
-- `AllowDuplicateDecks` - Whether duplicate decks are allowed
-- `ResultTimeoutMinutes` - Time limit for result submission
-
-### Leaderboard Settings
-- `DisplayTopN` - Number of teams to show in leaderboard
-- `RankingAlgorithm` - Ranking method ("elo")
-- `SeasonalResets` - Whether to reset ratings seasonally
-- `SeasonLengthDays` - Length of each season
-- `TournamentWeight` - Weight multiplier for tournament results
-- `ScrimmageWeight` - Weight multiplier for scrimmage results
-
 ## Environment Variable Overrides
 
 You can override any configuration value using environment variables:
 
 ```bash
 # Override specific settings
-WABBITBOT_SCRIMMAGE_MAXCONCURRENTSCRIMMAGES=15
-WABBITBOT_TOURNAMENT_BRACKETSIZE=32
 WABBITBOT_LEADERBOARD_DISPLAYTOPN=20
 ```
 
@@ -103,26 +214,6 @@ The system automatically validates configuration on startup:
 2. **Use environment variables** for tokens and API keys
 3. **Use different configs** for different environments
 4. **Restrict file permissions** on configuration files
-
-## Configuration Commands
-
-The bot provides Discord commands for configuration management:
-- `/config get` - View current configuration
-- `/config set-server` - Set server ID
-- `/config set-channel` - Configure channels
-- `/config set-role` - Configure roles
-- `/config export` - Export configuration as JSON
-- `/config import` - Import configuration from JSON
-
-## Migration from Old System
-
-If migrating from the old configuration system:
-
-1. **Backup** your existing `config.json`
-2. **Convert** settings to the new `appsettings.json` format
-3. **Set environment variables** for sensitive data
-4. **Test** configuration in development environment
-5. **Deploy** with new configuration system
 
 ## Troubleshooting
 
@@ -142,11 +233,3 @@ If migrating from the old configuration system:
 - Check numeric ranges
 - Verify required fields
 - Review logical constraints
-
-### Getting Help
-
-For configuration issues:
-1. Check the application logs
-2. Verify configuration syntax
-3. Test with minimal configuration
-4. Review this documentation

@@ -1,9 +1,9 @@
+using System.Collections.Immutable;
+using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
-using System.Collections.Immutable;
-using System.Linq;
 using WabbitBot.Analyzers.Descriptors;
 using WabbitBot.Generator.Shared.Utils;
 
@@ -16,9 +16,7 @@ namespace WabbitBot.Analyzers.Analyzers;
 public class EntityMetadataAnalyzer : DiagnosticAnalyzer
 {
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
-        ImmutableArray.Create(
-            EventAnalyzerDescriptors.MissingTableName,
-            EventAnalyzerDescriptors.InvalidCacheSize);
+        ImmutableArray.Create(EventAnalyzerDescriptors.MissingTableName, EventAnalyzerDescriptors.InvalidCacheSize);
 
     public override void Initialize(AnalysisContext context)
     {
@@ -37,8 +35,11 @@ public class EntityMetadataAnalyzer : DiagnosticAnalyzer
             return;
 
         // Check for EntityMetadata attribute
-        var entityMetadataAttr = classSymbol.GetAttributes()
-            .FirstOrDefault(attr => attr.AttributeClass?.ToDisplayString() == "WabbitBot.Common.Attributes.EntityMetadataAttribute");
+        var entityMetadataAttr = classSymbol
+            .GetAttributes()
+            .FirstOrDefault(attr =>
+                attr.AttributeClass?.ToDisplayString() == "WabbitBot.Common.Attributes.EntityMetadataAttribute"
+            );
 
         if (entityMetadataAttr != null)
         {
@@ -50,8 +51,12 @@ public class EntityMetadataAnalyzer : DiagnosticAnalyzer
         }
     }
 
-    private void CheckTableName(SyntaxNodeAnalysisContext context, ClassDeclarationSyntax classDecl,
-        INamedTypeSymbol classSymbol, AttributeData attribute)
+    private void CheckTableName(
+        SyntaxNodeAnalysisContext context,
+        ClassDeclarationSyntax classDecl,
+        INamedTypeSymbol classSymbol,
+        AttributeData attribute
+    )
     {
         // Check if tableName is specified (either positional or named argument)
         var tableName = AttributeExtractor.GetAttributeArgument(attribute, "tableName");
@@ -61,13 +66,18 @@ public class EntityMetadataAnalyzer : DiagnosticAnalyzer
             var diagnostic = Diagnostic.Create(
                 EventAnalyzerDescriptors.MissingTableName,
                 classDecl.Identifier.GetLocation(),
-                classSymbol.Name);
+                classSymbol.Name
+            );
             context.ReportDiagnostic(diagnostic);
         }
     }
 
-    private void CheckCacheSize(SyntaxNodeAnalysisContext context, ClassDeclarationSyntax classDecl,
-        INamedTypeSymbol classSymbol, AttributeData attribute)
+    private void CheckCacheSize(
+        SyntaxNodeAnalysisContext context,
+        ClassDeclarationSyntax classDecl,
+        INamedTypeSymbol classSymbol,
+        AttributeData attribute
+    )
     {
         // Check MaxCacheSize validity
         var maxCacheSize = AttributeExtractor.GetAttributeIntArgument(attribute, "MaxCacheSize");
@@ -78,7 +88,8 @@ public class EntityMetadataAnalyzer : DiagnosticAnalyzer
                 EventAnalyzerDescriptors.InvalidCacheSize,
                 classDecl.Identifier.GetLocation(),
                 classSymbol.Name,
-                maxCacheSize.Value);
+                maxCacheSize.Value
+            );
             context.ReportDiagnostic(diagnostic);
         }
     }

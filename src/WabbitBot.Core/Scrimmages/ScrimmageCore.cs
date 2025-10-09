@@ -2,20 +2,20 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.VisualBasic;
 using WabbitBot.Common.Attributes;
+using WabbitBot.Common.Data.Interfaces;
+using WabbitBot.Common.Data.Service;
+using WabbitBot.Common.ErrorService;
+using WabbitBot.Common.Events.Core;
+using WabbitBot.Common.Events.Interfaces;
+using WabbitBot.Common.Models;
 using WabbitBot.Core.Common.BotCore;
+using WabbitBot.Core.Common.Database;
+using WabbitBot.Core.Common.Interfaces;
 using WabbitBot.Core.Common.Models.Common;
 using WabbitBot.Core.Common.Models.Scrimmage;
 using WabbitBot.Core.Common.Services;
-using WabbitBot.Common.Events.Interfaces;
-using WabbitBot.Common.Events.Core;
-using WabbitBot.Common.Data.Service;
-using WabbitBot.Common.ErrorService;
-using WabbitBot.Common.Models;
-using WabbitBot.Common.Data.Interfaces;
-using WabbitBot.Core.Common.Database;
-using WabbitBot.Core.Common.Interfaces;
-using Microsoft.VisualBasic;
 
 namespace WabbitBot.Core.Scrimmages
 {
@@ -41,7 +41,8 @@ namespace WabbitBot.Core.Scrimmages
                 Player AcceptedByPlayer,
                 TeamSize teamSize,
                 int bestOf = 1,
-                ScrimmageStatus state = ScrimmageStatus.Accepted)
+                ScrimmageStatus state = ScrimmageStatus.Accepted
+            )
             {
                 var scrimmage = new Scrimmage
                 {
@@ -55,7 +56,7 @@ namespace WabbitBot.Core.Scrimmages
                     TeamSize = teamSize,
                     BestOf = bestOf,
                     StateHistory = new List<ScrimmageStateSnapshot> { new() { Status = state } },
-                    StartedAt = DateTime.UtcNow
+                    StartedAt = DateTime.UtcNow,
                 };
                 return scrimmage;
             }
@@ -66,7 +67,8 @@ namespace WabbitBot.Core.Scrimmages
                 Player IssuedByPlayer,
                 Player[] SelectedPlayers,
                 TeamSize teamSize,
-                int bestOf = 1)
+                int bestOf = 1
+            )
             {
                 if (ChallengerTeam == null)
                 {
@@ -99,6 +101,7 @@ namespace WabbitBot.Core.Scrimmages
             }
             #endregion
         }
+
         #region Accessors
         public static class Accessors
         {
@@ -157,10 +160,13 @@ namespace WabbitBot.Core.Scrimmages
             // ------------------------ State Machine Definition ---------------------------
             private static readonly Dictionary<ScrimmageStatus, List<ScrimmageStatus>> _validTransitions = new()
             {
-                [ScrimmageStatus.Accepted] = new() {
-                     ScrimmageStatus.InProgress, ScrimmageStatus.Cancelled },
-                [ScrimmageStatus.InProgress] = new() {
-                     ScrimmageStatus.Completed, ScrimmageStatus.Cancelled, ScrimmageStatus.Forfeited },
+                [ScrimmageStatus.Accepted] = new() { ScrimmageStatus.InProgress, ScrimmageStatus.Cancelled },
+                [ScrimmageStatus.InProgress] = new()
+                {
+                    ScrimmageStatus.Completed,
+                    ScrimmageStatus.Cancelled,
+                    ScrimmageStatus.Forfeited,
+                },
                 [ScrimmageStatus.Completed] = new(), // Terminal state
                 [ScrimmageStatus.Cancelled] = new(), // Terminal state
                 [ScrimmageStatus.Forfeited] = new(), // Terminal state
@@ -310,12 +316,13 @@ namespace WabbitBot.Core.Scrimmages
         #region Validation
         public static class Validation
         {
-            public static async Task<Result<ScrimmageChallenge>> ValidateChallengeAsync(
-                Guid challengeId)
+            public static async Task<Result<ScrimmageChallenge>> ValidateChallengeAsync(Guid challengeId)
             {
                 // Get challenge
                 var challengeResult = await CoreService.ScrimmageChallenges.GetByIdAsync(
-                    challengeId, DatabaseComponent.Repository);
+                    challengeId,
+                    DatabaseComponent.Repository
+                );
                 if (!challengeResult.Success)
                 {
                     return Result<ScrimmageChallenge>.Failure("Challenge not found");
@@ -327,12 +334,18 @@ namespace WabbitBot.Core.Scrimmages
                 }
 
                 // Get teams
-                var team1Result = await CoreService.Teams.GetByIdAsync(challenge.ChallengerTeamId, DatabaseComponent.Repository);
+                var team1Result = await CoreService.Teams.GetByIdAsync(
+                    challenge.ChallengerTeamId,
+                    DatabaseComponent.Repository
+                );
                 if (!team1Result.Success)
                 {
                     return Result<ScrimmageChallenge>.Failure("Team 1 not found");
                 }
-                var team2Result = await CoreService.Teams.GetByIdAsync(challenge.OpponentTeamId, DatabaseComponent.Repository);
+                var team2Result = await CoreService.Teams.GetByIdAsync(
+                    challenge.OpponentTeamId,
+                    DatabaseComponent.Repository
+                );
                 if (!team2Result.Success)
                 {
                     return Result<ScrimmageChallenge>.Failure("Team 2 not found");
@@ -347,15 +360,19 @@ namespace WabbitBot.Core.Scrimmages
                 {
                     return Result<ScrimmageChallenge>.Failure("Team 2 not found");
                 }
-                var issuedByPlayerResult = await CoreService.Players
-                    .GetByIdAsync(challenge.IssuedByPlayerId!, DatabaseComponent.Repository);
+                var issuedByPlayerResult = await CoreService.Players.GetByIdAsync(
+                    challenge.IssuedByPlayerId!,
+                    DatabaseComponent.Repository
+                );
                 if (!issuedByPlayerResult.Success)
                 {
                     return Result<ScrimmageChallenge>.Failure("Issued by player not found");
                 }
                 var issuedByPlayer = issuedByPlayerResult.Data!;
-                var acceptedByPlayerResult = await CoreService.Players
-                    .GetByIdAsync(challenge.AcceptedByPlayerId!, DatabaseComponent.Repository);
+                var acceptedByPlayerResult = await CoreService.Players.GetByIdAsync(
+                    challenge.AcceptedByPlayerId!,
+                    DatabaseComponent.Repository
+                );
                 if (!acceptedByPlayerResult.Success)
                 {
                     return Result<ScrimmageChallenge>.Failure("Accepted by player not found");
@@ -401,12 +418,12 @@ namespace WabbitBot.Core.Scrimmages
             List<Player> Team1Players,
             List<Player> Team2Players,
             Player IssuedByPlayer,
-            Player AcceptedByPlayer)
+            Player AcceptedByPlayer
+        )
         {
             try
             {
-                var validateResult = await Validation
-                    .ValidateChallengeAsync(ChallengeId);
+                var validateResult = await Validation.ValidateChallengeAsync(ChallengeId);
                 if (!validateResult.Success)
                 {
                     return Result<Scrimmage>.Failure("Challenge not found");
@@ -422,7 +439,8 @@ namespace WabbitBot.Core.Scrimmages
                     IssuedByPlayer,
                     AcceptedByPlayer,
                     challenge.TeamSize,
-                    challenge.BestOf);
+                    challenge.BestOf
+                );
 
                 var challengerTeam = challenge.ChallengerTeam;
                 var opponentTeam = challenge.OpponentTeam;
@@ -456,8 +474,7 @@ namespace WabbitBot.Core.Scrimmages
                     scrimmage.HigherRatedTeamId = scrimmage.Team2Id;
                 }
 
-                var dbResult = await CoreService.Scrimmages.CreateAsync(scrimmage,
-                    DatabaseComponent.Repository);
+                var dbResult = await CoreService.Scrimmages.CreateAsync(scrimmage, DatabaseComponent.Repository);
                 if (!dbResult.Success)
                 {
                     return Result<Scrimmage>.Failure("Failed to create scrimmage challenge.");
@@ -475,7 +492,10 @@ namespace WabbitBot.Core.Scrimmages
             catch (Exception ex)
             {
                 await CoreService.ErrorHandler.CaptureAsync(
-                    ex, "Failed to create scrimmage", nameof(CreateScrimmageAsync));
+                    ex,
+                    "Failed to create scrimmage",
+                    nameof(CreateScrimmageAsync)
+                );
                 return Result<Scrimmage>.Failure(
                     $"An unexpected error occurred while creating the scrimmage: {ex.Message}"
                 );
@@ -499,13 +519,13 @@ namespace WabbitBot.Core.Scrimmages
         {
             try
             {
-                var scrimmageResult = await CoreService.Scrimmages.GetByIdAsync(scrimmageId,
-                    DatabaseComponent.Repository);
+                var scrimmageResult = await CoreService.Scrimmages.GetByIdAsync(
+                    scrimmageId,
+                    DatabaseComponent.Repository
+                );
                 if (!scrimmageResult.Success)
                 {
-                    return Result.Failure(
-                        $"Failed to retrieve scrimmage: {scrimmageResult.ErrorMessage}"
-                    );
+                    return Result.Failure($"Failed to retrieve scrimmage: {scrimmageResult.ErrorMessage}");
                 }
                 var scrimmage = scrimmageResult.Data;
 
@@ -519,13 +539,10 @@ namespace WabbitBot.Core.Scrimmages
                 if (!State.IsValidTransition(currentState.Status, ScrimmageStatus.Accepted))
                     return Result.Failure("Failed to accept scrimmage.");
 
-                var updateResult = await CoreService.Scrimmages.UpdateAsync(scrimmage,
-                    DatabaseComponent.Repository);
+                var updateResult = await CoreService.Scrimmages.UpdateAsync(scrimmage, DatabaseComponent.Repository);
                 if (!updateResult.Success)
                 {
-                    return Result.Failure(
-                        $"Failed to update scrimmage: {updateResult.ErrorMessage}"
-                    );
+                    return Result.Failure($"Failed to update scrimmage: {updateResult.ErrorMessage}");
                 }
 
                 // Create match and publish provisioning request to both Core and Global
@@ -539,10 +556,12 @@ namespace WabbitBot.Core.Scrimmages
             catch (Exception ex)
             {
                 await CoreService.ErrorHandler.CaptureAsync(
-                    ex, "Failed to accept scrimmage", nameof(AcceptScrimmageAsync));
+                    ex,
+                    "Failed to accept scrimmage",
+                    nameof(AcceptScrimmageAsync)
+                );
                 return Result.Failure(
-                    $"An unexpected error occurred while accepting the scrimmage: " +
-                    $"{ex.Message}"
+                    $"An unexpected error occurred while accepting the scrimmage: " + $"{ex.Message}"
                 );
             }
         }

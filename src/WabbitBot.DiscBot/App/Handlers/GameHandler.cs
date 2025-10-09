@@ -9,7 +9,6 @@ using WabbitBot.Core.Common.Services;
 using WabbitBot.DiscBot.App.Events;
 using WabbitBot.DiscBot.App.Services.DiscBot;
 
-
 /// <summary>
 /// Handles button and component interactions for game flows.
 /// Publishes DiscBot-local interaction events to the event bus.
@@ -31,7 +30,10 @@ namespace WabbitBot.DiscBot.App.Handlers
         /// Returns Result indicating success/failure for immediate feedback.
         /// Publishes events for cross-boundary communication.
         /// </summary>
-        public static async Task<Result> HandleButtonInteractionAsync(DiscordClient client, ComponentInteractionCreatedEventArgs args)
+        public static async Task<Result> HandleButtonInteractionAsync(
+            DiscordClient client,
+            ComponentInteractionCreatedEventArgs args
+        )
         {
             var interaction = args.Interaction;
             var customId = interaction.Data.CustomId;
@@ -51,7 +53,8 @@ namespace WabbitBot.DiscBot.App.Handlers
                 await DiscBotService.ErrorHandler.CaptureAsync(
                     ex,
                     $"Failed to handle button interaction: {customId}",
-                    nameof(HandleButtonInteractionAsync));
+                    nameof(HandleButtonInteractionAsync)
+                );
 
                 // Try to respond with error - may fail if response was already sent
                 try
@@ -60,7 +63,8 @@ namespace WabbitBot.DiscBot.App.Handlers
                         DiscordInteractionResponseType.ChannelMessageWithSource,
                         new DiscordInteractionResponseBuilder()
                             .WithContent("An error occurred while processing your interaction. Please try again.")
-                            .AsEphemeral());
+                            .AsEphemeral()
+                    );
                 }
                 catch
                 {
@@ -75,7 +79,10 @@ namespace WabbitBot.DiscBot.App.Handlers
         /// Handles string select dropdown interactions (map ban selections).
         /// Returns Result indicating success/failure for immediate feedback.
         /// </summary>
-        public static async Task<Result> HandleSelectMenuInteractionAsync(DiscordClient client, ComponentInteractionCreatedEventArgs args)
+        public static async Task<Result> HandleSelectMenuInteractionAsync(
+            DiscordClient client,
+            ComponentInteractionCreatedEventArgs args
+        )
         {
             var interaction = args.Interaction;
             var customId = interaction.Data.CustomId;
@@ -90,7 +97,8 @@ namespace WabbitBot.DiscBot.App.Handlers
                 await DiscBotService.ErrorHandler.CaptureAsync(
                     ex,
                     $"Failed to handle select menu interaction: {customId}",
-                    nameof(HandleSelectMenuInteractionAsync));
+                    nameof(HandleSelectMenuInteractionAsync)
+                );
 
                 // Try to respond with error - may fail if response was already sent
                 try
@@ -99,7 +107,8 @@ namespace WabbitBot.DiscBot.App.Handlers
                         DiscordInteractionResponseType.ChannelMessageWithSource,
                         new DiscordInteractionResponseBuilder()
                             .WithContent("An error occurred while processing your selection. Please try again.")
-                            .AsEphemeral());
+                            .AsEphemeral()
+                    );
                 }
                 catch
                 {
@@ -135,7 +144,8 @@ namespace WabbitBot.DiscBot.App.Handlers
                 await DiscBotService.ErrorHandler.CaptureAsync(
                     ex,
                     $"Failed to handle modal submission: {customId}",
-                    nameof(HandleModalSubmitAsync));
+                    nameof(HandleModalSubmitAsync)
+                );
 
                 // Try to respond with error - may fail if response was already sent
                 try
@@ -144,7 +154,8 @@ namespace WabbitBot.DiscBot.App.Handlers
                         DiscordInteractionResponseType.ChannelMessageWithSource,
                         new DiscordInteractionResponseBuilder()
                             .WithContent("An error occurred while processing your submission. Please try again.")
-                            .AsEphemeral());
+                            .AsEphemeral()
+                    );
                 }
                 catch
                 {
@@ -159,13 +170,18 @@ namespace WabbitBot.DiscBot.App.Handlers
         {
             // Parse match ID and game number from custom ID: "submit_deck_{matchId}_{gameNumber}"
             var parts = customId.Replace("submit_deck_", "", StringComparison.Ordinal).Split('_');
-            if (parts.Length < 2 || !Guid.TryParse(parts[0], out var matchId) || !int.TryParse(parts[1], out var gameNumber))
+            if (
+                parts.Length < 2
+                || !Guid.TryParse(parts[0], out var matchId)
+                || !int.TryParse(parts[1], out var gameNumber)
+            )
             {
                 await interaction.CreateResponseAsync(
                     DiscordInteractionResponseType.ChannelMessageWithSource,
                     new DiscordInteractionResponseBuilder()
                         .WithContent("Invalid match or game information.")
-                        .AsEphemeral());
+                        .AsEphemeral()
+                );
                 return Result.Failure("Invalid match or game information");
             }
 
@@ -177,21 +193,17 @@ namespace WabbitBot.DiscBot.App.Handlers
             {
                 await interaction.CreateResponseAsync(
                     DiscordInteractionResponseType.ChannelMessageWithSource,
-                    new DiscordInteractionResponseBuilder()
-                        .WithContent("Deck code cannot be empty.")
-                        .AsEphemeral());
+                    new DiscordInteractionResponseBuilder().WithContent("Deck code cannot be empty.").AsEphemeral()
+                );
                 return Result.Failure("Deck code cannot be empty");
             }
 
-            await interaction.CreateResponseAsync(
-                DiscordInteractionResponseType.DeferredMessageUpdate);
+            await interaction.CreateResponseAsync(DiscordInteractionResponseType.DeferredMessageUpdate);
 
             // Publish PlayerDeckSubmitted (DiscBot-local) for App to handle
-            await DiscBotService.PublishAsync(new PlayerDeckSubmitted(
-                matchId,
-                gameNumber,
-                interaction.User.Id,
-                deckCode));
+            await DiscBotService.PublishAsync(
+                new PlayerDeckSubmitted(matchId, gameNumber, interaction.User.Id, deckCode)
+            );
 
             return Result.CreateSuccess("Deck submitted");
         }
@@ -200,28 +212,30 @@ namespace WabbitBot.DiscBot.App.Handlers
         {
             // Parse match ID and game number from custom ID: "confirm_deck_{matchId}_{gameNumber}"
             var parts = customId.Replace("confirm_deck_", "", StringComparison.Ordinal).Split('_');
-            if (parts.Length < 2 || !Guid.TryParse(parts[0], out var matchId) || !int.TryParse(parts[1], out var gameNumber))
+            if (
+                parts.Length < 2
+                || !Guid.TryParse(parts[0], out var matchId)
+                || !int.TryParse(parts[1], out var gameNumber)
+            )
             {
                 await interaction.CreateResponseAsync(
                     DiscordInteractionResponseType.ChannelMessageWithSource,
                     new DiscordInteractionResponseBuilder()
                         .WithContent("Invalid match or game information.")
-                        .AsEphemeral());
+                        .AsEphemeral()
+                );
                 return Result.Failure("Invalid match or game information");
             }
 
             // TODO: Retrieve current deck code from DM message state or cache
             var deckCode = string.Empty; // Placeholder
 
-            await interaction.CreateResponseAsync(
-                DiscordInteractionResponseType.DeferredMessageUpdate);
+            await interaction.CreateResponseAsync(DiscordInteractionResponseType.DeferredMessageUpdate);
 
             // Publish PlayerDeckConfirmed (DiscBot-local) for App to handle
-            await DiscBotService.PublishAsync(new PlayerDeckConfirmed(
-                matchId,
-                gameNumber,
-                interaction.User.Id,
-                deckCode));
+            await DiscBotService.PublishAsync(
+                new PlayerDeckConfirmed(matchId, gameNumber, interaction.User.Id, deckCode)
+            );
 
             return Result.CreateSuccess("Deck confirmed");
         }
@@ -245,7 +259,8 @@ namespace WabbitBot.DiscBot.App.Handlers
                 if (!validationResult.Success)
                 {
                     return Result.Failure(
-                        validationResult.ErrorMessage ?? "Match validation failed missing ErrorMessage");
+                        validationResult.ErrorMessage ?? "Match validation failed missing ErrorMessage"
+                    );
                 }
 
                 var match = matchResult.Data!;
@@ -267,7 +282,14 @@ namespace WabbitBot.DiscBot.App.Handlers
                 }
 
                 var containerResult = await Renderers.GameRenderer.RenderGameContainerAsync(
-                    client, channel, team1thread, team2thread, evt.MatchId, evt.GameNumber, evt.ChosenMap);
+                    client,
+                    channel,
+                    team1thread,
+                    team2thread,
+                    evt.MatchId,
+                    evt.GameNumber,
+                    evt.ChosenMap
+                );
 
                 if (!containerResult.Success)
                 {
@@ -280,7 +302,8 @@ namespace WabbitBot.DiscBot.App.Handlers
                 await DiscBotService.ErrorHandler.CaptureAsync(
                     ex,
                     $"Failed to handle game container request for match {evt.MatchId}, game {evt.GameNumber}",
-                    nameof(HandleGameContainerRequestedAsync));
+                    nameof(HandleGameContainerRequestedAsync)
+                );
                 return Result.Failure($"Failed to create game container: {ex.Message}");
             }
         }
@@ -300,7 +323,8 @@ namespace WabbitBot.DiscBot.App.Handlers
                     await DiscBotService.ErrorHandler.CaptureAsync(
                         new InvalidOperationException($"User {evt.PlayerDiscordUserId} not found"),
                         "Cannot send deck DM - user not found",
-                        nameof(HandleDeckDmStartRequestedAsync));
+                        nameof(HandleDeckDmStartRequestedAsync)
+                    );
                     return Result.Failure("User not found");
                 }
 
@@ -312,7 +336,8 @@ namespace WabbitBot.DiscBot.App.Handlers
                 await DiscBotService.ErrorHandler.CaptureAsync(
                     ex,
                     $"Failed to handle deck DM start request for match {evt.MatchId}, game {evt.GameNumber} to player {evt.PlayerDiscordUserId}",
-                    nameof(HandleDeckDmStartRequestedAsync));
+                    nameof(HandleDeckDmStartRequestedAsync)
+                );
                 return Result.Failure($"Failed to send deck DM: {ex.Message}");
             }
         }
@@ -332,7 +357,8 @@ namespace WabbitBot.DiscBot.App.Handlers
                 await DiscBotService.ErrorHandler.CaptureAsync(
                     ex,
                     $"Failed to handle deck DM update request for match {evt.MatchId}, game {evt.GameNumber}, player {evt.PlayerId}",
-                    nameof(HandleDeckDmUpdateRequestedAsync));
+                    nameof(HandleDeckDmUpdateRequestedAsync)
+                );
                 return Result.Failure($"Failed to update deck DM: {ex.Message}");
             }
         }
@@ -352,7 +378,8 @@ namespace WabbitBot.DiscBot.App.Handlers
                 await DiscBotService.ErrorHandler.CaptureAsync(
                     ex,
                     $"Failed to handle deck DM confirm request for match {evt.MatchId}, game {evt.GameNumber}, player {evt.PlayerId}",
-                    nameof(HandleDeckDmConfirmRequestedAsync));
+                    nameof(HandleDeckDmConfirmRequestedAsync)
+                );
                 return Result.Failure($"Failed to confirm deck DM: {ex.Message}");
             }
         }

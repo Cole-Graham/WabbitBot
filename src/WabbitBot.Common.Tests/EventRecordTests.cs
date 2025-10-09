@@ -1,7 +1,7 @@
-using Xunit;
+using WabbitBot.Common.Configuration;
 using WabbitBot.Common.Events;
 using WabbitBot.Common.Events.Interfaces;
-using WabbitBot.Common.Configuration;
+using Xunit;
 
 namespace WabbitBot.Common.Tests;
 
@@ -50,8 +50,14 @@ public class EventRecordTests
     public void EventRecords_HaveUniqueIds()
     {
         // Arrange & Act
-        var event1 = new StartupInitiatedEvent(new BotOptions { Token = "test-token" }, new MockBotConfigurationService());
-        var event2 = new StartupInitiatedEvent(new BotOptions { Token = "test-token" }, new MockBotConfigurationService());
+        var event1 = new StartupInitiatedEvent(
+            new BotOptions { Token = "test-token" },
+            new MockBotConfigurationService()
+        );
+        var event2 = new StartupInitiatedEvent(
+            new BotOptions { Token = "test-token" },
+            new MockBotConfigurationService()
+        );
 
         // Assert
         Assert.NotEqual(event1.EventId, event2.EventId);
@@ -64,7 +70,10 @@ public class EventRecordTests
         var before = DateTime.UtcNow;
 
         // Act
-        var @event = new StartupInitiatedEvent(new BotOptions { Token = "test-token" }, new MockBotConfigurationService());
+        var @event = new StartupInitiatedEvent(
+            new BotOptions { Token = "test-token" },
+            new MockBotConfigurationService()
+        );
         var after = DateTime.UtcNow;
 
         // Assert
@@ -76,7 +85,10 @@ public class EventRecordTests
     public void EventRecords_ImplementIEvent()
     {
         // Arrange & Act
-        var @event = new StartupInitiatedEvent(new BotOptions { Token = "test-token" }, new MockBotConfigurationService());
+        var @event = new StartupInitiatedEvent(
+            new BotOptions { Token = "test-token" },
+            new MockBotConfigurationService()
+        );
 
         // Assert
         Assert.IsAssignableFrom<IEvent>(@event);
@@ -109,7 +121,13 @@ public class EventRecordTests
 internal class MockBotConfigurationService : IBotConfigurationService
 {
     public string GetToken() => "mock-token";
+
     public string GetDatabasePath() => "mock-db-path";
-    public T GetSection<T>(string sectionName) where T : class, new() => new T();
-    public void ValidateConfiguration() { /* No-op for testing */ }
+
+    public T GetSection<T>(string sectionName)
+        where T : class, new() => new T();
+
+    public void ValidateConfiguration()
+    { /* No-op for testing */
+    }
 }

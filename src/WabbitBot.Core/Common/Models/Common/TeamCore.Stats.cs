@@ -22,7 +22,8 @@ namespace WabbitBot.Core.Common.Models.Common
 
             public static double GetVarietyScore(TeamVarietyStats varietyStats)
             {
-                if (varietyStats == null) return 0.0;
+                if (varietyStats == null)
+                    return 0.0;
 
                 var entropyScore = varietyStats.VarietyEntropy;
                 var bonusScore = varietyStats.VarietyBonus;
@@ -38,9 +39,13 @@ namespace WabbitBot.Core.Common.Models.Common
                 return baseRating + varietyBonus;
             }
 
-            public static void UpdateVarietyStats(TeamVarietyStats varietyStats, List<TeamOpponentEncounter> recentEncounters)
+            public static void UpdateVarietyStats(
+                TeamVarietyStats varietyStats,
+                List<TeamOpponentEncounter> recentEncounters
+            )
             {
-                if (!recentEncounters.Any()) return;
+                if (!recentEncounters.Any())
+                    return;
 
                 var uniqueOpponents = recentEncounters.Select(e => e.OpponentId).Distinct().Count();
                 var totalEncounters = recentEncounters.Count;
@@ -58,7 +63,8 @@ namespace WabbitBot.Core.Common.Models.Common
                 varietyStats.VarietyEntropy = maxEntropy == 0 ? 0 : entropy / maxEntropy;
 
                 var uniqueBonus = Math.Min(uniqueOpponents * 0.1, 1.0);
-                var repeatPenalty = totalEncounters > uniqueOpponents ? (totalEncounters - uniqueOpponents) * 0.05 : 0.0;
+                var repeatPenalty =
+                    totalEncounters > uniqueOpponents ? (totalEncounters - uniqueOpponents) * 0.05 : 0.0;
                 varietyStats.VarietyBonus = Math.Max(uniqueBonus - repeatPenalty, 0.0);
 
                 varietyStats.TotalOpponents = totalEncounters;
@@ -68,5 +74,3 @@ namespace WabbitBot.Core.Common.Models.Common
         }
     }
 }
-
-

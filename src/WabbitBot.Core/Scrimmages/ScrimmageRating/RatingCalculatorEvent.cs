@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
-using WabbitBot.Core.Common.Models.Common;
 using WabbitBot.Common.Attributes;
 using WabbitBot.Common.Events.Interfaces;
+using WabbitBot.Core.Common.Models.Common;
 
 namespace WabbitBot.Core.Scrimmages
 {
@@ -12,7 +12,8 @@ namespace WabbitBot.Core.Scrimmages
         double Adjustment,
         EventBusType EventBusType = EventBusType.Core,
         Guid EventId = default,
-        DateTime Timestamp = default) : IEvent;
+        DateTime Timestamp = default
+    ) : IEvent;
 
     public record ApplyProvenPotentialAdjustmentEvent(
         Guid ChallengerId,
@@ -22,7 +23,8 @@ namespace WabbitBot.Core.Scrimmages
         string Reason,
         EventBusType EventBusType = EventBusType.Core,
         Guid EventId = default,
-        DateTime Timestamp = default) : IEvent;
+        DateTime Timestamp = default
+    ) : IEvent;
 
     public record UpdateTeamRatingEvent(
         Guid TeamId,
@@ -31,7 +33,8 @@ namespace WabbitBot.Core.Scrimmages
         string Reason,
         EventBusType EventBusType = EventBusType.Core,
         Guid EventId = default,
-        DateTime Timestamp = default) : IEvent;
+        DateTime Timestamp = default
+    ) : IEvent;
 
     public record ApplyTeamRatingChangeEvent(
         Guid TeamId,
@@ -40,51 +43,44 @@ namespace WabbitBot.Core.Scrimmages
         string Reason,
         EventBusType EventBusType = EventBusType.Core,
         Guid EventId = default,
-        DateTime Timestamp = default) : IEvent;
+        DateTime Timestamp = default
+    ) : IEvent;
 
-    public record AllTeamRatingsRequest(
-        EventBusType EventBusType = EventBusType.Core) : IEvent
+    public record AllTeamRatingsRequest(EventBusType EventBusType = EventBusType.Core) : IEvent
     {
         public Guid EventId { get; init; } = Guid.NewGuid();
         public DateTime Timestamp { get; init; } = DateTime.UtcNow;
     }
 
-    public record AllTeamRatingsResponse(
-        EventBusType EventBusType = EventBusType.Core) : IEvent
+    public record AllTeamRatingsResponse(EventBusType EventBusType = EventBusType.Core) : IEvent
     {
         public Guid EventId { get; init; } = Guid.NewGuid();
         public DateTime Timestamp { get; init; } = DateTime.UtcNow;
         // Ratings and TeamIds should be fetched from database by handlers
     }
 
-    public record TeamOpponentStatsRequest(
-        Guid TeamId,
-        DateTime Since,
-        EventBusType EventBusType = EventBusType.Core) : IEvent
+    public record TeamOpponentStatsRequest(Guid TeamId, DateTime Since, EventBusType EventBusType = EventBusType.Core)
+        : IEvent
     {
         public Guid EventId { get; init; } = Guid.NewGuid();
         public DateTime Timestamp { get; init; } = DateTime.UtcNow;
     }
 
-    public record TeamOpponentStatsResponse(
-        Guid TeamId,
-        EventBusType EventBusType = EventBusType.Core) : IEvent
+    public record TeamOpponentStatsResponse(Guid TeamId, EventBusType EventBusType = EventBusType.Core) : IEvent
     {
         public Guid EventId { get; init; } = Guid.NewGuid();
         public DateTime Timestamp { get; init; } = DateTime.UtcNow;
         // Team rating, size, and opponent stats should be fetched from database by handlers using TeamId
     }
 
-    public record AllTeamOpponentDistributionsRequest(
-        DateTime Since,
-        EventBusType EventBusType = EventBusType.Core) : IEvent
+    public record AllTeamOpponentDistributionsRequest(DateTime Since, EventBusType EventBusType = EventBusType.Core)
+        : IEvent
     {
         public Guid EventId { get; init; } = Guid.NewGuid();
         public DateTime Timestamp { get; init; } = DateTime.UtcNow;
     }
 
-    public record AllTeamOpponentDistributionsResponse(
-        EventBusType EventBusType = EventBusType.Core) : IEvent
+    public record AllTeamOpponentDistributionsResponse(EventBusType EventBusType = EventBusType.Core) : IEvent
     {
         public Guid EventId { get; init; } = Guid.NewGuid();
         public DateTime Timestamp { get; init; } = DateTime.UtcNow;
@@ -94,7 +90,8 @@ namespace WabbitBot.Core.Scrimmages
     public record CalculateConfidenceRequest(
         Guid TeamId,
         TeamSize TeamSize,
-        EventBusType EventBusType = EventBusType.Core) : IEvent
+        EventBusType EventBusType = EventBusType.Core
+    ) : IEvent
     {
         public Guid EventId { get; init; } = Guid.NewGuid();
         public DateTime Timestamp { get; init; } = DateTime.UtcNow;
@@ -103,7 +100,8 @@ namespace WabbitBot.Core.Scrimmages
     public record CalculateConfidenceResponse(
         Guid TeamId,
         double Confidence,
-        EventBusType EventBusType = EventBusType.Core) : IEvent
+        EventBusType EventBusType = EventBusType.Core
+    ) : IEvent
     {
         public Guid EventId { get; init; } = Guid.NewGuid();
         public DateTime Timestamp { get; init; } = DateTime.UtcNow;
@@ -116,7 +114,8 @@ namespace WabbitBot.Core.Scrimmages
         double Team2Rating,
         int Team1Score,
         int Team2Score,
-        EventBusType EventBusType = EventBusType.Core) : IEvent
+        EventBusType EventBusType = EventBusType.Core
+    ) : IEvent
     {
         public Guid EventId { get; init; } = Guid.NewGuid();
         public DateTime Timestamp { get; init; } = DateTime.UtcNow;
@@ -126,7 +125,8 @@ namespace WabbitBot.Core.Scrimmages
         Guid MatchId,
         double Team1Change,
         double Team2Change,
-        EventBusType EventBusType = EventBusType.Core) : IEvent
+        EventBusType EventBusType = EventBusType.Core
+    ) : IEvent
     {
         public Guid EventId { get; init; } = Guid.NewGuid();
         public DateTime Timestamp { get; init; } = DateTime.UtcNow;

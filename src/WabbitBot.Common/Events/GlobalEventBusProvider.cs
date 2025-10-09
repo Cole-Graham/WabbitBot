@@ -11,7 +11,7 @@ public static class GlobalEventBusProvider
 
     public static IGlobalEventBus GetGlobalEventBus()
     {
-        return _instance ?? throw new InvalidOperationException(
-            "GlobalEventBus has not been initialized. Call Initialize() first.");
+        return _instance
+            ?? throw new InvalidOperationException("GlobalEventBus has not been initialized. Call Initialize() first.");
     }
 }

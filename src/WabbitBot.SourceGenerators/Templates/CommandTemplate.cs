@@ -8,7 +8,8 @@ public static class CommandTemplate
     /// <summary>
     /// Template for command registration class
     /// </summary>
-    public const string CommandRegistrationClass = @"
+    public const string CommandRegistrationClass =
+        @"
 using DSharpPlus.Commands;
 using System.Threading.Tasks;
 
@@ -26,13 +27,15 @@ namespace WabbitBot.DiscBot.DSharpPlus.Generated
     /// <summary>
     /// Template for individual command registration
     /// </summary>
-    public const string CommandRegistration = @"
+    public const string CommandRegistration =
+        @"
             await commands.RegisterCommands<{0}>();";
 
     /// <summary>
     /// Template for command class with attributes
     /// </summary>
-    public const string CommandClass = @"
+    public const string CommandClass =
+        @"
 using DSharpPlus.Commands;
 using DSharpPlus.Commands.ContextChecks;
 using DSharpPlus.Entities;
@@ -51,7 +54,8 @@ namespace {0}
     /// <summary>
     /// Template for command method
     /// </summary>
-    public const string CommandMethod = @"
+    public const string CommandMethod =
+        @"
         [Command(""{0}"")]
         [Description(""{1}"")]
         public async Task {2}Async(CommandContext ctx{3})

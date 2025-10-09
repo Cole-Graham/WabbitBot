@@ -13,7 +13,8 @@ namespace WabbitBot.Core.Common.Database
         public WabbitBotDbContext CreateDbContext(string[] args)
         {
             // For design-time operations (migrations), use environment variables or default connection string
-            var connectionString = Environment.GetEnvironmentVariable("WABBITBOT_CONNECTION_STRING")
+            var connectionString =
+                Environment.GetEnvironmentVariable("WABBITBOT_CONNECTION_STRING")
                 ?? "Host=localhost;Database=wabbitbot;Username=wabbitbot;Password=password123";
 
             var optionsBuilder = new DbContextOptionsBuilder<WabbitBotDbContext>();

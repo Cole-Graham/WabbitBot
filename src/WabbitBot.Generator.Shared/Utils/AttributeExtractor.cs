@@ -23,10 +23,11 @@ public static class AttributeExtractor
         var attrClass = attribute.AttributeClass;
         if (attrClass != null)
         {
-            var parameters = attrClass.GetMembers()
+            var parameters = attrClass
+                .GetMembers()
                 .OfType<IMethodSymbol>()
-                .FirstOrDefault(m => m.MethodKind == MethodKind.Constructor)?
-                .Parameters;
+                .FirstOrDefault(m => m.MethodKind == MethodKind.Constructor)
+                ?.Parameters;
 
             if (parameters != null)
             {
@@ -44,7 +45,8 @@ public static class AttributeExtractor
     /// <summary>
     /// Extracts an enum value from an attribute by parameter name.
     /// </summary>
-    public static TEnum? GetAttributeEnumArgument<TEnum>(AttributeData attribute, string parameterName) where TEnum : struct, Enum
+    public static TEnum? GetAttributeEnumArgument<TEnum>(AttributeData attribute, string parameterName)
+        where TEnum : struct, Enum
     {
         var value = GetAttributeArgument(attribute, parameterName);
         if (value != null && Enum.TryParse(value, out TEnum result))

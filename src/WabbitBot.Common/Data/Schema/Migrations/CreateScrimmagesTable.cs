@@ -1,7 +1,7 @@
 using System;
 using System.Threading.Tasks;
-using WabbitBot.Common.Data.Schema.Interface;
 using WabbitBot.Common.Data.Interfaces;
+using WabbitBot.Common.Data.Schema.Interface;
 using WabbitBot.Common.Data.Utilities;
 
 namespace WabbitBot.Common.Data.Schema.Migrations
@@ -19,7 +19,9 @@ namespace WabbitBot.Common.Data.Schema.Migrations
             try
             {
                 // Create Scrimmages table
-                await QueryUtil.ExecuteNonQueryAsync(conn, @"
+                await QueryUtil.ExecuteNonQueryAsync(
+                    conn,
+                    @"
                     CREATE TABLE IF NOT EXISTS Scrimmages (
                         Id TEXT PRIMARY KEY,
                         Team1Id TEXT NOT NULL,
@@ -43,17 +45,40 @@ namespace WabbitBot.Common.Data.Schema.Migrations
                         CreatedAt DATETIME NOT NULL,
                         UpdatedAt DATETIME NOT NULL,
                         SchemaVersion INTEGER NOT NULL DEFAULT 1
-                    )", new { }, transaction);
+                    )",
+                    new { },
+                    transaction
+                );
 
                 // Create indexes for faster lookups
-                await QueryUtil.ExecuteNonQueryAsync(conn, @"
-                    CREATE INDEX IF NOT EXISTS IX_Scrimmages_Team1Id ON Scrimmages(Team1Id)", new { }, transaction);
-                await QueryUtil.ExecuteNonQueryAsync(conn, @"
-                    CREATE INDEX IF NOT EXISTS IX_Scrimmages_Team2Id ON Scrimmages(Team2Id)", new { }, transaction);
-                await QueryUtil.ExecuteNonQueryAsync(conn, @"
-                    CREATE INDEX IF NOT EXISTS IX_Scrimmages_Status ON Scrimmages(Status)", new { }, transaction);
-                await QueryUtil.ExecuteNonQueryAsync(conn, @"
-                    CREATE INDEX IF NOT EXISTS IX_Scrimmages_CreatedAt ON Scrimmages(CreatedAt)", new { }, transaction);
+                await QueryUtil.ExecuteNonQueryAsync(
+                    conn,
+                    @"
+                    CREATE INDEX IF NOT EXISTS IX_Scrimmages_Team1Id ON Scrimmages(Team1Id)",
+                    new { },
+                    transaction
+                );
+                await QueryUtil.ExecuteNonQueryAsync(
+                    conn,
+                    @"
+                    CREATE INDEX IF NOT EXISTS IX_Scrimmages_Team2Id ON Scrimmages(Team2Id)",
+                    new { },
+                    transaction
+                );
+                await QueryUtil.ExecuteNonQueryAsync(
+                    conn,
+                    @"
+                    CREATE INDEX IF NOT EXISTS IX_Scrimmages_Status ON Scrimmages(Status)",
+                    new { },
+                    transaction
+                );
+                await QueryUtil.ExecuteNonQueryAsync(
+                    conn,
+                    @"
+                    CREATE INDEX IF NOT EXISTS IX_Scrimmages_CreatedAt ON Scrimmages(CreatedAt)",
+                    new { },
+                    transaction
+                );
 
                 transaction.Commit();
             }

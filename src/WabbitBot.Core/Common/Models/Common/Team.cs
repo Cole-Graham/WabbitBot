@@ -1,12 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using WabbitBot.Common.Models;
-using WabbitBot.Common.Attributes;
-using WabbitBot.Common.Data.Service;
-using WabbitBot.Core.Common.Services;
-using WabbitBot.Common.Data.Interfaces;
 using System.Threading.Tasks;
+using WabbitBot.Common.Attributes;
+using WabbitBot.Common.Data.Interfaces;
+using WabbitBot.Common.Data.Service;
+using WabbitBot.Common.Models;
+using WabbitBot.Core.Common.Services;
 
 namespace WabbitBot.Core.Common.Models.Common
 {
@@ -49,15 +49,15 @@ namespace WabbitBot.Core.Common.Models.Common
     {
         Captain,
         Core,
-        Substitute
+        Substitute,
     }
     #endregion
 
     #region TeamType
     public enum TeamType
     {
-        Solo = 0,  // 1v1 teams - can only have Solo roster
-        Team = 1   // Team games - can have Duo and/or Squad rosters (but not Solo)
+        Solo = 0, // 1v1 teams - can only have Solo roster
+        Team = 1, // Team games - can have Duo and/or Squad rosters (but not Solo)
     }
     #endregion
 
@@ -121,8 +121,6 @@ namespace WabbitBot.Core.Common.Models.Common
     #endregion
 
 
-
-
     #region ScrimmageTeamStats
     [EntityMetadata(
         tableName: "scrimmage_team_stats",
@@ -138,7 +136,8 @@ namespace WabbitBot.Core.Common.Models.Common
         // Team identification (for team stats)
         public Guid TeamId { get; set; }
         public TeamSize TeamSize { get; set; }
-        public virtual ICollection<TeamOpponentEncounter> OpponentEncounters { get; set; } = new List<TeamOpponentEncounter>();
+        public virtual ICollection<TeamOpponentEncounter> OpponentEncounters { get; set; } =
+            new List<TeamOpponentEncounter>();
 
         // Basic stats
         public int Wins { get; set; }
@@ -274,4 +273,3 @@ namespace WabbitBot.Core.Common.Models.Common
     }
     #endregion
 }
-

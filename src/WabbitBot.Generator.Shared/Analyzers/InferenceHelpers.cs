@@ -42,8 +42,8 @@ public static class InferenceHelpers
     /// </summary>
     public static IEnumerable<(string Type, string Name)> ExtractEventParameters(IMethodSymbol method)
     {
-        return method.Parameters
-            .Where(p => p.Type.ToDisplayString() != "DSharpPlus.Commands.InteractionContext") // Skip context
+        return method
+            .Parameters.Where(p => p.Type.ToDisplayString() != "DSharpPlus.Commands.InteractionContext") // Skip context
             .Select(p => (p.Type.ToDisplayString(), p.Name));
     }
 }

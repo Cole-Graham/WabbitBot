@@ -13,12 +13,14 @@ namespace WabbitBot.Common.Data
     {
         private static readonly ConcurrentDictionary<Type, object> _providers = new();
 
-        public static void RegisterProvider<TEntity>(ICacheProvider<TEntity> provider) where TEntity : Entity
+        public static void RegisterProvider<TEntity>(ICacheProvider<TEntity> provider)
+            where TEntity : Entity
         {
             _providers[typeof(TEntity)] = provider ?? throw new ArgumentNullException(nameof(provider));
         }
 
-        public static ICacheProvider<TEntity>? GetProvider<TEntity>() where TEntity : Entity
+        public static ICacheProvider<TEntity>? GetProvider<TEntity>()
+            where TEntity : Entity
         {
             if (_providers.TryGetValue(typeof(TEntity), out var provider) && provider is ICacheProvider<TEntity> typed)
             {
@@ -28,5 +30,3 @@ namespace WabbitBot.Common.Data
         }
     }
 }
-
-

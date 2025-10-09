@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
+using WabbitBot.Common.Attributes;
 using WabbitBot.Common.Models;
 using WabbitBot.Core.Common.Models.Common;
-using WabbitBot.Common.Attributes;
 
 namespace WabbitBot.Core.Common.Models.Common
 {
@@ -29,6 +29,7 @@ namespace WabbitBot.Core.Common.Models.Common
         public int TeamJoinLimit { get; set; }
         public Dictionary<Guid, DateTime> TeamJoinCooldowns { get; set; } = new Dictionary<Guid, DateTime>();
         public List<Guid> TeamIds { get; set; } = new();
+
         /// <summary>
         /// Key: Platform name (e.g., "Discord", "Steam"), Value: List of user IDs from that platform.
         /// </summary>

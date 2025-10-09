@@ -40,7 +40,8 @@ public sealed class ErrorContext
         ErrorSeverity severity,
         string operationName,
         Exception? exception = null,
-        IReadOnlyDictionary<string, object>? metadata = null)
+        IReadOnlyDictionary<string, object>? metadata = null
+    )
     {
         Message = message;
         Severity = severity;
@@ -60,16 +61,19 @@ public enum ErrorSeverity
     /// A critical error that requires immediate attention. The application may be in an unstable state.
     /// </summary>
     Critical,
+
     /// <summary>
     /// A significant error that has impacted a user or a system, but the application can continue.
     /// </summary>
     Error,
+
     /// <summary>
     /// A potential problem that does not prevent the current operation from completing but should be investigated.
     /// </summary>
     Warning,
+
     /// <summary>
     /// Informational message about a notable event that is not an error.
     /// </summary>
-    Information
+    Information,
 }

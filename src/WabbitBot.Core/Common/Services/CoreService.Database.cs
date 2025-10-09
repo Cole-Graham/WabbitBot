@@ -1,10 +1,10 @@
 using System;
-using WabbitBot.Common.Data.Service;
-using WabbitBot.Common.Data; // RepositoryAdapterRegistry
 using System.Linq;
+using WabbitBot.Common.Data; // RepositoryAdapterRegistry
+using WabbitBot.Common.Data.Service;
 using WabbitBot.Common.Models;
-using WabbitBot.Core.Common.Models.Common;
 using WabbitBot.Core.Common.Database;
+using WabbitBot.Core.Common.Models.Common;
 
 namespace WabbitBot.Core.Common.Services
 {
@@ -15,9 +15,6 @@ namespace WabbitBot.Core.Common.Services
     public static partial class CoreService
     {
         // Static lazy accessors for DatabaseService instances
-
-
-
 
         /// <summary>
         /// Executes work within a safely managed DbContext scope
@@ -67,7 +64,10 @@ namespace WabbitBot.Core.Common.Services
         /// <summary>
         /// Executes work within a safely managed DbContext scope with standardized error handling and returns a result
         /// </summary>
-        public static async Task<Result<T>> TryWithDbContext<T>(Func<WabbitBotDbContext, Task<T>> work, string operationName)
+        public static async Task<Result<T>> TryWithDbContext<T>(
+            Func<WabbitBotDbContext, Task<T>> work,
+            string operationName
+        )
         {
             try
             {
@@ -138,11 +138,14 @@ namespace WabbitBot.Core.Common.Services
                     // Build DbSet for archive type to get distinct EntityId values
                     await using var db = WabbitBotDbContextProvider.CreateDbContext();
                     var archiveType = entityType.Assembly.GetType(entityType.FullName + "Archive");
-                    if (archiveType is null) continue;
+                    if (archiveType is null)
+                        continue;
                     var entityIdProp = archiveType.GetProperty("EntityId");
-                    if (entityIdProp is null) continue;
+                    if (entityIdProp is null)
+                        continue;
                     var archivedAtProp = archiveType.GetProperty("ArchivedAt");
-                    if (archivedAtProp is null) continue;
+                    if (archivedAtProp is null)
+                        continue;
 
                     var setGeneric = typeof(Microsoft.EntityFrameworkCore.DbContext)
                         .GetMethods()
@@ -155,17 +158,18 @@ namespace WabbitBot.Core.Common.Services
                     {
                         list.Add(item);
                     }
-                    var entityIds = list
-                        .Select(x => (Guid)entityIdProp.GetValue(x)!)
-                        .Distinct()
-                        .ToList();
+                    var entityIds = list.Select(x => (Guid)entityIdProp.GetValue(x)!).Distinct().ToList();
 
                     // Resolve provider instance from registry via reflection of generic method
-                    var getProviderMethod = typeof(ArchiveProviderRegistry).GetMethod("GetProvider")!.MakeGenericMethod(entityType);
+                    var getProviderMethod = typeof(ArchiveProviderRegistry)
+                        .GetMethod("GetProvider")!
+                        .MakeGenericMethod(entityType);
                     var provider = getProviderMethod.Invoke(null, Array.Empty<object>());
-                    if (provider is null) continue;
+                    if (provider is null)
+                        continue;
                     var purgeMethod = provider.GetType().GetMethod("PurgeAsync");
-                    if (purgeMethod is null) continue;
+                    if (purgeMethod is null)
+                        continue;
 
                     foreach (var id in entityIds)
                     {

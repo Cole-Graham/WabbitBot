@@ -8,24 +8,28 @@ namespace WabbitBot.Core.Common.BotCore
         EventBusType EventBusType = EventBusType.Core,
         Guid EventId = default,
         DateTime Timestamp = default,
-        DateTime CompletedAt = default) : IEvent;
+        DateTime CompletedAt = default
+    ) : IEvent;
 
     public record CoreServicesInitializedEvent(
         string[] InitializedServices,
         EventBusType EventBusType = EventBusType.Core,
         Guid EventId = default,
-        DateTime Timestamp = default) : IEvent;
+        DateTime Timestamp = default
+    ) : IEvent;
 
     public record CoreFeatureReadyEvent(
         string FeatureName,
         EventBusType EventBusType = EventBusType.Core,
         Guid EventId = default,
-        DateTime Timestamp = default) : IEvent;
+        DateTime Timestamp = default
+    ) : IEvent;
 
     public record CoreErrorHandlingReadyEvent(
         EventBusType EventBusType = EventBusType.Core,
         Guid EventId = default,
-        DateTime Timestamp = default) : IEvent;
+        DateTime Timestamp = default
+    ) : IEvent;
     #endregion
 
     #region Error Events
@@ -34,13 +38,15 @@ namespace WabbitBot.Core.Common.BotCore
         Exception Exception,
         EventBusType EventBusType = EventBusType.Core,
         Guid EventId = default,
-        DateTime Timestamp = default) : IEvent;
+        DateTime Timestamp = default
+    ) : IEvent;
 
     public record CoreStartupFailedEvent(
         Exception Exception,
         string Component = "Unknown",
         EventBusType EventBusType = EventBusType.Core,
         Guid EventId = default,
-        DateTime Timestamp = default) : IEvent;
+        DateTime Timestamp = default
+    ) : IEvent;
     #endregion
 }

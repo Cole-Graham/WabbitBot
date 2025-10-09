@@ -7,7 +7,8 @@ namespace WabbitBot.Common.Data
     /// <summary>
     /// Base cache class for in-memory caching operations
     /// </summary>
-    public abstract class Cache<TEntity, TCollection> where TEntity : Entity
+    public abstract class Cache<TEntity, TCollection>
+        where TEntity : Entity
         where TCollection : Entity
     {
         private class CacheEntry
@@ -24,7 +25,8 @@ namespace WabbitBot.Common.Data
 
         protected Cache(int maxSize = 1000, TimeSpan? defaultExpiry = null)
         {
-            _maxSize = maxSize > 0 ? maxSize : throw new ArgumentException("Max size must be greater than 0", nameof(maxSize));
+            _maxSize =
+                maxSize > 0 ? maxSize : throw new ArgumentException("Max size must be greater than 0", nameof(maxSize));
             _cache = new ConcurrentDictionary<string, CacheEntry>();
             DefaultExpiry = defaultExpiry ?? TimeSpan.FromHours(1);
         }
@@ -55,7 +57,7 @@ namespace WabbitBot.Common.Data
             {
                 Value = value,
                 ExpiryTime = expiry.HasValue ? DateTime.UtcNow.Add(expiry.Value) : null,
-                LastAccessed = DateTime.UtcNow
+                LastAccessed = DateTime.UtcNow,
             };
 
             if (_cache.Count >= _maxSize && !_cache.ContainsKey(key))
@@ -125,7 +127,7 @@ namespace WabbitBot.Common.Data
             {
                 Value = collection,
                 ExpiryTime = expiry.HasValue ? DateTime.UtcNow.Add(expiry.Value) : null,
-                LastAccessed = DateTime.UtcNow
+                LastAccessed = DateTime.UtcNow,
             };
 
             if (_cache.Count >= _maxSize && !_cache.ContainsKey(key))
@@ -191,12 +193,8 @@ namespace WabbitBot.Common.Data
                 ExpiredEntries = expiredCount,
                 MaxSize = _maxSize,
                 UtilizationPercentage = UtilizationPercentage,
-                OldestEntryAge = _cache.Values.Any()
-                    ? now - _cache.Values.Min(e => e.LastAccessed)
-                    : TimeSpan.Zero,
-                NewestEntryAge = _cache.Values.Any()
-                    ? now - _cache.Values.Max(e => e.LastAccessed)
-                    : TimeSpan.Zero
+                OldestEntryAge = _cache.Values.Any() ? now - _cache.Values.Min(e => e.LastAccessed) : TimeSpan.Zero,
+                NewestEntryAge = _cache.Values.Any() ? now - _cache.Values.Max(e => e.LastAccessed) : TimeSpan.Zero,
             };
         }
 
@@ -216,10 +214,7 @@ namespace WabbitBot.Common.Data
         {
             lock (_evictionLock)
             {
-                var oldestEntries = _cache
-                    .OrderBy(kvp => kvp.Value.LastAccessed)
-                    .Take(count)
-                    .ToList();
+                var oldestEntries = _cache.OrderBy(kvp => kvp.Value.LastAccessed).Take(count).ToList();
 
                 foreach (var entry in oldestEntries)
                 {

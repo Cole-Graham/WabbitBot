@@ -14,7 +14,8 @@ namespace WabbitBot.Core.Common.Database
     /// EF Core-based archive provider. Persists immutable snapshots to the generated {Entity}Archive tables.
     /// Uses WabbitBotDbContextProvider for database access (no runtime DI).
     /// </summary>
-    public sealed class EfArchiveProvider<TEntity> : IArchiveProvider<TEntity> where TEntity : Entity
+    public sealed class EfArchiveProvider<TEntity> : IArchiveProvider<TEntity>
+        where TEntity : Entity
     {
         private static Type ResolveArchiveType()
         {
@@ -26,11 +27,15 @@ namespace WabbitBot.Core.Common.Database
             if (archiveType is null)
             {
                 // Fallback: scan assembly
-                archiveType = entityType.Assembly.GetTypes()
-                    .FirstOrDefault(t => string.Equals(t.Namespace, ns, StringComparison.Ordinal)
-                        && string.Equals(t.Name, archiveName, StringComparison.Ordinal));
+                archiveType = entityType
+                    .Assembly.GetTypes()
+                    .FirstOrDefault(t =>
+                        string.Equals(t.Namespace, ns, StringComparison.Ordinal)
+                        && string.Equals(t.Name, archiveName, StringComparison.Ordinal)
+                    );
             }
-            return archiveType ?? throw new InvalidOperationException($"Archive type not found for {entityType.FullName}");
+            return archiveType
+                ?? throw new InvalidOperationException($"Archive type not found for {entityType.FullName}");
         }
 
         private static void CopyScalarProperties(object destination, TEntity source)
@@ -39,12 +44,26 @@ namespace WabbitBot.Core.Common.Database
             var srcType = typeof(TEntity);
             foreach (var dp in destType.GetProperties(BindingFlags.Public | BindingFlags.Instance))
             {
-                if (!dp.CanWrite) continue;
+                if (!dp.CanWrite)
+                    continue;
                 var name = dp.Name;
-                if (name is "ArchiveId" or "EntityId" or "Version" or "ArchivedAt" or "ArchivedBy" or "Reason" or "Id" or "CreatedAt" or "UpdatedAt" or "Domain")
+                if (
+                    name
+                    is "ArchiveId"
+                        or "EntityId"
+                        or "Version"
+                        or "ArchivedAt"
+                        or "ArchivedBy"
+                        or "Reason"
+                        or "Id"
+                        or "CreatedAt"
+                        or "UpdatedAt"
+                        or "Domain"
+                )
                     continue;
                 var sp = srcType.GetProperty(name, BindingFlags.Public | BindingFlags.Instance);
-                if (sp is null || !sp.CanRead) continue;
+                if (sp is null || !sp.CanRead)
+                    continue;
                 var value = sp.GetValue(source);
                 dp.SetValue(destination, value);
             }
@@ -67,8 +86,13 @@ namespace WabbitBot.Core.Common.Database
             archiveType.GetProperty("Reason")!.SetValue(archive, reason);
 
             // Prefer generated mapper if available, otherwise fallback to reflection
-            var mapperType = Type.GetType($"WabbitBot.Core.Common.Database.Mappers.{typeof(TEntity).Name}ArchiveMapper, {typeof(TEntity).Assembly.GetName().Name}");
-            var mapMethod = mapperType?.GetMethod("MapToArchive", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+            var mapperType = Type.GetType(
+                $"WabbitBot.Core.Common.Database.Mappers.{typeof(TEntity).Name}ArchiveMapper, {typeof(TEntity).Assembly.GetName().Name}"
+            );
+            var mapMethod = mapperType?.GetMethod(
+                "MapToArchive",
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static
+            );
             if (mapperType is not null && mapMethod is not null)
             {
                 mapMethod.Invoke(null, new object[] { entity, archive });
@@ -105,44 +129,46 @@ namespace WabbitBot.Core.Common.Database
 
         public Task PurgeAsync(Guid entityId, DateTime? olderThan = null)
         {
-            return CoreService.TryWithDbContext(async db =>
-            {
-                var archiveType = ResolveArchiveType();
-                var entityIdProp = archiveType.GetProperty("EntityId")!;
-                var archivedAtProp = archiveType.GetProperty("ArchivedAt")!;
-
-                var setGeneric = typeof(Microsoft.EntityFrameworkCore.DbContext)
-                    .GetMethods()
-                    .First(m => m.Name == "Set" && m.IsGenericMethodDefinition && m.GetParameters().Length == 0)
-                    .MakeGenericMethod(archiveType)
-                    .Invoke(db, null)!;
-
-                var list = new List<object>();
-                foreach (var item in (System.Collections.IEnumerable)setGeneric)
+            return CoreService.TryWithDbContext(
+                async db =>
                 {
-                    list.Add(item);
-                }
+                    var archiveType = ResolveArchiveType();
+                    var entityIdProp = archiveType.GetProperty("EntityId")!;
+                    var archivedAtProp = archiveType.GetProperty("ArchivedAt")!;
 
-                var filtered = list.AsQueryable().Cast<object>();
-                if (entityId != Guid.Empty)
-                {
-                    filtered = filtered.Where(x => (Guid)entityIdProp.GetValue(x)! == entityId);
-                }
-                if (olderThan is not null)
-                {
-                    filtered = filtered.Where(x => (DateTime)archivedAtProp.GetValue(x)! < olderThan.Value);
-                }
+                    var setGeneric = typeof(Microsoft.EntityFrameworkCore.DbContext)
+                        .GetMethods()
+                        .First(m => m.Name == "Set" && m.IsGenericMethodDefinition && m.GetParameters().Length == 0)
+                        .MakeGenericMethod(archiveType)
+                        .Invoke(db, null)!;
 
-                var toDelete = filtered.ToList();
-                if (toDelete.Count == 0) return;
-                foreach (var r in toDelete)
-                {
-                    db.Remove(r);
-                }
-                await db.SaveChangesAsync();
-            }, "Archive Purge");
+                    var list = new List<object>();
+                    foreach (var item in (System.Collections.IEnumerable)setGeneric)
+                    {
+                        list.Add(item);
+                    }
+
+                    var filtered = list.AsQueryable().Cast<object>();
+                    if (entityId != Guid.Empty)
+                    {
+                        filtered = filtered.Where(x => (Guid)entityIdProp.GetValue(x)! == entityId);
+                    }
+                    if (olderThan is not null)
+                    {
+                        filtered = filtered.Where(x => (DateTime)archivedAtProp.GetValue(x)! < olderThan.Value);
+                    }
+
+                    var toDelete = filtered.ToList();
+                    if (toDelete.Count == 0)
+                        return;
+                    foreach (var r in toDelete)
+                    {
+                        db.Remove(r);
+                    }
+                    await db.SaveChangesAsync();
+                },
+                "Archive Purge"
+            );
         }
     }
 }
-
-

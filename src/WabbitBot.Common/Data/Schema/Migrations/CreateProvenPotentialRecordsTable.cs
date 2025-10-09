@@ -19,7 +19,9 @@ namespace WabbitBot.Common.Data.Schema
             try
             {
                 // Create ProvenPotentialRecords table
-                await QueryUtil.ExecuteNonQueryAsync(conn, @"
+                await QueryUtil.ExecuteNonQueryAsync(
+                    conn,
+                    @"
                     CREATE TABLE IF NOT EXISTS ProvenPotentialRecords (
                         Id TEXT PRIMARY KEY,
                         OriginalMatchId TEXT NOT NULL,
@@ -39,17 +41,40 @@ namespace WabbitBot.Common.Data.Schema
                         CreatedAt DATETIME NOT NULL,
                         UpdatedAt DATETIME NOT NULL,
                         SchemaVersion INTEGER NOT NULL DEFAULT 1
-                    )", new { }, transaction);
+                    )",
+                    new { },
+                    transaction
+                );
 
                 // Create indexes for faster lookups
-                await QueryUtil.ExecuteNonQueryAsync(conn, @"
-                    CREATE INDEX IF NOT EXISTS idx_proven_potential_challenger ON ProvenPotentialRecords(ChallengerId)", new { }, transaction);
-                await QueryUtil.ExecuteNonQueryAsync(conn, @"
-                    CREATE INDEX IF NOT EXISTS idx_proven_potential_opponent ON ProvenPotentialRecords(OpponentId)", new { }, transaction);
-                await QueryUtil.ExecuteNonQueryAsync(conn, @"
-                    CREATE INDEX IF NOT EXISTS idx_proven_potential_match ON ProvenPotentialRecords(OriginalMatchId)", new { }, transaction);
-                await QueryUtil.ExecuteNonQueryAsync(conn, @"
-                    CREATE INDEX IF NOT EXISTS idx_proven_potential_complete ON ProvenPotentialRecords(IsComplete)", new { }, transaction);
+                await QueryUtil.ExecuteNonQueryAsync(
+                    conn,
+                    @"
+                    CREATE INDEX IF NOT EXISTS idx_proven_potential_challenger ON ProvenPotentialRecords(ChallengerId)",
+                    new { },
+                    transaction
+                );
+                await QueryUtil.ExecuteNonQueryAsync(
+                    conn,
+                    @"
+                    CREATE INDEX IF NOT EXISTS idx_proven_potential_opponent ON ProvenPotentialRecords(OpponentId)",
+                    new { },
+                    transaction
+                );
+                await QueryUtil.ExecuteNonQueryAsync(
+                    conn,
+                    @"
+                    CREATE INDEX IF NOT EXISTS idx_proven_potential_match ON ProvenPotentialRecords(OriginalMatchId)",
+                    new { },
+                    transaction
+                );
+                await QueryUtil.ExecuteNonQueryAsync(
+                    conn,
+                    @"
+                    CREATE INDEX IF NOT EXISTS idx_proven_potential_complete ON ProvenPotentialRecords(IsComplete)",
+                    new { },
+                    transaction
+                );
 
                 transaction.Commit();
             }
@@ -67,7 +92,12 @@ namespace WabbitBot.Common.Data.Schema
 
             try
             {
-                await QueryUtil.ExecuteNonQueryAsync(conn, "DROP TABLE IF EXISTS ProvenPotentialRecords", new { }, transaction);
+                await QueryUtil.ExecuteNonQueryAsync(
+                    conn,
+                    "DROP TABLE IF EXISTS ProvenPotentialRecords",
+                    new { },
+                    transaction
+                );
                 transaction.Commit();
             }
             catch

@@ -16,8 +16,7 @@ public static class ThumbnailUtility
     /// </summary>
     public static void Initialize(Microsoft.Extensions.Configuration.IConfiguration configuration)
     {
-        _thumbnailsDirectory = configuration["Bot:Maps:ThumbnailsDirectory"]
-                             ?? "data/maps/thumbnails";
+        _thumbnailsDirectory = configuration["Bot:Maps:ThumbnailsDirectory"] ?? "data/maps/thumbnails";
     }
 
     /// <summary>

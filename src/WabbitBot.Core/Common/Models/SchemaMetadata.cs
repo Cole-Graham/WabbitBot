@@ -5,7 +5,7 @@ namespace WabbitBot.Core.Common.Models
     /// <summary>
     /// Tracks database schema version history and compatibility information.
     /// Used to monitor version drift and ensure application-database compatibility.
-    /// 
+    ///
     /// NOTE: This is infrastructure metadata, not a business domain entity.
     /// It does not inherit from Entity to avoid redundant fields (CreatedAt/UpdatedAt).
     /// DbContext configuration is manual since this table is stable and rarely modified.

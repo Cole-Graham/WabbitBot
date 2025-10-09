@@ -5,7 +5,8 @@ using WabbitBot.Common.Models;
 
 namespace WabbitBot.Common.Data.Service
 {
-    public class NoOpCacheProvider<TEntity> : ICacheProvider<TEntity> where TEntity : Entity
+    public class NoOpCacheProvider<TEntity> : ICacheProvider<TEntity>
+        where TEntity : Entity
     {
         public Task<bool> TryGetAsync(object id, out TEntity? entity)
         {
@@ -29,5 +30,3 @@ namespace WabbitBot.Common.Data.Service
         }
     }
 }
-
-

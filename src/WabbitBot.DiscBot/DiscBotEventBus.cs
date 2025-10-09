@@ -32,11 +32,13 @@ public class DiscBotEventBus(IGlobalEventBus globalEventBus) : IDiscBotEventBus
     private readonly Dictionary<Type, List<Delegate>> _requestHandlers = [];
     private readonly ConcurrentDictionary<Guid, TaskCompletionSource<object?>> _pendingRequests = new();
     private readonly Lock _lock = new();
-    private readonly IGlobalEventBus _globalEventBus = globalEventBus ?? throw new ArgumentNullException(nameof(globalEventBus));
+    private readonly IGlobalEventBus _globalEventBus =
+        globalEventBus ?? throw new ArgumentNullException(nameof(globalEventBus));
     private bool _isInitialized;
 
     /// <inheritdoc />
-    public async ValueTask PublishAsync<TEvent>(TEvent @event) where TEvent : class, IEvent
+    public async ValueTask PublishAsync<TEvent>(TEvent @event)
+        where TEvent : class, IEvent
     {
         if (!_isInitialized)
         {
@@ -74,7 +76,8 @@ public class DiscBotEventBus(IGlobalEventBus globalEventBus) : IDiscBotEventBus
     }
 
     /// <inheritdoc />
-    public void Subscribe<TEvent>(Func<TEvent, Task> handler) where TEvent : class, IEvent
+    public void Subscribe<TEvent>(Func<TEvent, Task> handler)
+        where TEvent : class, IEvent
     {
         ArgumentNullException.ThrowIfNull(handler);
 
@@ -91,7 +94,8 @@ public class DiscBotEventBus(IGlobalEventBus globalEventBus) : IDiscBotEventBus
     }
 
     /// <inheritdoc />
-    public void Unsubscribe<TEvent>(Func<TEvent, Task> handler) where TEvent : class, IEvent
+    public void Unsubscribe<TEvent>(Func<TEvent, Task> handler)
+        where TEvent : class, IEvent
     {
         ArgumentNullException.ThrowIfNull(handler);
 
@@ -161,7 +165,8 @@ public class DiscBotEventBus(IGlobalEventBus globalEventBus) : IDiscBotEventBus
         return Task.CompletedTask;
     }
 
-    private async ValueTask PublishLocallyAsync<TEvent>(TEvent @event) where TEvent : class, IEvent
+    private async ValueTask PublishLocallyAsync<TEvent>(TEvent @event)
+        where TEvent : class, IEvent
     {
         var eventType = @event.GetType();
         List<Delegate>? handlersCopy = null;
@@ -170,7 +175,7 @@ public class DiscBotEventBus(IGlobalEventBus globalEventBus) : IDiscBotEventBus
         {
             if (_handlers.TryGetValue(eventType, out var handlers))
             {
-                handlersCopy = [.. handlers,];
+                handlersCopy = [.. handlers];
             }
         }
 
@@ -186,4 +191,3 @@ public class DiscBotEventBus(IGlobalEventBus globalEventBus) : IDiscBotEventBus
         }
     }
 }
-

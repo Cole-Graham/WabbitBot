@@ -1,5 +1,5 @@
-using Microsoft.CodeAnalysis.Text;
 using System.Text;
+using Microsoft.CodeAnalysis.Text;
 using WabbitBot.SourceGenerators.Utils;
 
 namespace WabbitBot.SourceGenerators.Templates;
@@ -37,22 +37,27 @@ public static class CommonTemplates
     public static string CreatePartialClassWithDependencies(
         string className,
         string content,
-        IEnumerable<(string type, string name)> dependencies)
+        IEnumerable<(string type, string name)> dependencies
+    )
     {
         var constructorParams = string.Join(", ", dependencies.Select(d => $"{d.type} {d.name}"));
-        var fieldAssignments = string.Join("\n",
-            dependencies.Select(d => $"    private readonly {d.type} _{d.name.FirstCharToLower()};"));
+        var fieldAssignments = string.Join(
+            "\n",
+            dependencies.Select(d => $"    private readonly {d.type} _{d.name.FirstCharToLower()};")
+        );
 
         var constructor = SourceEmitter.CreateMethod(
             returnType: "",
             methodName: className,
             parameters: constructorParams,
-            body: string.Join("\n", dependencies.Select(d =>
-                $"        _{d.name.FirstCharToLower()} = {d.name.FirstCharToLower()};")),
-            modifiers: "public");
+            body: string.Join(
+                "\n",
+                dependencies.Select(d => $"        _{d.name.FirstCharToLower()} = {d.name.FirstCharToLower()};")
+            ),
+            modifiers: "public"
+        );
 
-        return SourceEmitter.CreatePartialClass(className,
-            fieldAssignments + "\n\n" + constructor + "\n\n" + content);
+        return SourceEmitter.CreatePartialClass(className, fieldAssignments + "\n\n" + constructor + "\n\n" + content);
     }
 
     /// <summary>
@@ -61,14 +66,18 @@ public static class CommonTemplates
     public static string CreateEventRecord(
         string eventName,
         IEnumerable<(string type, string name)> payloadParams,
-        string busType = "EventBusType.Core")
+        string busType = "EventBusType.Core"
+    )
     {
-        var paramsList = string.Join(",\n    ", new[]
-        {
-            $"EventBusType EventBusType = {busType}",
-            "Guid EventId = default",
-            "DateTime Timestamp = default"
-        }.Concat(payloadParams.Select(p => $"{p.type} {p.name}")));
+        var paramsList = string.Join(
+            ",\n    ",
+            new[]
+            {
+                $"EventBusType EventBusType = {busType}",
+                "Guid EventId = default",
+                "DateTime Timestamp = default",
+            }.Concat(payloadParams.Select(p => $"{p.type} {p.name}"))
+        );
 
         return $$"""
             public record {{eventName}}(
@@ -140,5 +149,4 @@ public static class CommonTemplates
             return str;
         return char.ToLower(str[0]) + str.Substring(1);
     }
-
 }

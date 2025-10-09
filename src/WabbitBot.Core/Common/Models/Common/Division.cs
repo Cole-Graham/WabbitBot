@@ -21,7 +21,7 @@ public enum Faction
 /// Percentile-based skill/rating tiers for filtering and analyzing division statistics.
 /// Uses "sticky" percentile breakpoints that are calculated periodically (daily/weekly)
 /// rather than in real-time to enable efficient caching and stable tier boundaries.
-/// 
+///
 /// Percentiles represent the TOP X% of players (e.g., Top10 = top 10% of all players).
 /// </summary>
 public enum RatingTier
@@ -368,7 +368,7 @@ public class GameLengthBucket // Value object, doesn't inherit from Entity becau
 /// Utility class for managing game length buckets and bucket calculations.
 /// Defines standard bucket sizes and provides helper methods for bucketing game durations.
 /// </summary>
-public static class GameLengthBuckets // Value object, doesn't inherit from Entity because it has no independent lifecycle. 
+public static class GameLengthBuckets // Value object, doesn't inherit from Entity because it has no independent lifecycle.
 {
     /// <summary>
     /// Size of each bucket in minutes.
@@ -385,8 +385,7 @@ public static class GameLengthBuckets // Value object, doesn't inherit from Enti
     /// Gets all bucket start points (0, 5, 10, 15, 20, 25, 30, 35).
     /// </summary>
     public static IEnumerable<int> AllBuckets =>
-        Enumerable.Range(0, MaxGameLengthMinutes / BucketSizeMinutes)
-                  .Select(i => i * BucketSizeMinutes);
+        Enumerable.Range(0, MaxGameLengthMinutes / BucketSizeMinutes).Select(i => i * BucketSizeMinutes);
 
     /// <summary>
     /// Determines which bucket a game duration falls into.
@@ -409,11 +408,7 @@ public static class GameLengthBuckets // Value object, doesn't inherit from Enti
     /// <param name="bucketStart">The bucket start minute (0, 5, 10, etc.).</param>
     public static GameLengthBucket CreateEmptyBucket(int bucketStart)
     {
-        return new GameLengthBucket
-        {
-            MinMinutes = bucketStart,
-            MaxMinutes = bucketStart + BucketSizeMinutes,
-        };
+        return new GameLengthBucket { MinMinutes = bucketStart, MaxMinutes = bucketStart + BucketSizeMinutes };
     }
 
     /// <summary>
@@ -423,7 +418,8 @@ public static class GameLengthBuckets // Value object, doesn't inherit from Enti
     public static void RecalculatePercentages(Dictionary<int, GameLengthBucket> buckets)
     {
         int totalGames = buckets.Values.Sum(b => b.GamesPlayed);
-        if (totalGames == 0) return;
+        if (totalGames == 0)
+            return;
 
         foreach (var bucket in buckets.Values)
         {
@@ -567,11 +563,11 @@ public enum CurveModel
 /// <summary>
 /// Tracks how a team's performance with a specific division evolves over time
 /// using mathematical curve fitting rather than discrete milestones.
-/// 
+///
 /// Stores regression parameters that allow precise winrate calculation at any game count.
 /// High skill ceiling divisions show steep curves with high ceilings,
 /// while easy-to-use divisions show flat curves near their starting performance.
-/// 
+///
 /// NOTE: Currently only tracked for 1v1 games to avoid complexity of team coordination effects.
 /// </summary>
 [EntityMetadata(
@@ -694,17 +690,14 @@ public static class LearningCurveHelpers
         }
     }
 
-    private static double EvaluateLinear(Dictionary<string, double> p, int x)
-        => p["a"] + p["b"] * x;
+    private static double EvaluateLinear(Dictionary<string, double> p, int x) => p["a"] + p["b"] * x;
 
-    private static double EvaluateLogarithmic(Dictionary<string, double> p, int x)
-        => p["a"] + p["b"] * Math.Log(x);
+    private static double EvaluateLogarithmic(Dictionary<string, double> p, int x) => p["a"] + p["b"] * Math.Log(x);
 
-    private static double EvaluatePowerLaw(Dictionary<string, double> p, int x)
-        => p["a"] * Math.Pow(x, p["b"]);
+    private static double EvaluatePowerLaw(Dictionary<string, double> p, int x) => p["a"] * Math.Pow(x, p["b"]);
 
-    private static double EvaluateExponentialApproach(Dictionary<string, double> p, int x)
-        => p["ceiling"] - (p["ceiling"] - p["initial"]) * Math.Exp(-p["k"] * x);
+    private static double EvaluateExponentialApproach(Dictionary<string, double> p, int x) =>
+        p["ceiling"] - (p["ceiling"] - p["initial"]) * Math.Exp(-p["k"] * x);
 
     /// <summary>
     /// Calculates the learning rate (derivative) at a specific game count.
@@ -723,7 +716,9 @@ public static class LearningCurveHelpers
                 CurveModel.Linear => p["b"],
                 CurveModel.Logarithmic => p["b"] / gameCount,
                 CurveModel.PowerLaw => p["a"] * p["b"] * Math.Pow(gameCount, p["b"] - 1),
-                CurveModel.ExponentialApproach => (p["ceiling"] - p["initial"]) * p["k"] * Math.Exp(-p["k"] * gameCount),
+                CurveModel.ExponentialApproach => (p["ceiling"] - p["initial"])
+                    * p["k"]
+                    * Math.Exp(-p["k"] * gameCount),
                 _ => null,
             };
         }
@@ -753,4 +748,3 @@ public static class LearningCurveHelpers
     }
 }
 #endregion
-

@@ -12,7 +12,8 @@ public class EventBoundaryGeneratorTests
         // This is a placeholder test. Actual implementation will depend on the EventBoundaryGenerator
         // Once implemented, this will test incremental generation of event boundaries.
 
-        const string source = @"
+        const string source =
+            @"
 using WabbitBot.Common.Attributes;
 
 namespace TestNamespace

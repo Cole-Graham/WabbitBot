@@ -35,18 +35,24 @@ namespace WabbitBot.Core.Common.Database
                 dsBuilder.EnableDynamicJson();
                 _dataSource = dsBuilder.Build();
 
-                optionsBuilder.UseNpgsql(_dataSource, npgsqlOptions =>
-                {
-                    npgsqlOptions.EnableRetryOnFailure(
-                        maxRetryCount: 3,
-                        maxRetryDelay: TimeSpan.FromSeconds(30),
-                        errorCodesToAdd: null);
-                    npgsqlOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
-                });
+                optionsBuilder.UseNpgsql(
+                    _dataSource,
+                    npgsqlOptions =>
+                    {
+                        npgsqlOptions.EnableRetryOnFailure(
+                            maxRetryCount: 3,
+                            maxRetryDelay: TimeSpan.FromSeconds(30),
+                            errorCodesToAdd: null
+                        );
+                        npgsqlOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
+                    }
+                );
             }
             else
             {
-                throw new NotSupportedException($"Database provider '{databaseSettings.Provider}' is not supported. Only 'postgresql' is supported.");
+                throw new NotSupportedException(
+                    $"Database provider '{databaseSettings.Provider}' is not supported. Only 'postgresql' is supported."
+                );
             }
 
             if (configuration.GetValue<bool>("UseDetailedErrors", false))
@@ -68,7 +74,9 @@ namespace WabbitBot.Core.Common.Database
         public static WabbitBotDbContext CreateDbContext()
         {
             if (_options == null)
-                throw new InvalidOperationException("DbContextProvider has not been initialized. Call Initialize() first.");
+                throw new InvalidOperationException(
+                    "DbContextProvider has not been initialized. Call Initialize() first."
+                );
 
             return new WabbitBotDbContext(_options);
         }
@@ -78,7 +86,8 @@ namespace WabbitBot.Core.Common.Database
         /// </summary>
         public static string GetConnectionString()
         {
-            return _connectionString ?? throw new InvalidOperationException("DbContextProvider has not been initialized.");
+            return _connectionString
+                ?? throw new InvalidOperationException("DbContextProvider has not been initialized.");
         }
     }
 }

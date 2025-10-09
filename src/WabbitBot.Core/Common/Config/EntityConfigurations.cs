@@ -6,7 +6,8 @@ namespace WabbitBot.Core.Common.Config
     /// <summary>
     /// Base class for entity configurations that define database mappings and settings
     /// </summary>
-    public abstract class EntityConfig<TEntity> where TEntity : class
+    public abstract class EntityConfig<TEntity>
+        where TEntity : class
     {
         /// <summary>
         /// Gets the table name for this entity
@@ -43,7 +44,6 @@ namespace WabbitBot.Core.Common.Config
         /// </summary>
         public string[] JsonbColumns { get; protected set; } = Array.Empty<string>();
 
-
         protected EntityConfig(
             string tableName,
             string archiveTableName,
@@ -51,7 +51,8 @@ namespace WabbitBot.Core.Common.Config
             string idColumn = "id",
             int maxCacheSize = 1000,
             TimeSpan? defaultCacheExpiry = null,
-            string[]? jsonbColumns = null)
+            string[]? jsonbColumns = null
+        )
         {
             TableName = tableName ?? throw new ArgumentNullException(nameof(tableName));
             ArchiveTableName = archiveTableName ?? throw new ArgumentNullException(nameof(archiveTableName));

@@ -5,8 +5,8 @@ using WabbitBot.Common.Models;
 
 namespace WabbitBot.Core.Common.Models.Common;
 
-
-public enum MapDensity {
+public enum MapDensity
+{
     Low,
     Medium,
     High,
@@ -25,7 +25,6 @@ public enum MapDensity {
 )]
 public class Map : Entity, IMapEntity
 {
-
     /// <summary>
     /// The display name of the map.
     /// </summary>
@@ -68,7 +67,6 @@ public class Map : Entity, IMapEntity
     /// </summary>
     public string? ThumbnailFilename { get; set; }
     public override Domain Domain => Domain.Common;
-
 
     // Removed static class Validation.
 }

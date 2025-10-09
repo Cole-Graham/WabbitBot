@@ -1,10 +1,10 @@
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using WabbitBot.Generator.Shared.Analyzers;
 using WabbitBot.SourceGenerators.Templates;
 using WabbitBot.SourceGenerators.Utils;
@@ -29,81 +29,110 @@ namespace WabbitBot.SourceGenerators.Generators.Database
         {
             try
             {
-                context.RegisterPostInitializationOutput(ctx => ctx.AddSource("__WG_Init_DbContextGenerator.g.cs", "// DbContextGenerator: Initialize hit"));
+                context.RegisterPostInitializationOutput(ctx =>
+                    ctx.AddSource("__WG_Init_DbContextGenerator.g.cs", "// DbContextGenerator: Initialize hit")
+                );
             }
             catch (Exception ex)
             {
-                context.RegisterPostInitializationOutput(ctx => ctx.AddSource("__WG_Init_DbContextGenerator_Error.g.cs", "// Init exception: " + ex.Message.Replace("\"", "'")));
+                context.RegisterPostInitializationOutput(ctx =>
+                    ctx.AddSource(
+                        "__WG_Init_DbContextGenerator_Error.g.cs",
+                        "// Init exception: " + ex.Message.Replace("\"", "'")
+                    )
+                );
             }
 
             var isCoreProject = context.CompilationProvider.IsCore();
 
             // Extract entity metadata per attributed class, then aggregate
-            var entityInfos = context.SyntaxProvider
-                .CreateSyntaxProvider(
-                    predicate: static (node, _) => node is Microsoft.CodeAnalysis.CSharp.Syntax.ClassDeclarationSyntax { AttributeLists.Count: > 0 },
+            var entityInfos = context
+                .SyntaxProvider.CreateSyntaxProvider(
+                    predicate: static (node, _) => node is ClassDeclarationSyntax { AttributeLists.Count: > 0 },
                     transform: static (ctx, _) =>
                     {
-                        var classDecl = (Microsoft.CodeAnalysis.CSharp.Syntax.ClassDeclarationSyntax)ctx.Node;
-                        var classSymbol = ctx.SemanticModel.GetDeclaredSymbol(classDecl) as INamedTypeSymbol;
+                        var classDecl = (ClassDeclarationSyntax)ctx.Node;
+                        var classSymbol = ctx.SemanticModel.GetDeclaredSymbol(classDecl);
                         if (classSymbol is null)
                             return null;
 
-                        var attr = classSymbol.GetAttributes()
-                            .FirstOrDefault(a => a.AttributeClass?.ToDisplayString() == WabbitBot.Generator.Shared.AttributeNames.EntityMetadata);
+                        var attr = classSymbol
+                            .GetAttributes()
+                            .FirstOrDefault(a =>
+                                a.AttributeClass?.ToDisplayString() == Generator.Shared.AttributeNames.EntityMetadata
+                            );
                         return attr is null ? null : AttributeAnalyzer.ExtractEntityMetadataInfo(classSymbol, attr);
-                    })
+                    }
+                )
                 .Where(static info => info is not null)
                 .Collect();
 
-            var dbContextSource = entityInfos.Select((entities, ct) =>
-            {
-                ct.ThrowIfCancellationRequested();
-                return GenerateDbContextConfiguration(entities.Where(e => e is not null)!);
-            });
+            var dbContextSource = entityInfos.Select(
+                (entities, ct) =>
+                {
+                    ct.ThrowIfCancellationRequested();
+                    return GenerateDbContextConfiguration(entities.Where(e => e is not null)!);
+                }
+            );
 
-            context.RegisterSourceOutput(dbContextSource.Combine(isCoreProject), (spc, tuple) =>
-            {
-                if (!tuple.Right)
-                    return;
-                spc.AddSource("WabbitBotDbContext.Generated.g.cs", tuple.Left);
-            });
+            context.RegisterSourceOutput(
+                dbContextSource.Combine(isCoreProject),
+                (spc, tuple) =>
+                {
+                    if (!tuple.Right)
+                        return;
+                    spc.AddSource("WabbitBotDbContext.Generated.g.cs", tuple.Left);
+                }
+            );
 
             // Generate archive model classes
-            var archiveModelsSource = entityInfos.Select((entities, ct) =>
-            {
-                ct.ThrowIfCancellationRequested();
-                return GenerateArchiveModels(entities.Where(e => e is not null)!);
-            });
+            var archiveModelsSource = entityInfos.Select(
+                (entities, ct) =>
+                {
+                    ct.ThrowIfCancellationRequested();
+                    return GenerateArchiveModels(entities.Where(e => e is not null)!);
+                }
+            );
 
-            context.RegisterSourceOutput(archiveModelsSource.Combine(isCoreProject), (spc, tuple) =>
-            {
-                if (!tuple.Right)
-                    return;
-                spc.AddSource("ArchiveModels.Generated.g.cs", tuple.Left);
-            });
+            context.RegisterSourceOutput(
+                archiveModelsSource.Combine(isCoreProject),
+                (spc, tuple) =>
+                {
+                    if (!tuple.Right)
+                        return;
+                    spc.AddSource("ArchiveModels.Generated.g.cs", tuple.Left);
+                }
+            );
 
             // Generate archive mappers (live <-> archive)
-            var archiveMappersSource = entityInfos.Select((entities, ct) =>
-            {
-                ct.ThrowIfCancellationRequested();
-                return GenerateArchiveMappers(entities.Where(e => e is not null)!);
-            });
+            var archiveMappersSource = entityInfos.Select(
+                (entities, ct) =>
+                {
+                    ct.ThrowIfCancellationRequested();
+                    return GenerateArchiveMappers(entities.Where(e => e is not null)!);
+                }
+            );
 
-            context.RegisterSourceOutput(archiveMappersSource.Combine(isCoreProject), (spc, tuple) =>
-            {
-                if (!tuple.Right)
-                    return;
-                spc.AddSource("ArchiveMappers.Generated.g.cs", tuple.Left);
-            });
+            context.RegisterSourceOutput(
+                archiveMappersSource.Combine(isCoreProject),
+                (spc, tuple) =>
+                {
+                    if (!tuple.Right)
+                        return;
+                    spc.AddSource("ArchiveMappers.Generated.g.cs", tuple.Left);
+                }
+            );
         }
 
         private SourceText GenerateDbContextConfiguration(
-            IEnumerable<WabbitBot.Generator.Shared.Metadata.EntityMetadataInfo> entityMetadata)
+            IEnumerable<Generator.Shared.Metadata.EntityMetadataInfo> entityMetadata
+        )
         {
             var sourceBuilder = new StringBuilder();
 
-            sourceBuilder.AppendLine(CreateFileHeader("DbContextGenerator", "Auto-generated EF Core DbContext configuration"));
+            sourceBuilder.AppendLine(
+                CreateFileHeader("DbContextGenerator", "Auto-generated EF Core DbContext configuration")
+            );
             sourceBuilder.AppendLine("using Microsoft.EntityFrameworkCore;");
             sourceBuilder.AppendLine("using Npgsql.EntityFrameworkCore.PostgreSQL;");
             sourceBuilder.AppendLine("using WabbitBot.Common.Models;");
@@ -116,7 +145,9 @@ namespace WabbitBot.SourceGenerators.Generators.Database
             sourceBuilder.AppendLine("    /// </summary>");
             sourceBuilder.AppendLine("    public partial class WabbitBotDbContext : DbContext");
             sourceBuilder.AppendLine("    {");
-            sourceBuilder.AppendLine("        public WabbitBotDbContext(DbContextOptions<WabbitBotDbContext> options) : base(options)");
+            sourceBuilder.AppendLine(
+                "        public WabbitBotDbContext(DbContextOptions<WabbitBotDbContext> options) : base(options)"
+            );
             sourceBuilder.AppendLine("        {");
             sourceBuilder.AppendLine("        }");
             sourceBuilder.AppendLine();
@@ -125,11 +156,15 @@ namespace WabbitBot.SourceGenerators.Generators.Database
             foreach (var metadata in entityMetadata)
             {
                 var entityTypeName = metadata.EntityType.ToDisplayString();
-                sourceBuilder.AppendLine(CommonTemplates.CreateGeneratedDoc($"DbSet for {metadata.ClassName} entities."));
+                sourceBuilder.AppendLine(
+                    CommonTemplates.CreateGeneratedDoc($"DbSet for {metadata.ClassName} entities.")
+                );
                 var dbSetName = !string.IsNullOrWhiteSpace(metadata.ServicePropertyName)
-                    ? GeneratorHelpers.NormalizeServicePropertyName(metadata.ServicePropertyName!)
-                    : GeneratorHelpers.NormalizeServicePropertyName(metadata.DefaultServicePropertyName);
-                sourceBuilder.AppendLine($"        public DbSet<{entityTypeName}> {dbSetName} {{ get; set; }} = null!;");
+                    ? NormalizeServicePropertyName(metadata.ServicePropertyName!)
+                    : NormalizeServicePropertyName(metadata.DefaultServicePropertyName);
+                sourceBuilder.AppendLine(
+                    $"        public DbSet<{entityTypeName}> {dbSetName} {{ get; set; }} = null!;"
+                );
                 sourceBuilder.AppendLine();
             }
 
@@ -137,9 +172,13 @@ namespace WabbitBot.SourceGenerators.Generators.Database
             foreach (var metadata in entityMetadata)
             {
                 var archiveTypeName = GetArchiveTypeName(metadata.ClassName);
-                var archiveDbSetName = GeneratorHelpers.NormalizeServicePropertyName(metadata.DefaultServicePropertyName) + "Archives";
-                sourceBuilder.AppendLine(CommonTemplates.CreateGeneratedDoc($"DbSet for {metadata.ClassName} archive snapshots."));
-                sourceBuilder.AppendLine($"        public DbSet<{archiveTypeName}> {archiveDbSetName} {{ get; set; }} = null!;");
+                var archiveDbSetName = NormalizeServicePropertyName(metadata.DefaultServicePropertyName) + "Archives";
+                sourceBuilder.AppendLine(
+                    CommonTemplates.CreateGeneratedDoc($"DbSet for {metadata.ClassName} archive snapshots.")
+                );
+                sourceBuilder.AppendLine(
+                    $"        public DbSet<{archiveTypeName}> {archiveDbSetName} {{ get; set; }} = null!;"
+                );
                 sourceBuilder.AppendLine("");
             }
 
@@ -148,7 +187,9 @@ namespace WabbitBot.SourceGenerators.Generators.Database
             sourceBuilder.AppendLine("        {");
             sourceBuilder.AppendLine("            base.OnModelCreating(modelBuilder);");
             sourceBuilder.AppendLine();
-            sourceBuilder.AppendLine("            // Call manual configuration methods (if they exist in the partial class)");
+            sourceBuilder.AppendLine(
+                "            // Call manual configuration methods (if they exist in the partial class)"
+            );
             sourceBuilder.AppendLine("            ConfigureSchemaMetadata(modelBuilder);");
             sourceBuilder.AppendLine();
             foreach (var metadata in entityMetadata)
@@ -183,7 +224,8 @@ namespace WabbitBot.SourceGenerators.Generators.Database
         }
 
         private SourceText GenerateArchiveModels(
-            IEnumerable<WabbitBot.Generator.Shared.Metadata.EntityMetadataInfo> entityMetadata)
+            IEnumerable<Generator.Shared.Metadata.EntityMetadataInfo> entityMetadata
+        )
         {
             var sb = new StringBuilder();
             sb.AppendLine(CreateFileHeader("DbContextGenerator", "Auto-generated archive models"));
@@ -196,15 +238,20 @@ namespace WabbitBot.SourceGenerators.Generators.Database
             foreach (var m in entityMetadata)
             {
                 // Gather scalar properties (exclude navs and collections of entities)
-                var properties = m.EntityType
-                        .GetMembers()
-                        .OfType<IPropertySymbol>()
-                        .Where(p => p.DeclaredAccessibility == Accessibility.Public && !p.IsStatic)
-                        .ToArray();
+                var properties = m
+                    .EntityType.GetMembers()
+                    .OfType<IPropertySymbol>()
+                    .Where(p => p.DeclaredAccessibility == Accessibility.Public && !p.IsStatic)
+                    .ToArray();
 
                 bool IsEntityType(ITypeSymbol type)
                 {
-                    if (type is INamedTypeSymbol nts && nts.IsGenericType && nts.Name == "Nullable" && nts.TypeArguments.Length == 1)
+                    if (
+                        type is INamedTypeSymbol nts
+                        && nts.IsGenericType
+                        && nts.Name == "Nullable"
+                        && nts.TypeArguments.Length == 1
+                    )
                     {
                         type = nts.TypeArguments[0];
                     }
@@ -233,7 +280,9 @@ namespace WabbitBot.SourceGenerators.Generators.Database
                             || display.StartsWith("System.Collections.Generic.IReadOnlyCollection<")
                             || display.StartsWith("System.Collections.Generic.List<")
                             || display.EndsWith("[]")
-                            || t.AllInterfaces.Any(i => i.ToDisplayString().StartsWith("System.Collections.Generic.ICollection<"));
+                            || t.AllInterfaces.Any(i =>
+                                i.ToDisplayString().StartsWith("System.Collections.Generic.ICollection<")
+                            );
                     }
 
                     var isCollection = IsCollectionLike(type);
@@ -248,7 +297,19 @@ namespace WabbitBot.SourceGenerators.Generators.Database
                         continue; // nav collection
                     }
                     // Skip base/metadata properties and Domain to avoid duplicates
-                    if (p.Name is "Id" or "CreatedAt" or "UpdatedAt" or "Domain" or "ArchiveId" or "EntityId" or "Version" or "ArchivedAt" or "ArchivedBy" or "Reason")
+                    if (
+                        p.Name
+                        is "Id"
+                            or "CreatedAt"
+                            or "UpdatedAt"
+                            or "Domain"
+                            or "ArchiveId"
+                            or "EntityId"
+                            or "Version"
+                            or "ArchivedAt"
+                            or "ArchivedBy"
+                            or "Reason"
+                    )
                         continue;
 
                     scalarProps.Add(p);
@@ -277,7 +338,9 @@ namespace WabbitBot.SourceGenerators.Generators.Database
                         return display.StartsWith("System.Collections.Generic.ICollection<")
                             || display.StartsWith("System.Collections.Generic.List<")
                             || display.EndsWith("[]")
-                            || t.AllInterfaces.Any(i => i.ToDisplayString().StartsWith("System.Collections.Generic.ICollection<"));
+                            || t.AllInterfaces.Any(i =>
+                                i.ToDisplayString().StartsWith("System.Collections.Generic.ICollection<")
+                            );
                     }
 
                     static bool IsDictionaryType(ITypeSymbol t)
@@ -314,7 +377,8 @@ namespace WabbitBot.SourceGenerators.Generators.Database
         }
 
         private SourceText GenerateArchiveMappers(
-            IEnumerable<WabbitBot.Generator.Shared.Metadata.EntityMetadataInfo> entityMetadata)
+            IEnumerable<Generator.Shared.Metadata.EntityMetadataInfo> entityMetadata
+        )
         {
             var sb = new StringBuilder();
             sb.AppendLine(CreateFileHeader("DbContextGenerator", "Auto-generated archive mappers"));
@@ -330,15 +394,20 @@ namespace WabbitBot.SourceGenerators.Generators.Database
                 var archiveTypeName = GetArchiveTypeName(m.ClassName);
 
                 // Collect scalar properties mirrored in archive
-                var props = m.EntityType
-                    .GetMembers()
+                var props = m
+                    .EntityType.GetMembers()
                     .OfType<IPropertySymbol>()
                     .Where(p => p.DeclaredAccessibility == Accessibility.Public && !p.IsStatic)
                     .ToArray();
 
                 static bool IsEntityType(ITypeSymbol type)
                 {
-                    if (type is INamedTypeSymbol nts && nts.IsGenericType && nts.Name == "Nullable" && nts.TypeArguments.Length == 1)
+                    if (
+                        type is INamedTypeSymbol nts
+                        && nts.IsGenericType
+                        && nts.Name == "Nullable"
+                        && nts.TypeArguments.Length == 1
+                    )
                     {
                         type = nts.TypeArguments[0];
                     }
@@ -358,7 +427,9 @@ namespace WabbitBot.SourceGenerators.Generators.Database
                     return display.StartsWith("System.Collections.Generic.ICollection<")
                         || display.StartsWith("System.Collections.Generic.List<")
                         || display.EndsWith("[]")
-                        || type.AllInterfaces.Any(i => i.ToDisplayString().StartsWith("System.Collections.Generic.ICollection<"));
+                        || type.AllInterfaces.Any(i =>
+                            i.ToDisplayString().StartsWith("System.Collections.Generic.ICollection<")
+                        );
                 }
 
                 var scalarProps = new List<IPropertySymbol>();
@@ -367,16 +438,21 @@ namespace WabbitBot.SourceGenerators.Generators.Database
                     var t = p.Type;
                     var isCollection = IsCollection(t);
                     var elementType = (t as INamedTypeSymbol)?.TypeArguments.FirstOrDefault();
-                    if (IsEntityType(t)) continue;
-                    if (isCollection && elementType is not null && IsEntityType(elementType)) continue;
-                    if (p.Name is "Id" or "CreatedAt" or "UpdatedAt" or "Domain") continue;
+                    if (IsEntityType(t))
+                        continue;
+                    if (isCollection && elementType is not null && IsEntityType(elementType))
+                        continue;
+                    if (p.Name is "Id" or "CreatedAt" or "UpdatedAt" or "Domain")
+                        continue;
                     scalarProps.Add(p);
                 }
 
                 sb.AppendLine($"    internal static class {m.ClassName}ArchiveMapper");
                 sb.AppendLine("    {");
                 // MapToArchive
-                sb.AppendLine($"        internal static void MapToArchive({entityTypeName} source, {archiveTypeName} dest)");
+                sb.AppendLine(
+                    $"        internal static void MapToArchive({entityTypeName} source, {archiveTypeName} dest)"
+                );
                 sb.AppendLine("        {");
                 foreach (var p in scalarProps)
                 {
@@ -413,7 +489,10 @@ namespace WabbitBot.SourceGenerators.Generators.Database
             return SourceText.From(sb.ToString(), Encoding.UTF8);
         }
 
-        private void GenerateEntityConfiguration(StringBuilder sourceBuilder, WabbitBot.Generator.Shared.Metadata.EntityMetadataInfo metadata)
+        private void GenerateEntityConfiguration(
+            StringBuilder sourceBuilder,
+            Generator.Shared.Metadata.EntityMetadataInfo metadata
+        )
         {
             var entityTypeName = metadata.EntityType.ToDisplayString();
             var methodName = $"Configure{metadata.ClassName}";
@@ -424,16 +503,25 @@ namespace WabbitBot.SourceGenerators.Generators.Database
             sourceBuilder.AppendLine("            {");
             sourceBuilder.AppendLine($"                entity.ToTable(\"{metadata.TableName}\");");
             sourceBuilder.AppendLine("                entity.HasKey(e => e.Id);");
-            sourceBuilder.AppendLine("                entity.Property(e => e.Id).HasColumnName(\"id\").ValueGeneratedOnAdd();");
-            sourceBuilder.AppendLine("                entity.Property(e => e.CreatedAt).HasColumnName(\"created_at\");");
-            sourceBuilder.AppendLine("                entity.Property(e => e.UpdatedAt).HasColumnName(\"updated_at\");");
+            sourceBuilder.AppendLine(
+                "                entity.Property(e => e.Id).HasColumnName(\"id\").ValueGeneratedOnAdd();"
+            );
+            sourceBuilder.AppendLine(
+                "                entity.Property(e => e.CreatedAt).HasColumnName(\"created_at\");"
+            );
+            sourceBuilder.AppendLine(
+                "                entity.Property(e => e.UpdatedAt).HasColumnName(\"updated_at\");"
+            );
             AppendEntityPropertyConfigurations(sourceBuilder, metadata);
             sourceBuilder.AppendLine("            });");
             sourceBuilder.AppendLine("        }");
             sourceBuilder.AppendLine();
         }
 
-        private void GenerateArchiveEntityConfiguration(StringBuilder sourceBuilder, WabbitBot.Generator.Shared.Metadata.EntityMetadataInfo metadata)
+        private void GenerateArchiveEntityConfiguration(
+            StringBuilder sourceBuilder,
+            Generator.Shared.Metadata.EntityMetadataInfo metadata
+        )
         {
             var archiveTypeName = GetArchiveTypeName(metadata.ClassName);
             var methodName = $"Configure{metadata.ClassName}Archive";
@@ -445,34 +533,52 @@ namespace WabbitBot.SourceGenerators.Generators.Database
             sourceBuilder.AppendLine("            {");
             sourceBuilder.AppendLine($"                entity.ToTable(\"{archiveTable}\");");
             sourceBuilder.AppendLine("                entity.HasKey(e => e.ArchiveId);");
-            sourceBuilder.AppendLine("                entity.Property(e => e.ArchiveId).HasColumnName(\"archive_id\");");
+            sourceBuilder.AppendLine(
+                "                entity.Property(e => e.ArchiveId).HasColumnName(\"archive_id\");"
+            );
             sourceBuilder.AppendLine("                entity.Property(e => e.EntityId).HasColumnName(\"entity_id\");");
             sourceBuilder.AppendLine("                entity.Property(e => e.Version).HasColumnName(\"version\");");
-            sourceBuilder.AppendLine("                entity.Property(e => e.ArchivedAt).HasColumnName(\"archived_at\");");
-            sourceBuilder.AppendLine("                entity.Property(e => e.ArchivedBy).HasColumnName(\"archived_by\");");
+            sourceBuilder.AppendLine(
+                "                entity.Property(e => e.ArchivedAt).HasColumnName(\"archived_at\");"
+            );
+            sourceBuilder.AppendLine(
+                "                entity.Property(e => e.ArchivedBy).HasColumnName(\"archived_by\");"
+            );
             sourceBuilder.AppendLine("                entity.Property(e => e.Reason).HasColumnName(\"reason\");");
 
             // Mirror scalar properties
             AppendArchivePropertyConfigurations(sourceBuilder, metadata);
 
-            sourceBuilder.AppendLine($"                entity.HasIndex(e => new {{ e.EntityId, e.Version }}).HasDatabaseName(\"idx_{archiveTable}_entity_version\");");
-            sourceBuilder.AppendLine($"                entity.HasIndex(e => e.ArchivedAt).HasDatabaseName(\"idx_{archiveTable}_archived_at\");");
+            sourceBuilder.AppendLine(
+                $"                entity.HasIndex(e => new {{ e.EntityId, e.Version }}).HasDatabaseName(\"idx_{archiveTable}_entity_version\");"
+            );
+            sourceBuilder.AppendLine(
+                $"                entity.HasIndex(e => e.ArchivedAt).HasDatabaseName(\"idx_{archiveTable}_archived_at\");"
+            );
             sourceBuilder.AppendLine("            });");
             sourceBuilder.AppendLine("        }");
             sourceBuilder.AppendLine();
         }
 
-        private static void AppendEntityPropertyConfigurations(StringBuilder sourceBuilder, WabbitBot.Generator.Shared.Metadata.EntityMetadataInfo metadata)
+        private static void AppendEntityPropertyConfigurations(
+            StringBuilder sourceBuilder,
+            Generator.Shared.Metadata.EntityMetadataInfo metadata
+        )
         {
-            var properties = metadata.EntityType
-                .GetMembers()
+            var properties = metadata
+                .EntityType.GetMembers()
                 .OfType<IPropertySymbol>()
                 .Where(p => p.DeclaredAccessibility == Accessibility.Public && !p.IsStatic)
                 .ToArray();
 
             static bool IsEntityType(ITypeSymbol type)
             {
-                if (type is INamedTypeSymbol nts && nts.IsGenericType && nts.Name == "Nullable" && nts.TypeArguments.Length == 1)
+                if (
+                    type is INamedTypeSymbol nts
+                    && nts.IsGenericType
+                    && nts.Name == "Nullable"
+                    && nts.TypeArguments.Length == 1
+                )
                 {
                     type = nts.TypeArguments[0];
                 }
@@ -489,27 +595,37 @@ namespace WabbitBot.SourceGenerators.Generators.Database
             static bool IsCollection(ITypeSymbol type)
             {
                 var display = type.ToDisplayString();
-                if (display.StartsWith("System.Collections.Generic.ICollection<") || display.StartsWith("System.Collections.Generic.List<") || display.EndsWith("[]"))
+                if (
+                    display.StartsWith("System.Collections.Generic.ICollection<")
+                    || display.StartsWith("System.Collections.Generic.List<")
+                    || display.EndsWith("[]")
+                )
                     return true;
                 // Also consider interfaces that implement ICollection<T>
-                return type.AllInterfaces.Any(i => i.ToDisplayString().StartsWith("System.Collections.Generic.ICollection<"));
+                return type.AllInterfaces.Any(i =>
+                    i.ToDisplayString().StartsWith("System.Collections.Generic.ICollection<")
+                );
             }
 
-            static bool IsDictionary(ITypeSymbol type) => type.ToDisplayString().StartsWith("System.Collections.Generic.Dictionary<");
+            static bool IsDictionary(ITypeSymbol type) =>
+                type.ToDisplayString().StartsWith("System.Collections.Generic.Dictionary<");
 
             static string ToSnakeCase(string s)
             {
-                if (string.IsNullOrEmpty(s)) return s;
+                if (string.IsNullOrEmpty(s))
+                    return s;
                 var sb = new StringBuilder();
                 for (int i = 0; i < s.Length; i++)
                 {
                     var c = s[i];
                     if (char.IsUpper(c))
                     {
-                        if (i > 0) sb.Append('_');
+                        if (i > 0)
+                            sb.Append('_');
                         sb.Append(char.ToLowerInvariant(c));
                     }
-                    else sb.Append(c);
+                    else
+                        sb.Append(c);
                 }
                 return sb.ToString();
             }
@@ -523,7 +639,8 @@ namespace WabbitBot.SourceGenerators.Generators.Database
             {
                 var type = p.Type;
                 var isCollection = IsCollection(type);
-                var elementType = type is INamedTypeSymbol nts && nts.IsGenericType ? nts.TypeArguments.FirstOrDefault() : null;
+                var elementType =
+                    type is INamedTypeSymbol nts && nts.IsGenericType ? nts.TypeArguments.FirstOrDefault() : null;
 
                 // Skip computed/read-only properties (e.g., Domain)
                 if (p.SetMethod is null || p.Name == "Domain")
@@ -568,16 +685,20 @@ namespace WabbitBot.SourceGenerators.Generators.Database
                     else if (elementType is not null && !IsEntityType(elementType))
                     {
                         var elemDisplay = elementType.ToDisplayString();
-                        if (elemDisplay == "System.Guid") assignedColumnType = "uuid[]";
-                        else if (elemDisplay == "System.String") assignedColumnType = "text[]";
-                        else assignedColumnType = "jsonb";
+                        if (elemDisplay == "System.Guid")
+                            assignedColumnType = "uuid[]";
+                        else if (elemDisplay == "System.String")
+                            assignedColumnType = "text[]";
+                        else
+                            assignedColumnType = "jsonb";
                     }
                 }
 
                 if (assignedColumnType is not null)
                 {
                     line += $".HasColumnType(\"{assignedColumnType}\")";
-                    if (assignedColumnType == "jsonb") jsonColumns.Add((p.Name, column));
+                    if (assignedColumnType == "jsonb")
+                        jsonColumns.Add((p.Name, column));
                 }
 
                 var isRequired = p.Type.IsValueType && !(p.NullableAnnotation == NullableAnnotation.Annotated);
@@ -595,14 +716,16 @@ namespace WabbitBot.SourceGenerators.Generators.Database
             // Create GIN indexes for JSONB columns
             foreach (var jc in jsonColumns)
             {
-                sourceBuilder.AppendLine($"                entity.HasIndex(e => e.{jc.PropName}).HasDatabaseName(\"gin_idx_{metadata.TableName}_{jc.ColumnName}\").HasMethod(\"gin\");");
+                sourceBuilder.AppendLine(
+                    $"                entity.HasIndex(e => e.{jc.PropName}).HasDatabaseName(\"gin_idx_{metadata.TableName}_{jc.ColumnName}\").HasMethod(\"gin\");"
+                );
             }
 
             // SKIP single navigation properties - they will be configured from the collection side
             // to avoid duplicate relationship configurations that create shadow foreign keys.
             // If we configure HasOne().WithMany() here and ALSO HasMany().WithOne() from the principal,
             // EF Core creates two separate relationships on the same FK, causing shadow properties like MatchId1.
-            // 
+            //
             // foreach (var nav in navSingles)
             // {
             //     var fkNameCandidate = nav.Name + "Id";
@@ -626,14 +749,18 @@ namespace WabbitBot.SourceGenerators.Generators.Database
             foreach (var nav in navSingles)
             {
                 var fkNameCandidate = nav.Name + "Id";
-                var fk = scalarProps.FirstOrDefault(p => string.Equals(p.Name, fkNameCandidate, StringComparison.Ordinal));
+                var fk = scalarProps.FirstOrDefault(p =>
+                    string.Equals(p.Name, fkNameCandidate, StringComparison.Ordinal)
+                );
                 if (fk is null)
                 {
                     continue;
                 }
 
                 var fkColumn = ToSnakeCase(fk.Name);
-                sourceBuilder.AppendLine($"                entity.HasIndex(e => e.{fk.Name}).HasDatabaseName(\"idx_{metadata.TableName}_{fkColumn}\");");
+                sourceBuilder.AppendLine(
+                    $"                entity.HasIndex(e => e.{fk.Name}).HasDatabaseName(\"idx_{metadata.TableName}_{fkColumn}\");"
+                );
             }
 
             // Collection navigations: emit HasMany/WithOne when inverse and FK are discoverable
@@ -654,27 +781,41 @@ namespace WabbitBot.SourceGenerators.Generators.Database
                     .FirstOrDefault(pp => pp.Name == metadata.ClassName + "Id");
                 if (backRef is null || fkProp is null)
                     continue;
-                sourceBuilder.AppendLine($"                entity.HasMany(e => e.{nav.Name}).WithOne(e => e.{backRef.Name}).HasForeignKey(e => e.{fkProp.Name}).OnDelete(DeleteBehavior.Cascade);");
+                sourceBuilder.AppendLine(
+                    $"                entity.HasMany(e => e.{nav.Name}).WithOne(e => e.{backRef.Name}).HasForeignKey(e => e.{fkProp.Name}).OnDelete(DeleteBehavior.Cascade);"
+                );
             }
 
-            var nameProp = scalarProps.FirstOrDefault(p => p.Name == "Name" && p.Type.ToDisplayString() == "System.String");
+            var nameProp = scalarProps.FirstOrDefault(p =>
+                p.Name == "Name" && p.Type.ToDisplayString() == "System.String"
+            );
             if (nameProp is not null)
             {
-                sourceBuilder.AppendLine($"                entity.HasIndex(e => e.Name).HasDatabaseName(\"idx_{metadata.TableName}_name\");");
+                sourceBuilder.AppendLine(
+                    $"                entity.HasIndex(e => e.Name).HasDatabaseName(\"idx_{metadata.TableName}_name\");"
+                );
             }
         }
 
-        private static void AppendArchivePropertyConfigurations(StringBuilder sourceBuilder, WabbitBot.Generator.Shared.Metadata.EntityMetadataInfo metadata)
+        private static void AppendArchivePropertyConfigurations(
+            StringBuilder sourceBuilder,
+            Generator.Shared.Metadata.EntityMetadataInfo metadata
+        )
         {
-            var properties = metadata.EntityType
-                .GetMembers()
+            var properties = metadata
+                .EntityType.GetMembers()
                 .OfType<IPropertySymbol>()
                 .Where(p => p.DeclaredAccessibility == Accessibility.Public && !p.IsStatic)
                 .ToArray();
 
             static bool IsEntityType(ITypeSymbol type)
             {
-                if (type is INamedTypeSymbol nts && nts.IsGenericType && nts.Name == "Nullable" && nts.TypeArguments.Length == 1)
+                if (
+                    type is INamedTypeSymbol nts
+                    && nts.IsGenericType
+                    && nts.Name == "Nullable"
+                    && nts.TypeArguments.Length == 1
+                )
                 {
                     type = nts.TypeArguments[0];
                 }
@@ -694,22 +835,27 @@ namespace WabbitBot.SourceGenerators.Generators.Database
                 return display.StartsWith("System.Collections.Generic.ICollection<")
                     || display.StartsWith("System.Collections.Generic.List<")
                     || display.EndsWith("[]")
-                    || type.AllInterfaces.Any(i => i.ToDisplayString().StartsWith("System.Collections.Generic.ICollection<"));
+                    || type.AllInterfaces.Any(i =>
+                        i.ToDisplayString().StartsWith("System.Collections.Generic.ICollection<")
+                    );
             }
 
             static string ToSnakeCase(string s)
             {
-                if (string.IsNullOrEmpty(s)) return s;
+                if (string.IsNullOrEmpty(s))
+                    return s;
                 var sb = new StringBuilder();
                 for (int i = 0; i < s.Length; i++)
                 {
                     var c = s[i];
                     if (char.IsUpper(c))
                     {
-                        if (i > 0) sb.Append('_');
+                        if (i > 0)
+                            sb.Append('_');
                         sb.Append(char.ToLowerInvariant(c));
                     }
-                    else sb.Append(c);
+                    else
+                        sb.Append(c);
                 }
                 return sb.ToString();
             }
@@ -718,7 +864,8 @@ namespace WabbitBot.SourceGenerators.Generators.Database
             {
                 var type = p.Type;
                 var isCollection = IsCollection(type);
-                var elementType = type is INamedTypeSymbol nts && nts.IsGenericType ? nts.TypeArguments.FirstOrDefault() : null;
+                var elementType =
+                    type is INamedTypeSymbol nts && nts.IsGenericType ? nts.TypeArguments.FirstOrDefault() : null;
 
                 // Skip navigations and collections of entities
                 if (IsEntityType(type) || (isCollection && elementType is not null && IsEntityType(elementType)))
@@ -727,7 +874,19 @@ namespace WabbitBot.SourceGenerators.Generators.Database
                 }
 
                 var name = p.Name;
-                if (name is "Id" or "CreatedAt" or "UpdatedAt" or "Domain" or "ArchiveId" or "EntityId" or "Version" or "ArchivedAt" or "ArchivedBy" or "Reason")
+                if (
+                    name
+                    is "Id"
+                        or "CreatedAt"
+                        or "UpdatedAt"
+                        or "Domain"
+                        or "ArchiveId"
+                        or "EntityId"
+                        or "Version"
+                        or "ArchivedAt"
+                        or "ArchivedBy"
+                        or "Reason"
+                )
                     continue;
 
                 var column = ToSnakeCase(name);
@@ -745,9 +904,12 @@ namespace WabbitBot.SourceGenerators.Generators.Database
                     if (elementType is not null && !IsEntityType(elementType))
                     {
                         var elemDisplay = elementType.ToDisplayString();
-                        if (elemDisplay == "System.Guid") assignedColumnType = "uuid[]";
-                        else if (elemDisplay == "System.String") assignedColumnType = "text[]";
-                        else assignedColumnType = "jsonb";
+                        if (elemDisplay == "System.Guid")
+                            assignedColumnType = "uuid[]";
+                        else if (elemDisplay == "System.String")
+                            assignedColumnType = "text[]";
+                        else
+                            assignedColumnType = "jsonb";
                     }
                 }
 

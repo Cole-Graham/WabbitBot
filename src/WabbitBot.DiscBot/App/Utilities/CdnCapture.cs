@@ -32,11 +32,14 @@ namespace WabbitBot.DiscBot.App.Utilities
                         var fileName = canonicalFileName ?? attachment.FileName;
 
                         // Publish CDN link reported event
-                        await globalBus.PublishAsync(new FileCdnLinkReported(
-                            CanonicalFileName: fileName,
-                            CdnUrl: attachment.Url,
-                            SourceMessageId: message.Id,
-                            ChannelId: message.ChannelId));
+                        await globalBus.PublishAsync(
+                            new FileCdnLinkReported(
+                                CanonicalFileName: fileName,
+                                CdnUrl: attachment.Url,
+                                SourceMessageId: message.Id,
+                                ChannelId: message.ChannelId
+                            )
+                        );
                     }
                 }
 
@@ -48,25 +51,45 @@ namespace WabbitBot.DiscBot.App.Utilities
                         // Thumbnail
                         if (!string.IsNullOrEmpty(embed.Thumbnail?.Url?.ToString()))
                         {
-                            await ReportCdnUrlAsync(globalBus, embed.Thumbnail.Url.ToString(), message.Id, message.ChannelId);
+                            await ReportCdnUrlAsync(
+                                globalBus,
+                                embed.Thumbnail.Url.ToString(),
+                                message.Id,
+                                message.ChannelId
+                            );
                         }
 
                         // Image
                         if (!string.IsNullOrEmpty(embed.Image?.Url?.ToString()))
                         {
-                            await ReportCdnUrlAsync(globalBus, embed.Image.Url.ToString(), message.Id, message.ChannelId);
+                            await ReportCdnUrlAsync(
+                                globalBus,
+                                embed.Image.Url.ToString(),
+                                message.Id,
+                                message.ChannelId
+                            );
                         }
 
                         // Author icon
                         if (!string.IsNullOrEmpty(embed.Author?.IconUrl?.ToString()))
                         {
-                            await ReportCdnUrlAsync(globalBus, embed.Author.IconUrl.ToString(), message.Id, message.ChannelId);
+                            await ReportCdnUrlAsync(
+                                globalBus,
+                                embed.Author.IconUrl.ToString(),
+                                message.Id,
+                                message.ChannelId
+                            );
                         }
 
                         // Footer icon
                         if (!string.IsNullOrEmpty(embed.Footer?.IconUrl?.ToString()))
                         {
-                            await ReportCdnUrlAsync(globalBus, embed.Footer.IconUrl.ToString(), message.Id, message.ChannelId);
+                            await ReportCdnUrlAsync(
+                                globalBus,
+                                embed.Footer.IconUrl.ToString(),
+                                message.Id,
+                                message.ChannelId
+                            );
                         }
                     }
                 }
@@ -77,7 +100,8 @@ namespace WabbitBot.DiscBot.App.Utilities
                 await App.Services.DiscBot.DiscBotService.ErrorHandler.CaptureAsync(
                     ex,
                     $"Failed to capture CDN URLs from message {message.Id}",
-                    nameof(CaptureFromMessageAsync));
+                    nameof(CaptureFromMessageAsync)
+                );
             }
         }
 
@@ -85,7 +109,12 @@ namespace WabbitBot.DiscBot.App.Utilities
         /// Reports a single CDN URL to Core.
         /// Attempts to extract canonical filename from the URL.
         /// </summary>
-        private static async Task ReportCdnUrlAsync(IGlobalEventBus globalBus, string cdnUrl, ulong messageId, ulong channelId)
+        private static async Task ReportCdnUrlAsync(
+            IGlobalEventBus globalBus,
+            string cdnUrl,
+            ulong messageId,
+            ulong channelId
+        )
         {
             try
             {
@@ -96,11 +125,14 @@ namespace WabbitBot.DiscBot.App.Utilities
                 if (string.IsNullOrEmpty(fileName))
                     return;
 
-                await globalBus.PublishAsync(new FileCdnLinkReported(
-                    CanonicalFileName: fileName,
-                    CdnUrl: cdnUrl,
-                    SourceMessageId: messageId,
-                    ChannelId: channelId));
+                await globalBus.PublishAsync(
+                    new FileCdnLinkReported(
+                        CanonicalFileName: fileName,
+                        CdnUrl: cdnUrl,
+                        SourceMessageId: messageId,
+                        ChannelId: channelId
+                    )
+                );
             }
             catch (Exception ex)
             {
@@ -108,7 +140,8 @@ namespace WabbitBot.DiscBot.App.Utilities
                 await App.Services.DiscBot.DiscBotService.ErrorHandler.CaptureAsync(
                     ex,
                     $"Failed to capture CDN URL {cdnUrl}",
-                    nameof(ReportCdnUrlAsync));
+                    nameof(ReportCdnUrlAsync)
+                );
             }
         }
     }

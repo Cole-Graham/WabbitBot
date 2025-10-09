@@ -19,7 +19,9 @@ namespace WabbitBot.Common.Data.Schema.Migrations
             try
             {
                 // Create Leaderboards table
-                await QueryUtil.ExecuteNonQueryAsync(conn, @"
+                await QueryUtil.ExecuteNonQueryAsync(
+                    conn,
+                    @"
                     CREATE TABLE IF NOT EXISTS Leaderboards (
                         Id TEXT PRIMARY KEY,
                         SeasonId TEXT NOT NULL,
@@ -29,11 +31,19 @@ namespace WabbitBot.Common.Data.Schema.Migrations
                         CreatedAt DATETIME NOT NULL,
                         UpdatedAt DATETIME NOT NULL,
                         SchemaVersion INTEGER NOT NULL DEFAULT 1
-                    )", new { }, transaction);
+                    )",
+                    new { },
+                    transaction
+                );
 
                 // Create indexes for faster lookups
-                await QueryUtil.ExecuteNonQueryAsync(conn, @"
-                    CREATE INDEX IF NOT EXISTS idx_leaderboards_gamesize ON Leaderboards(TeamSize)", new { }, transaction);
+                await QueryUtil.ExecuteNonQueryAsync(
+                    conn,
+                    @"
+                    CREATE INDEX IF NOT EXISTS idx_leaderboards_gamesize ON Leaderboards(TeamSize)",
+                    new { },
+                    transaction
+                );
 
                 transaction.Commit();
             }

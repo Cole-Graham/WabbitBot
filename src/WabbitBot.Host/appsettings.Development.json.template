@@ -1,0 +1,10 @@
+{
+    "Bot": {
+      "LogLevel": "Debug",
+      "Activity": {
+        "Type": "Playing",
+        "Name": "WARNO Actual (DEV)"
+      }
+    }
+  }
+  

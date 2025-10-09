@@ -56,18 +56,22 @@ namespace WabbitBot.DiscBot.App
             var team1Thread = await scrimmageChannel.CreateThreadAsync(
                 $"{match.Team1.Name} vs. {match.Team2.Name}",
                 DiscordAutoArchiveDuration.Day,
-                DiscordChannelType.PrivateThread);
+                DiscordChannelType.PrivateThread
+            );
 
             var team2Thread = await scrimmageChannel.CreateThreadAsync(
                 $"{match.Team2.Name} vs. {match.Team1.Name}",
                 DiscordAutoArchiveDuration.Day,
-                DiscordChannelType.PrivateThread);
+                DiscordChannelType.PrivateThread
+            );
 
             // Build messages
-            var team1Message = new DiscordMessageBuilder()
-                .WithContent($"{match.Team1.Name}: " + string.Join(", ", team1Mentions));
-            var team2Message = new DiscordMessageBuilder()
-                .WithContent($"{match.Team2.Name}: " + string.Join(", ", team2Mentions));
+            var team1Message = new DiscordMessageBuilder().WithContent(
+                $"{match.Team1.Name}: " + string.Join(", ", team1Mentions)
+            );
+            var team2Message = new DiscordMessageBuilder().WithContent(
+                $"{match.Team2.Name}: " + string.Join(", ", team2Mentions)
+            );
 
             // Send messages to threads
             await team1Thread.SendMessageAsync(team1Message);
@@ -75,6 +79,5 @@ namespace WabbitBot.DiscBot.App
 
             return Result.CreateSuccess();
         }
-
     }
 }

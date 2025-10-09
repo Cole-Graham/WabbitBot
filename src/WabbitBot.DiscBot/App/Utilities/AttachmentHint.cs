@@ -37,12 +37,7 @@ namespace WabbitBot.DiscBot.App.Utilities
                 _ => "image/jpeg",
             };
 
-            return new AttachmentHint
-            {
-                CanonicalFileName = canonicalFileName,
-                ContentType = contentType,
-            };
+            return new AttachmentHint { CanonicalFileName = canonicalFileName, ContentType = contentType };
         }
     }
 }
-

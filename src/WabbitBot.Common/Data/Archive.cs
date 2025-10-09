@@ -8,7 +8,8 @@ namespace WabbitBot.Common.Data
     /// <summary>
     /// Base archive class for historical data storage operations
     /// </summary>
-    public abstract class Archive<TEntity> where TEntity : Models.Entity
+    public abstract class Archive<TEntity>
+        where TEntity : Models.Entity
     {
         protected readonly IDatabaseConnection _connection;
         protected readonly string _tableName;
@@ -21,7 +22,8 @@ namespace WabbitBot.Common.Data
             string tableName,
             string[] columns,
             string idColumn = "Id",
-            string dateColumn = "CreatedAt")
+            string dateColumn = "CreatedAt"
+        )
         {
             _connection = connection ?? throw new ArgumentNullException(nameof(connection));
             _tableName = tableName ?? throw new ArgumentNullException(nameof(tableName));

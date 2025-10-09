@@ -14,10 +14,12 @@ namespace WabbitBot.Common.Data.Service;
 /// Uses partial classes for clean organization of different operation types.
 /// Implements the same IDatabaseService interface as individual services for compatibility.
 /// </summary>
-public partial class DatabaseService<TEntity> : IDatabaseService<TEntity> where TEntity : Entity
+public partial class DatabaseService<TEntity> : IDatabaseService<TEntity>
+    where TEntity : Entity
 {
     private IRepositoryAdapter<TEntity>? _repositoryAdapter;
     private ICacheProvider<TEntity>? _cacheProvider;
+
     /// <summary>
     /// Creates a new DatabaseService with default configuration
     /// </summary>
@@ -40,7 +42,8 @@ public partial class DatabaseService<TEntity> : IDatabaseService<TEntity> where 
         IEnumerable<string> archiveColumns,
         int cacheMaxSize = 1000,
         TimeSpan? cacheDefaultExpiry = null,
-        string idColumn = "Id")
+        string idColumn = "Id"
+    )
     {
         InitializeRepository(tableName, columns, idColumn);
         InitializeCache(cacheMaxSize, cacheDefaultExpiry);
@@ -79,7 +82,10 @@ public partial class DatabaseService<TEntity> : IDatabaseService<TEntity> where 
 
         if (result is null)
         {
-            throw new ArgumentException($"Create operation for component '{component}' returned null.", nameof(component));
+            throw new ArgumentException(
+                $"Create operation for component '{component}' returned null.",
+                nameof(component)
+            );
         }
 
         return result;
@@ -109,7 +115,10 @@ public partial class DatabaseService<TEntity> : IDatabaseService<TEntity> where 
 
         if (result is null)
         {
-            throw new ArgumentException($"Update operation for component '{component}' returned null.", nameof(component));
+            throw new ArgumentException(
+                $"Update operation for component '{component}' returned null.",
+                nameof(component)
+            );
         }
 
         return result;
@@ -145,7 +154,10 @@ public partial class DatabaseService<TEntity> : IDatabaseService<TEntity> where 
 
         if (result is null)
         {
-            throw new ArgumentException($"Delete operation for component '{component}' returned null.", nameof(component));
+            throw new ArgumentException(
+                $"Delete operation for component '{component}' returned null.",
+                nameof(component)
+            );
         }
 
         return result;
@@ -187,9 +199,7 @@ public partial class DatabaseService<TEntity> : IDatabaseService<TEntity> where 
                 return Result<TEntity?>.CreateSuccess(entity);
 
             default:
-                return Result<TEntity?>.Failure(
-                    $"Unsupported component for GetById: {component}"
-                );
+                return Result<TEntity?>.Failure($"Unsupported component for GetById: {component}");
         }
     }
 
@@ -215,9 +225,7 @@ public partial class DatabaseService<TEntity> : IDatabaseService<TEntity> where 
                 entity = await GetByIdFromCacheAsync(guid);
                 return Result<TEntity?>.CreateSuccess(entity);
             default:
-                return Result<TEntity?>.Failure(
-                    $"Unsupported component for GetByStringId: {component}"
-                );
+                return Result<TEntity?>.Failure($"Unsupported component for GetByStringId: {component}");
         }
     }
 
@@ -238,9 +246,7 @@ public partial class DatabaseService<TEntity> : IDatabaseService<TEntity> where 
                 entity = await GetByNameFromCacheAsync(name);
                 return Result<TEntity?>.CreateSuccess(entity);
             default:
-                return Result<TEntity?>.Failure(
-                    $"Unsupported component for GetByName: {component}"
-                );
+                return Result<TEntity?>.Failure($"Unsupported component for GetByName: {component}");
         }
     }
 
@@ -256,16 +262,15 @@ public partial class DatabaseService<TEntity> : IDatabaseService<TEntity> where 
                 result = await GetAllFromCacheAsync();
                 return Result<IEnumerable<TEntity>>.CreateSuccess(result);
             default:
-                return Result<IEnumerable<TEntity>>.Failure(
-                    $"Unsupported component for GetAll: {component}"
-                );
+                return Result<IEnumerable<TEntity>>.Failure($"Unsupported component for GetAll: {component}");
         }
     }
 
     public async Task<Result<IEnumerable<TEntity>>> GetByDateRangeAsync(
         DateTime startDate,
         DateTime endDate,
-        DatabaseComponent component)
+        DatabaseComponent component
+    )
     {
         IEnumerable<TEntity>? result;
         switch (component)
@@ -274,9 +279,7 @@ public partial class DatabaseService<TEntity> : IDatabaseService<TEntity> where 
                 result = await GetByDateRangeFromRepositoryAsync(startDate, endDate);
                 return Result<IEnumerable<TEntity>>.CreateSuccess(result);
             default:
-                return Result<IEnumerable<TEntity>>.Failure(
-                    $"Unsupported component for GetByDateRange: {component}"
-                );
+                return Result<IEnumerable<TEntity>>.Failure($"Unsupported component for GetByDateRange: {component}");
         }
     }
 

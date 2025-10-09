@@ -1,6 +1,6 @@
-using Microsoft.CodeAnalysis;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.CodeAnalysis;
 
 namespace WabbitBot.Generator.Shared.Metadata
 {
@@ -13,7 +13,8 @@ namespace WabbitBot.Generator.Shared.Metadata
         string? PubTargetClass,
         List<string> SubTargetClasses,
         List<EventParameter> Parameters,
-        INamedTypeSymbol EventClassSymbol)
+        INamedTypeSymbol EventClassSymbol
+    )
     {
         /// <summary>
         /// Whether to generate a publisher method.
@@ -29,7 +30,5 @@ namespace WabbitBot.Generator.Shared.Metadata
     /// <summary>
     /// Represents a parameter in an event record.
     /// </summary>
-    public record EventParameter(
-        string Name,
-        string Type);
+    public record EventParameter(string Name, string Type);
 }

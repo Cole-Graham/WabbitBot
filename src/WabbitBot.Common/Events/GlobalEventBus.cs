@@ -2,9 +2,12 @@ namespace WabbitBot.Common.Events;
 
 public interface IGlobalEventBus
 {
-    Task PublishAsync<TEvent>(TEvent @event) where TEvent : class;
-    void Subscribe<TEvent>(Func<TEvent, Task> handler) where TEvent : class;
-    void Unsubscribe<TEvent>(Func<TEvent, Task> handler) where TEvent : class;
+    Task PublishAsync<TEvent>(TEvent @event)
+        where TEvent : class;
+    void Subscribe<TEvent>(Func<TEvent, Task> handler)
+        where TEvent : class;
+    void Unsubscribe<TEvent>(Func<TEvent, Task> handler)
+        where TEvent : class;
 
     /// <summary>
     /// Sends a request and waits for a response event.
@@ -26,9 +29,11 @@ public class GlobalEventBus : IGlobalEventBus
     private readonly Dictionary<Guid, TaskCompletionSource<object>> _pendingRequests = new();
     private readonly object _lock = new();
 
-    public Task PublishAsync<TEvent>(TEvent @event) where TEvent : class
+    public Task PublishAsync<TEvent>(TEvent @event)
+        where TEvent : class
     {
-        if (@event == null) throw new ArgumentNullException(nameof(@event));
+        if (@event == null)
+            throw new ArgumentNullException(nameof(@event));
 
         var eventType = typeof(TEvent);
         List<Delegate>? handlers;
@@ -43,9 +48,11 @@ public class GlobalEventBus : IGlobalEventBus
         return Task.WhenAll(tasks);
     }
 
-    public void Subscribe<TEvent>(Func<TEvent, Task> handler) where TEvent : class
+    public void Subscribe<TEvent>(Func<TEvent, Task> handler)
+        where TEvent : class
     {
-        if (handler == null) throw new ArgumentNullException(nameof(handler));
+        if (handler == null)
+            throw new ArgumentNullException(nameof(handler));
 
         var eventType = typeof(TEvent);
         lock (_lock)
@@ -57,9 +64,11 @@ public class GlobalEventBus : IGlobalEventBus
         }
     }
 
-    public void Unsubscribe<TEvent>(Func<TEvent, Task> handler) where TEvent : class
+    public void Unsubscribe<TEvent>(Func<TEvent, Task> handler)
+        where TEvent : class
     {
-        if (handler == null) throw new ArgumentNullException(nameof(handler));
+        if (handler == null)
+            throw new ArgumentNullException(nameof(handler));
 
         var eventType = typeof(TEvent);
         lock (_lock)
@@ -73,7 +82,8 @@ public class GlobalEventBus : IGlobalEventBus
         where TRequest : class
         where TResponse : class
     {
-        if (request == null) throw new ArgumentNullException(nameof(request));
+        if (request == null)
+            throw new ArgumentNullException(nameof(request));
 
         timeout ??= TimeSpan.FromSeconds(5);
         var requestId = Guid.NewGuid();

@@ -1,5 +1,5 @@
-using WabbitBot.Common.Configuration;
 using WabbitBot.Common.Attributes;
+using WabbitBot.Common.Configuration;
 using WabbitBot.Common.Events.Interfaces;
 
 namespace WabbitBot.Core.Common.Events;
@@ -12,14 +12,16 @@ public partial record ConfigurationChangedEvent(
     string ChangeType = "",
     EventBusType EventBusType = EventBusType.Core,
     Guid EventId = default,
-    DateTime Timestamp = default) : IEvent;
+    DateTime Timestamp = default
+) : IEvent;
 
 public partial record ServerIdSetEvent(
     ulong ServerId,
     string? PreviousServerId = null,
     EventBusType EventBusType = EventBusType.Core,
     Guid EventId = default,
-    DateTime Timestamp = default) : IEvent;
+    DateTime Timestamp = default
+) : IEvent;
 
 public partial record ChannelConfiguredEvent(
     string ChannelType,
@@ -27,7 +29,8 @@ public partial record ChannelConfiguredEvent(
     ulong? PreviousChannelId = null,
     EventBusType EventBusType = EventBusType.Core,
     Guid EventId = default,
-    DateTime Timestamp = default) : IEvent;
+    DateTime Timestamp = default
+) : IEvent;
 
 public partial record RoleConfiguredEvent(
     string RoleType,
@@ -35,4 +38,5 @@ public partial record RoleConfiguredEvent(
     ulong? PreviousRoleId = null,
     EventBusType EventBusType = EventBusType.Core,
     Guid EventId = default,
-    DateTime Timestamp = default) : IEvent;
+    DateTime Timestamp = default
+) : IEvent;

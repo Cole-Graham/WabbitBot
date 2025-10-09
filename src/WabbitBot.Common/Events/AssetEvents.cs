@@ -9,10 +9,7 @@ namespace WabbitBot.Common.Events;
 /// <param name="AssetType">Type of asset being requested (e.g., "MapThumbnail", "DivisionIcon")</param>
 /// <param name="AssetId">Identifier for the specific asset (e.g., map ID, division name)</param>
 /// <param name="RequestId">Unique ID for request-response correlation</param>
-public record AssetResolveRequested(
-    string AssetType,
-    string AssetId,
-    Guid RequestId)
+public record AssetResolveRequested(string AssetType, string AssetId, Guid RequestId)
 {
     public EventBusType EventBusType => EventBusType.Global;
     public Guid EventId { get; init; } = Guid.NewGuid();
@@ -35,7 +32,8 @@ public record AssetResolved(
     string CanonicalFileName,
     string? CdnUrl,
     string? RelativePathUnderAppBase,
-    Guid CorrelationId)
+    Guid CorrelationId
+)
 {
     public EventBusType EventBusType => EventBusType.Global;
     public Guid EventId { get; init; } = Guid.NewGuid();
@@ -54,7 +52,8 @@ public record FileIngestRequested(
     string TempFilePath,
     string AssetKind,
     Dictionary<string, string> Metadata,
-    Guid RequestId)
+    Guid RequestId
+)
 {
     public EventBusType EventBusType => EventBusType.Global;
     public Guid EventId { get; init; } = Guid.NewGuid();
@@ -75,7 +74,8 @@ public record FileIngested(
     string AssetKind,
     string? CdnUrl,
     Dictionary<string, string> Metadata,
-    Guid CorrelationId)
+    Guid CorrelationId
+)
 {
     public EventBusType EventBusType => EventBusType.Global;
     public Guid EventId { get; init; } = Guid.NewGuid();
@@ -91,14 +91,9 @@ public record FileIngested(
 /// <param name="CdnUrl">The Discord CDN URL</param>
 /// <param name="SourceMessageId">The Discord message ID where the file was uploaded</param>
 /// <param name="ChannelId">The channel where the message was sent</param>
-public record FileCdnLinkReported(
-    string CanonicalFileName,
-    string CdnUrl,
-    ulong SourceMessageId,
-    ulong ChannelId)
+public record FileCdnLinkReported(string CanonicalFileName, string CdnUrl, ulong SourceMessageId, ulong ChannelId)
 {
     public EventBusType EventBusType => EventBusType.Global;
     public Guid EventId { get; init; } = Guid.NewGuid();
     public DateTime Timestamp { get; init; } = DateTime.UtcNow;
 }
-

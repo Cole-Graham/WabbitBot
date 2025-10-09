@@ -1,7 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Data;
 using System.Threading.Tasks;
-using System.Collections.Generic;
 using WabbitBot.Common.Data.Interfaces;
 using WabbitBot.Common.Data.Utilities;
 
@@ -10,7 +10,8 @@ namespace WabbitBot.Common.Data
     /// <summary>
     /// Base repository class for database operations
     /// </summary>
-    public abstract class Repository<TEntity> where TEntity : Models.Entity
+    public abstract class Repository<TEntity>
+        where TEntity : Models.Entity
     {
         protected readonly IDatabaseConnection _connection;
         protected readonly string _tableName;
@@ -23,7 +24,8 @@ namespace WabbitBot.Common.Data
             string tableName,
             string[] columns,
             string idColumn = "Id",
-            string dateColumn = "CreatedAt")
+            string dateColumn = "CreatedAt"
+        )
         {
             _connection = connection ?? throw new ArgumentNullException(nameof(connection));
             _tableName = tableName ?? throw new ArgumentNullException(nameof(tableName));

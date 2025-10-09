@@ -1,7 +1,6 @@
 using System;
 using WabbitBot.Generator.Shared.Analyzers;
 
-
 namespace WabbitBot.SourceGenerators.Attributes
 {
     #region Event Generator
@@ -10,9 +9,7 @@ namespace WabbitBot.SourceGenerators.Attributes
     /// Applied to event record/class definitions to generate supporting infrastructure.
     /// </summary>
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
-    public class EventGeneratorAttribute(
-        string? pubTargetClass = null,
-        string[]? subTargetClasses = null) : Attribute
+    public class EventGeneratorAttribute(string? pubTargetClass = null, string[]? subTargetClasses = null) : Attribute
     {
         /// <summary>
         /// The fully qualified class name where the publisher method should be generated.
@@ -44,7 +41,7 @@ namespace WabbitBot.SourceGenerators.Attributes
     [AttributeUsage(AttributeTargets.All, AllowMultiple = false)]
     public class SuppressGenerationAttribute(string? reason = null) : Attribute
     {
-        public string? Reason { get; } = reason;  // Optional for docs
+        public string? Reason { get; } = reason; // Optional for docs
     }
     #endregion
 }

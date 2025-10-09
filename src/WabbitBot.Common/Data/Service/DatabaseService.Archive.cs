@@ -5,7 +5,8 @@ using WabbitBot.Common.Models;
 
 namespace WabbitBot.Common.Data.Service;
 
-public partial class DatabaseService<TEntity> where TEntity : Entity
+public partial class DatabaseService<TEntity>
+    where TEntity : Entity
 {
     private IArchiveProvider<TEntity>? _archiveProvider;
 

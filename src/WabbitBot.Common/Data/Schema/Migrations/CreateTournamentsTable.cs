@@ -19,7 +19,9 @@ namespace WabbitBot.Common.Data.Schema.Migrations
             try
             {
                 // Create Tournaments table
-                await QueryUtil.ExecuteNonQueryAsync(conn, @"
+                await QueryUtil.ExecuteNonQueryAsync(
+                    conn,
+                    @"
                     CREATE TABLE IF NOT EXISTS Tournaments (
                         Id TEXT PRIMARY KEY,
                         Name TEXT NOT NULL,
@@ -33,13 +35,26 @@ namespace WabbitBot.Common.Data.Schema.Migrations
                         CreatedAt DATETIME NOT NULL,
                         UpdatedAt DATETIME NOT NULL,
                         SchemaVersion INTEGER NOT NULL DEFAULT 1
-                    )", new { }, transaction);
+                    )",
+                    new { },
+                    transaction
+                );
 
                 // Create indexes for faster lookups
-                await QueryUtil.ExecuteNonQueryAsync(conn, @"
-                    CREATE INDEX IF NOT EXISTS idx_tournaments_status ON Tournaments(Status)", new { }, transaction);
-                await QueryUtil.ExecuteNonQueryAsync(conn, @"
-                    CREATE INDEX IF NOT EXISTS idx_tournaments_startdate ON Tournaments(StartDate)", new { }, transaction);
+                await QueryUtil.ExecuteNonQueryAsync(
+                    conn,
+                    @"
+                    CREATE INDEX IF NOT EXISTS idx_tournaments_status ON Tournaments(Status)",
+                    new { },
+                    transaction
+                );
+                await QueryUtil.ExecuteNonQueryAsync(
+                    conn,
+                    @"
+                    CREATE INDEX IF NOT EXISTS idx_tournaments_startdate ON Tournaments(StartDate)",
+                    new { },
+                    transaction
+                );
 
                 transaction.Commit();
             }

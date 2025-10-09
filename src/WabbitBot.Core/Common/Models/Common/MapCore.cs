@@ -1,8 +1,8 @@
 using System;
 using System.IO;
 using WabbitBot.Common.Models;
-using WabbitBot.Core.Common.Services;
 using WabbitBot.Core.Common.Interfaces;
+using WabbitBot.Core.Common.Services;
 
 namespace WabbitBot.Core.Common.Models.Common
 {
@@ -29,8 +29,7 @@ namespace WabbitBot.Core.Common.Models.Common
             /// </summary>
             public static bool IsValidMapSize(string size)
             {
-                return !string.IsNullOrWhiteSpace(size) &&
-                       size.ToLowerInvariant() is "1v1" or "2v2" or "3v3" or "4v4";
+                return !string.IsNullOrWhiteSpace(size) && size.ToLowerInvariant() is "1v1" or "2v2" or "3v3" or "4v4";
             }
 
             /// <summary>
@@ -50,9 +49,9 @@ namespace WabbitBot.Core.Common.Models.Common
             /// </summary>
             public static bool IsCompleteMapConfiguration(Map map)
             {
-                return IsValidMapName(map.Name) &&
-                       IsValidMapSize(map.Size) &&
-                       !string.IsNullOrEmpty(map.ThumbnailFilename);
+                return IsValidMapName(map.Name)
+                    && IsValidMapSize(map.Size)
+                    && !string.IsNullOrEmpty(map.ThumbnailFilename);
             }
         }
     }

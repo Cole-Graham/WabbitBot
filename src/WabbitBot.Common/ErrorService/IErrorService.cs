@@ -26,5 +26,6 @@ public interface IErrorService
         Exception exception,
         string message,
         string operationName,
-        ErrorSeverity severity = ErrorSeverity.Error);
+        ErrorSeverity severity = ErrorSeverity.Error
+    );
 }

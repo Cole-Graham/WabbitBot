@@ -1,15 +1,14 @@
+using System.Net.NetworkInformation;
+using Microsoft.EntityFrameworkCore;
+using WabbitBot.Common.Configuration;
 using WabbitBot.Common.Data.Interfaces;
+using WabbitBot.Common.Events.Core;
 using WabbitBot.Common.Models;
+using WabbitBot.Core.Common.Database;
 using WabbitBot.Core.Common.Models.Common;
 using WabbitBot.Core.Common.Models.Scrimmage;
 using WabbitBot.Core.Common.Services;
-using WabbitBot.Common.Events.Core;
-using WabbitBot.Common.Configuration;
-using System.Net.NetworkInformation;
-using Microsoft.EntityFrameworkCore;
-using WabbitBot.Core.Common.Database;
 using WabbitBot.Core.Scrimmages;
-
 
 namespace WabbitBot.Core.Scrimmages
 {
@@ -21,13 +20,18 @@ namespace WabbitBot.Core.Scrimmages
             string OpponentTeamName,
             string[] SelectedPlayerNames,
             ulong IssuedByDiscordUserId,
-            int BestOf)
+            int BestOf
+        )
         {
             // Convert to entities
-            var challengerTeamResult = await CoreService.Teams
-                .GetByNameAsync(ChallengerTeamName, DatabaseComponent.Repository);
-            var opponentTeamResult = await CoreService.Teams
-                .GetByNameAsync(OpponentTeamName, DatabaseComponent.Repository);
+            var challengerTeamResult = await CoreService.Teams.GetByNameAsync(
+                ChallengerTeamName,
+                DatabaseComponent.Repository
+            );
+            var opponentTeamResult = await CoreService.Teams.GetByNameAsync(
+                OpponentTeamName,
+                DatabaseComponent.Repository
+            );
             if (!challengerTeamResult.Success || challengerTeamResult.Data == null)
             {
                 return Result.Failure("Challenger team not found");
@@ -50,8 +54,10 @@ namespace WabbitBot.Core.Scrimmages
             var selectedPlayersResult = new List<Player>();
             for (int i = 0; i < SelectedPlayerNames.Length; i++)
             {
-                var playerResult = await CoreService.Players
-                    .GetByNameAsync(SelectedPlayerNames[i], DatabaseComponent.Repository);
+                var playerResult = await CoreService.Players.GetByNameAsync(
+                    SelectedPlayerNames[i],
+                    DatabaseComponent.Repository
+                );
                 if (!playerResult.Success || playerResult.Data == null)
                 {
                     return Result.Failure("Player not found");
@@ -74,7 +80,8 @@ namespace WabbitBot.Core.Scrimmages
                 IssuedByPlayer,
                 SelectedPlayers,
                 (TeamSize)TeamSize,
-                BestOf);
+                BestOf
+            );
             if (!challengeResult.Success)
             {
                 return Result.Failure("Failed to create challenge");
@@ -93,13 +100,18 @@ namespace WabbitBot.Core.Scrimmages
 
             return Result.CreateSuccess(challenge.Id.ToString());
         }
+
         public static async Task<Result> HandleChallengeAcceptedAsync(
             Guid ChallengeId,
             Guid OpponentTeamId,
             Guid[] OpponentSelectedPlayerIds,
-            Guid acceptedByPlayerId)
+            Guid acceptedByPlayerId
+        )
         {
-            var challengeResult = await CoreService.ScrimmageChallenges.GetByIdAsync(ChallengeId, DatabaseComponent.Repository);
+            var challengeResult = await CoreService.ScrimmageChallenges.GetByIdAsync(
+                ChallengeId,
+                DatabaseComponent.Repository
+            );
             if (!challengeResult.Success)
             {
                 return Result.Failure("Failed to get challenge");
@@ -123,7 +135,10 @@ namespace WabbitBot.Core.Scrimmages
             var opponentSelectedPlayersResult = new List<Player>();
             for (int i = 0; i < OpponentSelectedPlayerIds.Length; i++)
             {
-                var playerResult = await CoreService.Players.GetByIdAsync(OpponentSelectedPlayerIds[i], DatabaseComponent.Repository);
+                var playerResult = await CoreService.Players.GetByIdAsync(
+                    OpponentSelectedPlayerIds[i],
+                    DatabaseComponent.Repository
+                );
                 if (!playerResult.Success || playerResult.Data == null)
                 {
                     return Result.Failure("Player not found");
@@ -136,7 +151,10 @@ namespace WabbitBot.Core.Scrimmages
             }
             var OpponentSelectedPlayers = opponentSelectedPlayersResult.ToArray();
 
-            var acceptedByPlayerResult = await CoreService.Players.GetByIdAsync(acceptedByPlayerId, DatabaseComponent.Repository);
+            var acceptedByPlayerResult = await CoreService.Players.GetByIdAsync(
+                acceptedByPlayerId,
+                DatabaseComponent.Repository
+            );
             if (!acceptedByPlayerResult.Success)
             {
                 return Result.Failure("Failed to get accepted by player");
@@ -157,7 +175,8 @@ namespace WabbitBot.Core.Scrimmages
                 challenge.Team1Players,
                 [.. OpponentSelectedPlayers],
                 challenge.IssuedByPlayer!,
-                AcceptedByPlayer);
+                AcceptedByPlayer
+            );
             if (!scrimmageResult.Success)
             {
                 return Result.Failure("Failed to create scrimmage");
@@ -193,7 +212,8 @@ namespace WabbitBot.Core.Scrimmages
         {
             // Get scrimmage channel from config
             var scrimmageChannelConfig = ConfigurationProvider
-                .GetSection<ChannelsOptions>(ChannelsOptions.SectionName).ScrimmageChannel;
+                .GetSection<ChannelsOptions>(ChannelsOptions.SectionName)
+                .ScrimmageChannel;
             if (scrimmageChannelConfig is null)
             {
                 return Result.Failure("Scrimmage channel not found");

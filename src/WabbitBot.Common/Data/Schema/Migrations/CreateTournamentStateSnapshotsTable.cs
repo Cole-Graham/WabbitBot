@@ -19,7 +19,9 @@ namespace WabbitBot.Common.Data.Schema.Migrations
             try
             {
                 // Create TournamentStateSnapshots table
-                await QueryUtil.ExecuteNonQueryAsync(conn, @"
+                await QueryUtil.ExecuteNonQueryAsync(
+                    conn,
+                    @"
                     CREATE TABLE IF NOT EXISTS TournamentStateSnapshots (
                         Id TEXT PRIMARY KEY,
                         CreatedAt DATETIME NOT NULL,
@@ -55,17 +57,40 @@ namespace WabbitBot.Common.Data.Schema.Migrations
                         CurrentParticipantCount INTEGER NOT NULL DEFAULT 0,
                         CurrentRound INTEGER NOT NULL DEFAULT 1,
                         FOREIGN KEY (TournamentId) REFERENCES Tournaments(Id) ON DELETE CASCADE
-                    )", new { }, transaction);
+                    )",
+                    new { },
+                    transaction
+                );
 
                 // Create indexes for faster lookups
-                await QueryUtil.ExecuteNonQueryAsync(conn, @"
-                    CREATE INDEX IF NOT EXISTS idx_tournamentstatesnapshots_tournamentid ON TournamentStateSnapshots(TournamentId)", new { }, transaction);
-                await QueryUtil.ExecuteNonQueryAsync(conn, @"
-                    CREATE INDEX IF NOT EXISTS idx_tournamentstatesnapshots_timestamp ON TournamentStateSnapshots(Timestamp)", new { }, transaction);
-                await QueryUtil.ExecuteNonQueryAsync(conn, @"
-                    CREATE INDEX IF NOT EXISTS idx_tournamentstatesnapshots_userid ON TournamentStateSnapshots(UserId)", new { }, transaction);
-                await QueryUtil.ExecuteNonQueryAsync(conn, @"
-                    CREATE INDEX IF NOT EXISTS idx_tournamentstatesnapshots_createdat ON TournamentStateSnapshots(CreatedAt)", new { }, transaction);
+                await QueryUtil.ExecuteNonQueryAsync(
+                    conn,
+                    @"
+                    CREATE INDEX IF NOT EXISTS idx_tournamentstatesnapshots_tournamentid ON TournamentStateSnapshots(TournamentId)",
+                    new { },
+                    transaction
+                );
+                await QueryUtil.ExecuteNonQueryAsync(
+                    conn,
+                    @"
+                    CREATE INDEX IF NOT EXISTS idx_tournamentstatesnapshots_timestamp ON TournamentStateSnapshots(Timestamp)",
+                    new { },
+                    transaction
+                );
+                await QueryUtil.ExecuteNonQueryAsync(
+                    conn,
+                    @"
+                    CREATE INDEX IF NOT EXISTS idx_tournamentstatesnapshots_userid ON TournamentStateSnapshots(UserId)",
+                    new { },
+                    transaction
+                );
+                await QueryUtil.ExecuteNonQueryAsync(
+                    conn,
+                    @"
+                    CREATE INDEX IF NOT EXISTS idx_tournamentstatesnapshots_createdat ON TournamentStateSnapshots(CreatedAt)",
+                    new { },
+                    transaction
+                );
 
                 transaction.Commit();
             }
@@ -83,7 +108,12 @@ namespace WabbitBot.Common.Data.Schema.Migrations
 
             try
             {
-                await QueryUtil.ExecuteNonQueryAsync(conn, "DROP TABLE IF EXISTS TournamentStateSnapshots", new { }, transaction);
+                await QueryUtil.ExecuteNonQueryAsync(
+                    conn,
+                    "DROP TABLE IF EXISTS TournamentStateSnapshots",
+                    new { },
+                    transaction
+                );
                 transaction.Commit();
             }
             catch

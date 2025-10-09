@@ -22,7 +22,14 @@ namespace WabbitBot.Core.Common.Models.Common
         #region Statistics Management
 
         /// <inheritdoc />
-        public async Task UpdateDivisionStatsAsync(Guid divisionId, Guid teamId, bool won, double gameDurationMinutes, Guid mapId, Guid? seasonId = null)
+        public async Task UpdateDivisionStatsAsync(
+            Guid divisionId,
+            Guid teamId,
+            bool won,
+            double gameDurationMinutes,
+            Guid mapId,
+            Guid? seasonId = null
+        )
         {
             // TODO: Implement division stats update logic
             // 1. Load or create DivisionStats for this division/teamSize/season
@@ -42,7 +49,13 @@ namespace WabbitBot.Core.Common.Models.Common
         }
 
         /// <inheritdoc />
-        public async Task UpdateLearningCurveAsync(Guid teamId, Guid divisionId, bool won, double gameDurationMinutes, Guid? seasonId = null)
+        public async Task UpdateLearningCurveAsync(
+            Guid teamId,
+            Guid divisionId,
+            bool won,
+            double gameDurationMinutes,
+            Guid? seasonId = null
+        )
         {
             // TODO: Implement learning curve update logic
             // 1. Load or create DivisionLearningCurve for this team/division/season
@@ -57,7 +70,11 @@ namespace WabbitBot.Core.Common.Models.Common
         }
 
         /// <inheritdoc />
-        public async Task<DivisionLearningCurve?> GetLearningCurveAsync(Guid teamId, Guid divisionId, Guid? seasonId = null)
+        public async Task<DivisionLearningCurve?> GetLearningCurveAsync(
+            Guid teamId,
+            Guid divisionId,
+            Guid? seasonId = null
+        )
         {
             // TODO: Implement learning curve retrieval
             // Query DivisionLearningCurve by teamId, divisionId, and optional seasonId
@@ -66,7 +83,12 @@ namespace WabbitBot.Core.Common.Models.Common
         }
 
         /// <inheritdoc />
-        public async Task<double?> PredictWinrateAsync(Guid teamId, Guid divisionId, int gameCount, Guid? seasonId = null)
+        public async Task<double?> PredictWinrateAsync(
+            Guid teamId,
+            Guid divisionId,
+            int gameCount,
+            Guid? seasonId = null
+        )
         {
             // TODO: Implement winrate prediction
             // 1. Get learning curve for this team/division/season
@@ -77,7 +99,12 @@ namespace WabbitBot.Core.Common.Models.Common
         }
 
         /// <inheritdoc />
-        public async Task<DivisionStats?> GetDivisionStatsAsync(Guid divisionId, TeamSize? teamSize = null, Guid? seasonId = null, RatingTier ratingTier = RatingTier.All)
+        public async Task<DivisionStats?> GetDivisionStatsAsync(
+            Guid divisionId,
+            TeamSize? teamSize = null,
+            Guid? seasonId = null,
+            RatingTier ratingTier = RatingTier.All
+        )
         {
             // TODO: Implement division stats retrieval
             // 1. Query DivisionStats by divisionId, optional teamSize, and optional seasonId
@@ -88,7 +115,13 @@ namespace WabbitBot.Core.Common.Models.Common
         }
 
         /// <inheritdoc />
-        public async Task<DivisionMapStats?> GetDivisionMapStatsAsync(Guid divisionId, Guid mapId, TeamSize? teamSize = null, Guid? seasonId = null, RatingTier ratingTier = RatingTier.All)
+        public async Task<DivisionMapStats?> GetDivisionMapStatsAsync(
+            Guid divisionId,
+            Guid mapId,
+            TeamSize? teamSize = null,
+            Guid? seasonId = null,
+            RatingTier ratingTier = RatingTier.All
+        )
         {
             // TODO: Implement division map stats retrieval
             // 1. Query DivisionMapStats by divisionId, mapId, optional teamSize, and optional seasonId
@@ -98,7 +131,11 @@ namespace WabbitBot.Core.Common.Models.Common
         }
 
         /// <inheritdoc />
-        public async Task<IEnumerable<DivisionLearningCurve>> GetLearningCurvesAsync(Guid divisionId, Guid? seasonId = null, RatingTier ratingTier = RatingTier.All)
+        public async Task<IEnumerable<DivisionLearningCurve>> GetLearningCurvesAsync(
+            Guid divisionId,
+            Guid? seasonId = null,
+            RatingTier ratingTier = RatingTier.All
+        )
         {
             // TODO: Implement learning curves retrieval
             // 1. Query DivisionLearningCurve records for this division/season
@@ -109,7 +146,12 @@ namespace WabbitBot.Core.Common.Models.Common
         }
 
         /// <inheritdoc />
-        public async Task<IEnumerable<DivisionPerformanceSummary>> GetTopDivisionsAsync(TeamSize teamSize, Guid? seasonId = null, RatingTier ratingTier = RatingTier.All, int limit = 10)
+        public async Task<IEnumerable<DivisionPerformanceSummary>> GetTopDivisionsAsync(
+            TeamSize teamSize,
+            Guid? seasonId = null,
+            RatingTier ratingTier = RatingTier.All,
+            int limit = 10
+        )
         {
             // TODO: Implement top divisions query
             // 1. Query all DivisionLearningCurve records for the team size
@@ -143,7 +185,11 @@ namespace WabbitBot.Core.Common.Models.Common
         /// Determines if a division is beginner-friendly based on learning curve data.
         /// Beginner-friendly divisions have high initial winrates and low learning rates.
         /// </summary>
-        public static bool IsBeginnerFriendly(DivisionLearningCurve curve, double thresholdWinrate = 0.45, double maxLearningRate = 0.01)
+        public static bool IsBeginnerFriendly(
+            DivisionLearningCurve curve,
+            double thresholdWinrate = 0.45,
+            double maxLearningRate = 0.01
+        )
         {
             // TODO: Implement beginner-friendly analysis
             // 1. Check if predicted winrate at game 1 is above threshold
@@ -151,9 +197,7 @@ namespace WabbitBot.Core.Common.Models.Common
             var initialWinrate = LearningCurveHelpers.EvaluateCurve(curve, 1);
             var learningRate = LearningCurveHelpers.GetLearningRate(curve, 5);
 
-            return initialWinrate >= thresholdWinrate &&
-                   learningRate is not null &&
-                   learningRate <= maxLearningRate;
+            return initialWinrate >= thresholdWinrate && learningRate is not null && learningRate <= maxLearningRate;
         }
 
         /// <summary>
@@ -186,8 +230,8 @@ namespace WabbitBot.Core.Common.Models.Common
         /// <returns>Dictionary with bucket start minutes as keys and winrates as values</returns>
         public static Dictionary<int, double> GetWinrateByGameLengthData(DivisionStats stats)
         {
-            return stats.GameLengthPerformance
-                .Where(kvp => kvp.Value.GamesPlayed > 0)
+            return stats
+                .GameLengthPerformance.Where(kvp => kvp.Value.GamesPlayed > 0)
                 .OrderBy(kvp => kvp.Key)
                 .ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Winrate);
         }
@@ -200,8 +244,8 @@ namespace WabbitBot.Core.Common.Models.Common
         /// <returns>Dictionary with bucket start minutes as keys and percentages as values</returns>
         public static Dictionary<int, double> GetGameLengthDistributionData(DivisionStats stats)
         {
-            return stats.GameLengthPerformance
-                .Where(kvp => kvp.Value.GamesPlayed > 0)
+            return stats
+                .GameLengthPerformance.Where(kvp => kvp.Value.GamesPlayed > 0)
                 .OrderBy(kvp => kvp.Key)
                 .ToDictionary(kvp => kvp.Key, kvp => kvp.Value.PercentageOfTotal);
         }
@@ -211,8 +255,8 @@ namespace WabbitBot.Core.Common.Models.Common
         /// </summary>
         public static int? GetMostCommonGameLength(DivisionStats stats)
         {
-            var bucket = stats.GameLengthPerformance
-                .Where(kvp => kvp.Value.GamesPlayed > 0)
+            var bucket = stats
+                .GameLengthPerformance.Where(kvp => kvp.Value.GamesPlayed > 0)
                 .OrderByDescending(kvp => kvp.Value.GamesPlayed)
                 .FirstOrDefault();
 
@@ -225,8 +269,8 @@ namespace WabbitBot.Core.Common.Models.Common
         /// </summary>
         public static int? GetOptimalGameLength(DivisionStats stats, int minGamesThreshold = 10)
         {
-            var bucket = stats.GameLengthPerformance
-                .Where(kvp => kvp.Value.GamesPlayed >= minGamesThreshold)
+            var bucket = stats
+                .GameLengthPerformance.Where(kvp => kvp.Value.GamesPlayed >= minGamesThreshold)
                 .OrderByDescending(kvp => kvp.Value.Winrate)
                 .FirstOrDefault();
 
@@ -275,9 +319,9 @@ namespace WabbitBot.Core.Common.Models.Common
             /// </summary>
             public static bool IsCompleteDivisionConfiguration(Division division)
             {
-                return IsValidDivisionName(division.Name) &&
-                       Enum.IsDefined(typeof(Faction), division.Faction) &&
-                       IsValidIconFilename(division.IconFilename);
+                return IsValidDivisionName(division.Name)
+                    && Enum.IsDefined(typeof(Faction), division.Faction)
+                    && IsValidIconFilename(division.IconFilename);
             }
 
             /// <summary>
@@ -403,7 +447,11 @@ namespace WabbitBot.Core.Common.Models.Common
         #region Percentile Breakpoint Management
 
         /// <inheritdoc />
-        public async Task<RatingPercentileBreakpoints> CalculatePercentileBreakpointsAsync(TeamSize teamSize, Guid? seasonId = null, int expiryHours = 24)
+        public async Task<RatingPercentileBreakpoints> CalculatePercentileBreakpointsAsync(
+            TeamSize teamSize,
+            Guid? seasonId = null,
+            int expiryHours = 24
+        )
         {
             // TODO: Implement percentile breakpoint calculation
             // 1. Query all active teams for this team size and season
@@ -431,7 +479,10 @@ namespace WabbitBot.Core.Common.Models.Common
         }
 
         /// <inheritdoc />
-        public async Task<RatingPercentileBreakpoints?> GetActivePercentileBreakpointsAsync(TeamSize teamSize, Guid? seasonId = null)
+        public async Task<RatingPercentileBreakpoints?> GetActivePercentileBreakpointsAsync(
+            TeamSize teamSize,
+            Guid? seasonId = null
+        )
         {
             // TODO: Implement active breakpoints retrieval
             // 1. Query RatingPercentileBreakpoints for teamSize/seasonId where IsActive = true
@@ -504,4 +555,3 @@ namespace WabbitBot.Core.Common.Models.Common
     }
     #endregion
 }
-

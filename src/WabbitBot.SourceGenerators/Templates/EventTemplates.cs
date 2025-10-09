@@ -1,11 +1,11 @@
-using Microsoft.CodeAnalysis.Text;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Microsoft.CodeAnalysis.Text;
 using WabbitBot.Generator.Shared;
+using WabbitBot.Generator.Shared.Analyzers;
 using WabbitBot.SourceGenerators.Templates; // For CommonTemplates
 using WabbitBot.SourceGenerators.Utils; // For SourceEmitter, InferenceHelpers
-using WabbitBot.Generator.Shared.Analyzers;
 
 namespace WabbitBot.SourceGenerators.Templates;
 
@@ -24,7 +24,8 @@ public static class EventTemplates
     /// <summary>
     /// Template for event subscription (used when generating handler registrations).
     /// </summary>
-    public const string EventSubscription = @"
+    public const string EventSubscription =
+        @"
             {0}.Subscribe<{1}>(async evt =>
             {{
                 using var metrics = EventMetrics.Start(""{1}"");
@@ -44,7 +45,8 @@ public static class EventTemplates
     /// <summary>
     /// Template for request-response subscription (used when generating handler registrations).
     /// </summary>
-    public const string RequestResponseSubscription = @"
+    public const string RequestResponseSubscription =
+        @"
             {0}.SubscribeRequest<{1}, {2}>(
                 async request =>
                 {{
@@ -128,11 +130,12 @@ public static class EventTemplates
                 methodName: $"Raise{method.Name}Async",
                 parameters: paramList,
                 body: $$"""
-                    {{CommonTemplates.CreateNullCheck("_eventBus")}}
-                    var @event = new {{eventName}}({{paramAssignments}}, EventBusType = {{busType}});
-                    {{CommonTemplates.CreateBusPublish("_eventBus", "@event")}}
-                    """,
-                modifiers: "partial");
+                {{CommonTemplates.CreateNullCheck("_eventBus")}}
+                var @event = new {{eventName}}({{paramAssignments}}, EventBusType = {{busType}});
+                {{CommonTemplates.CreateBusPublish("_eventBus", "@event")}}
+                """,
+                modifiers: "partial"
+            );
 
             publishers.AppendLine(CommonTemplates.CreateGeneratedDoc($"Raises {eventName} event for {method.Name}."));
             publishers.AppendLine(publisherMethod);
@@ -142,7 +145,8 @@ public static class EventTemplates
         var classContent = CommonTemplates.CreatePartialClassWithDependencies(
             className,
             publishers.ToString(),
-            dependencies);
+            dependencies
+        );
 
         var content = $$"""
             {{CommonTemplates.CreateFileHeader("EventBoundaryGenerator")}}

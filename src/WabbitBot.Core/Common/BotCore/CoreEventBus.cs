@@ -32,11 +32,13 @@ public class CoreEventBus(IGlobalEventBus globalEventBus) : ICoreEventBus
     private readonly Dictionary<Type, List<Delegate>> _requestHandlers = [];
     private readonly ConcurrentDictionary<Guid, TaskCompletionSource<object?>> _pendingRequests = new();
     private readonly Lock _lock = new();
-    private readonly IGlobalEventBus _globalEventBus = globalEventBus ?? throw new ArgumentNullException(nameof(globalEventBus));
+    private readonly IGlobalEventBus _globalEventBus =
+        globalEventBus ?? throw new ArgumentNullException(nameof(globalEventBus));
     private bool _isInitialized;
 
     /// <inheritdoc />
-    public async ValueTask PublishAsync<TEvent>(TEvent @event) where TEvent : class, IEvent
+    public async ValueTask PublishAsync<TEvent>(TEvent @event)
+        where TEvent : class, IEvent
     {
         if (!_isInitialized)
         {
@@ -84,28 +86,31 @@ public class CoreEventBus(IGlobalEventBus globalEventBus) : ICoreEventBus
         // Only forward to global bus if the event is meant for global routing
         if (@event.EventBusType == EventBusType.Global)
         {
-            tasks.Add(Task.Run(async () =>
-            {
-                try
+            tasks.Add(
+                Task.Run(async () =>
                 {
-                    var evtType2 = @event.GetType();
-                    var method = typeof(IGlobalEventBus).GetMethod("PublishAsync")!;
-                    var generic = method.MakeGenericMethod(evtType2);
-                    var task = (Task)generic.Invoke(_globalEventBus, new object[] { @event })!;
-                    await task;
-                }
-                catch (Exception ex)
-                {
-                    var errorEvent = new BoundaryErrorEvent(ex, "Core-to-Global", EventBusType.Global);
-                }
-            }));
+                    try
+                    {
+                        var evtType2 = @event.GetType();
+                        var method = typeof(IGlobalEventBus).GetMethod("PublishAsync")!;
+                        var generic = method.MakeGenericMethod(evtType2);
+                        var task = (Task)generic.Invoke(_globalEventBus, new object[] { @event })!;
+                        await task;
+                    }
+                    catch (Exception ex)
+                    {
+                        var errorEvent = new BoundaryErrorEvent(ex, "Core-to-Global", EventBusType.Global);
+                    }
+                })
+            );
         }
 
         await Task.WhenAll(tasks);
     }
 
     /// <inheritdoc />
-    public void Subscribe<TEvent>(Func<TEvent, Task> handler) where TEvent : class, IEvent
+    public void Subscribe<TEvent>(Func<TEvent, Task> handler)
+        where TEvent : class, IEvent
     {
         if (!_isInitialized)
         {
@@ -129,7 +134,8 @@ public class CoreEventBus(IGlobalEventBus globalEventBus) : ICoreEventBus
     }
 
     /// <inheritdoc />
-    public void Unsubscribe<TEvent>(Func<TEvent, Task> handler) where TEvent : class, IEvent
+    public void Unsubscribe<TEvent>(Func<TEvent, Task> handler)
+        where TEvent : class, IEvent
     {
         if (!_isInitialized)
         {

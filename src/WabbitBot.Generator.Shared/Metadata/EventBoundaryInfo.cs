@@ -7,7 +7,8 @@ public record EventBoundaryInfo(
     string ClassName,
     bool GenerateRequestResponse = false,
     EventBusType? BusType = null,
-    string? TargetProjects = null)
+    string? TargetProjects = null
+)
 {
     // Note: Creation from symbols is handled in AttributeAnalyzer to avoid circular dependencies
 }

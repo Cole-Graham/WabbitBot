@@ -1,5 +1,5 @@
-using WabbitBot.Common.Models;
 using WabbitBot.Common.Attributes;
+using WabbitBot.Common.Models;
 
 namespace WabbitBot.Core.Common.Models.Common
 {
@@ -9,14 +9,14 @@ namespace WabbitBot.Core.Common.Models.Common
         OneVOne = 0,
         TwoVTwo = 1,
         ThreeVThree = 2,
-        FourVFour = 3
+        FourVFour = 3,
     }
 
     public enum TeamSizeRosterGroup
     {
-        Solo = 0,  // 1v1
-        Duo = 1,  // 2v2
-        Squad = 2,  // 3v3 and 4v4
+        Solo = 0, // 1v1
+        Duo = 1, // 2v2
+        Squad = 2, // 3v3 and 4v4
     }
     #endregion
 
@@ -104,19 +104,19 @@ namespace WabbitBot.Core.Common.Models.Common
     #region # MatchStateSnapshot
     /// <summary>
     /// Immutable snapshot of match state at a point in time.
-    /// 
+    ///
     /// Design Principles:
     /// 1. IMMUTABLE - Never modified after creation
     /// 2. COMPLETE - Contains all data needed to reconstruct state
     /// 3. DENORMALIZED - Duplicates data for historical completeness
     /// 4. NO NAVIGATION TO MUTABLE ENTITIES - Only reference by ID
-    /// 
+    ///
     /// Responsibilities:
     /// - Match lifecycle tracking (created, started, completed, cancelled, forfeited)
-    /// - Map ban process (match-level, happens before games start)  
+    /// - Map ban process (match-level, happens before games start)
     /// - Overall match progression and score
     /// - Winner determination
-    /// 
+    ///
     /// Forfeit Handling:
     /// - When a match is forfeited, forfeit properties are set
     /// - CurrentGameNumber indicates which game was active during forfeit
@@ -173,7 +173,6 @@ namespace WabbitBot.Core.Common.Models.Common
         public bool Team1BansConfirmed { get; set; }
         public bool Team2BansConfirmed { get; set; }
 
-
         public override Domain Domain => Domain.Common;
     }
     #endregion
@@ -184,7 +183,7 @@ namespace WabbitBot.Core.Common.Models.Common
         InProgress,
         Completed,
         Cancelled,
-        Forfeited
+        Forfeited,
     }
 
     public enum GameStatus
@@ -203,8 +202,8 @@ namespace WabbitBot.Core.Common.Models.Common
     /// </summary>
     public enum MatchParentType
     {
-        Scrimmage,   // Match belongs to a Scrimmage entity
-        Tournament,  // Match belongs to a Tournament entity
+        Scrimmage, // Match belongs to a Scrimmage entity
+        Tournament, // Match belongs to a Tournament entity
     }
 
     #region Game
@@ -247,32 +246,32 @@ namespace WabbitBot.Core.Common.Models.Common
     #region GameStateSnapshot
     /// <summary>
     /// Immutable snapshot of game state at a point in time.
-    /// 
+    ///
     /// Design Principles:
     /// 1. IMMUTABLE - Never modified after creation
     /// 2. COMPLETE - Contains all data needed to reconstruct state without joins
     /// 3. DENORMALIZED - Duplicates parent data (MatchId, MapId, etc.) for historical completeness
     /// 4. NO NAVIGATION TO MUTABLE ENTITIES (except via explicit navigation properties)
-    /// 
+    ///
     /// Responsibilities:
     /// - Game lifecycle tracking (created, started, completed, cancelled, forfeited)
     /// - Deck submission tracking (per-game, not per-match)
     /// - Game-specific winner determination
     /// - Historical record of game state changes
-    /// 
+    ///
     /// Deck Code Submission:
     /// - Deck codes are GAME-SPECIFIC and submitted before each game starts
     /// - Players may submit different deck codes for each game in a match
     /// - Stored here (not in MatchStateSnapshot) because this is game-level state
     /// - Each game's deck submission is independent of other games
-    /// 
+    ///
     /// Forfeit Handling:
     /// - When a match is forfeited during this game, forfeit properties are set
     /// - Forfeiting a game ALWAYS forfeits the entire match
     /// - Game forfeit properties MIRROR the match forfeit for historical record
     /// - These properties show which game was active when the match was forfeited
     /// - Cannot be set independently - always set via match forfeit logic
-    /// 
+    ///
     /// Denormalized Data:
     /// - MatchId, MapId, TeamSize, PlayerIds, GameNumber are duplicated from Game entity
     /// - This ensures historical completeness even if Game entity is modified/deleted
@@ -349,5 +348,4 @@ namespace WabbitBot.Core.Common.Models.Common
         public override Domain Domain => Domain.Common;
     }
     #endregion
-
 }

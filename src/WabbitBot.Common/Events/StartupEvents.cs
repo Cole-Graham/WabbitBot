@@ -9,23 +9,22 @@ namespace WabbitBot.Common.Events
     /// They are part of the infrastructure layer and therefore live in the Common project.
     /// </summary>
     public record StartupInitiatedEvent(
-    BotOptions Configuration,
-    IBotConfigurationService ConfigurationService,
-    EventBusType EventBusType = EventBusType.Global) : IEvent
+        BotOptions Configuration,
+        IBotConfigurationService ConfigurationService,
+        EventBusType EventBusType = EventBusType.Global
+    ) : IEvent
     {
         public Guid EventId { get; init; } = Guid.NewGuid();
         public DateTime Timestamp { get; init; } = DateTime.UtcNow;
     }
 
-    public record SystemReadyEvent(
-    EventBusType EventBusType = EventBusType.Global) : IEvent
+    public record SystemReadyEvent(EventBusType EventBusType = EventBusType.Global) : IEvent
     {
         public Guid EventId { get; init; } = Guid.NewGuid();
         public DateTime Timestamp { get; init; } = DateTime.UtcNow;
     }
 
-    public record ApplicationReadyEvent(
-    EventBusType EventBusType = EventBusType.Global) : IEvent
+    public record ApplicationReadyEvent(EventBusType EventBusType = EventBusType.Global) : IEvent
     {
         public Guid EventId { get; init; } = Guid.NewGuid();
         public DateTime Timestamp { get; init; } = DateTime.UtcNow;
@@ -33,8 +32,7 @@ namespace WabbitBot.Common.Events
     #endregion
 
     #region Shutdown Events
-    public record ApplicationShuttingDownEvent(
-    EventBusType EventBusType = EventBusType.Global) : IEvent
+    public record ApplicationShuttingDownEvent(EventBusType EventBusType = EventBusType.Global) : IEvent
     {
         public Guid EventId { get; init; } = Guid.NewGuid();
         public DateTime Timestamp { get; init; } = DateTime.UtcNow;
@@ -43,26 +41,27 @@ namespace WabbitBot.Common.Events
     #endregion
 
     #region Error Events
-    public record GlobalErrorHandlingReadyEvent(
-    EventBusType EventBusType = EventBusType.Global) : IEvent
+    public record GlobalErrorHandlingReadyEvent(EventBusType EventBusType = EventBusType.Global) : IEvent
     {
         public Guid EventId { get; init; } = Guid.NewGuid();
         public DateTime Timestamp { get; init; } = DateTime.UtcNow;
     }
 
     public record CriticalStartupErrorEvent(
-    Exception Exception,
-    string Component = "Unknown",
-    EventBusType EventBusType = EventBusType.Global) : IEvent
+        Exception Exception,
+        string Component = "Unknown",
+        EventBusType EventBusType = EventBusType.Global
+    ) : IEvent
     {
         public Guid EventId { get; init; } = Guid.NewGuid();
         public DateTime Timestamp { get; init; } = DateTime.UtcNow;
     }
 
     public record BoundaryErrorEvent(
-    Exception Exception,
-    string Boundary,
-    EventBusType EventBusType = EventBusType.Global) : IEvent
+        Exception Exception,
+        string Boundary,
+        EventBusType EventBusType = EventBusType.Global
+    ) : IEvent
     {
         public Guid EventId { get; init; } = Guid.NewGuid();
         public DateTime Timestamp { get; init; } = DateTime.UtcNow;

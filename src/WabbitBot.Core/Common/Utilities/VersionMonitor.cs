@@ -38,7 +38,8 @@ namespace WabbitBot.Core.Common.Utilities
                     await CoreService.ErrorHandler.CaptureAsync(
                         ex,
                         "Error checking version compatibility",
-                        nameof(CheckVersionDriftAsync));
+                        nameof(CheckVersionDriftAsync)
+                    );
 
                     // Wait a shorter interval before retrying after an error
                     await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
@@ -61,9 +62,11 @@ namespace WabbitBot.Core.Common.Utilities
             {
                 await CoreService.ErrorHandler.CaptureAsync(
                     new IncompatibleVersionException(
-                        $"Version drift detected: App {appVersion} vs Schema {schemaVersion}"),
+                        $"Version drift detected: App {appVersion} vs Schema {schemaVersion}"
+                    ),
                     $"Version drift detected: App {appVersion} vs Schema {schemaVersion}",
-                    nameof(CheckVersionDriftAsync));
+                    nameof(CheckVersionDriftAsync)
+                );
             }
             // Version OK - no action needed (logging would be too verbose for this check)
         }

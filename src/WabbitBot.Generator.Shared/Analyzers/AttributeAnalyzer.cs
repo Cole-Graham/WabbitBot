@@ -5,7 +5,6 @@ using WabbitBot.Generator.Shared.Metadata;
 
 namespace WabbitBot.Generator.Shared.Analyzers;
 
-
 /// <summary>
 /// Defines the target projects for event generation.
 /// </summary>
@@ -27,6 +26,7 @@ public enum GenerationTargets
     /// </summary>
     DiscBot = 4,
 }
+
 /// <summary>
 /// Defines the target event buses for event publishing.
 /// Used with EventTrigger to specify where events should be published.
@@ -47,8 +47,9 @@ public enum EventTargets
     /// <summary>
     /// Publish to both local and Global event buses (dual-publish).
     /// </summary>
-    Both = Local | Global
+    Both = Local | Global,
 }
+
 /// <summary>
 /// Utility class for analyzing attributes on symbols.
 /// </summary>
@@ -59,16 +60,15 @@ public static class AttributeAnalyzer
     /// </summary>
     public static CommandInfo? ExtractCommandInfo(INamedTypeSymbol classSymbol)
     {
-        var attribute = classSymbol.GetAttributes()
+        var attribute = classSymbol
+            .GetAttributes()
             .FirstOrDefault(attr => attr.AttributeClass?.ToDisplayString() == AttributeNames.WabbitCommand);
 
         if (attribute == null)
             return null;
 
         var name = attribute.ConstructorArguments.FirstOrDefault().Value as string;
-        var group = attribute.NamedArguments
-            .FirstOrDefault(kvp => kvp.Key == "Group")
-            .Value.Value as string;
+        var group = attribute.NamedArguments.FirstOrDefault(kvp => kvp.Key == "Group").Value.Value as string;
 
         return new CommandInfo(classSymbol.Name, name ?? classSymbol.Name.ToLower(), group);
     }
@@ -78,8 +78,7 @@ public static class AttributeAnalyzer
     /// </summary>
     public static bool HasAttribute(INamedTypeSymbol classSymbol, string attributeName)
     {
-        return classSymbol.GetAttributes()
-            .Any(attr => attr.AttributeClass?.ToDisplayString() == attributeName);
+        return classSymbol.GetAttributes().Any(attr => attr.AttributeClass?.ToDisplayString() == attributeName);
     }
 
     /// <summary>
@@ -87,11 +86,14 @@ public static class AttributeAnalyzer
     /// </summary>
     public static IEnumerable<IMethodSymbol> GetEventTriggeringMethods(INamedTypeSymbol classSymbol)
     {
-        return classSymbol.GetMembers()
+        return classSymbol
+            .GetMembers()
             .OfType<IMethodSymbol>()
-            .Where(method => method.DeclaredAccessibility == Accessibility.Public &&
-                           !method.IsStatic &&
-                           method.MethodKind == MethodKind.Ordinary);
+            .Where(method =>
+                method.DeclaredAccessibility == Accessibility.Public
+                && !method.IsStatic
+                && method.MethodKind == MethodKind.Ordinary
+            );
     }
 
     /// <summary>
@@ -115,16 +117,16 @@ public static class AttributeAnalyzer
         foreach (var syntaxTree in compilation.SyntaxTrees)
         {
             var semanticModel = compilation.GetSemanticModel(syntaxTree);
-            var classDeclarations = syntaxTree.GetRoot()
-                .DescendantNodes()
-                .OfType<ClassDeclarationSyntax>();
+            var classDeclarations = syntaxTree.GetRoot().DescendantNodes().OfType<ClassDeclarationSyntax>();
 
             foreach (var classDecl in classDeclarations)
             {
                 var classSymbol = semanticModel.GetDeclaredSymbol(classDecl) as INamedTypeSymbol;
-                if (classSymbol == null) continue;
+                if (classSymbol == null)
+                    continue;
 
-                var entityMetadataAttr = classSymbol.GetAttributes()
+                var entityMetadataAttr = classSymbol
+                    .GetAttributes()
                     .FirstOrDefault(attr => attr.AttributeClass?.ToDisplayString() == AttributeNames.EntityMetadata);
 
                 if (entityMetadataAttr != null)
@@ -149,15 +151,21 @@ public static class AttributeAnalyzer
         try
         {
             // Extract table name from constructor arguments or named arguments
-            var tableName = attribute.ConstructorArguments.FirstOrDefault().Value as string ??
-                           attribute.NamedArguments.FirstOrDefault(kvp => kvp.Key == "TableName").Value.Value as string ??
-                           classSymbol.Name.ToLower();
+            var tableName =
+                attribute.ConstructorArguments.FirstOrDefault().Value as string
+                ?? attribute.NamedArguments.FirstOrDefault(kvp => kvp.Key == "TableName").Value.Value as string
+                ?? classSymbol.Name.ToLower();
 
-            var archiveTableName = attribute.NamedArguments.FirstOrDefault(kvp => kvp.Key == "ArchiveTableName").Value.Value as string ??
-                                  $"{tableName}_archive";
+            var archiveTableName =
+                attribute.NamedArguments.FirstOrDefault(kvp => kvp.Key == "ArchiveTableName").Value.Value as string
+                ?? $"{tableName}_archive";
 
-            var maxCacheSize = (int)(attribute.NamedArguments.FirstOrDefault(kvp => kvp.Key == "MaxCacheSize").Value.Value ?? 1000);
-            var cacheExpiryMinutes = (int)(attribute.NamedArguments.FirstOrDefault(kvp => kvp.Key == "CacheExpiryMinutes").Value.Value ?? 60);
+            var maxCacheSize = (int)(
+                attribute.NamedArguments.FirstOrDefault(kvp => kvp.Key == "MaxCacheSize").Value.Value ?? 1000
+            );
+            var cacheExpiryMinutes = (int)(
+                attribute.NamedArguments.FirstOrDefault(kvp => kvp.Key == "CacheExpiryMinutes").Value.Value ?? 60
+            );
             bool emitCacheRegistration = false;
             bool emitArchiveRegistration = false;
             var ctorArgs = attribute.ConstructorArguments;
@@ -172,22 +180,30 @@ public static class AttributeAnalyzer
             // Fallback to named args if ever exposed as settable properties in future
             if (!emitCacheRegistration)
             {
-                emitCacheRegistration = (bool)(attribute.NamedArguments.FirstOrDefault(kvp => kvp.Key == "EmitCacheRegistration").Value.Value ?? false);
+                emitCacheRegistration = (bool)(
+                    attribute.NamedArguments.FirstOrDefault(kvp => kvp.Key == "EmitCacheRegistration").Value.Value
+                    ?? false
+                );
             }
             if (!emitArchiveRegistration)
             {
-                emitArchiveRegistration = (bool)(attribute.NamedArguments.FirstOrDefault(kvp => kvp.Key == "EmitArchiveRegistration").Value.Value ?? false);
+                emitArchiveRegistration = (bool)(
+                    attribute.NamedArguments.FirstOrDefault(kvp => kvp.Key == "EmitArchiveRegistration").Value.Value
+                    ?? false
+                );
             }
 
             // Extract column names from public properties
-            var columnNames = classSymbol.GetMembers()
+            var columnNames = classSymbol
+                .GetMembers()
                 .OfType<IPropertySymbol>()
                 .Where(prop => prop.DeclaredAccessibility == Accessibility.Public && !prop.IsStatic)
                 .Select(prop => prop.Name)
                 .ToArray();
 
             // Optional service property override
-            var servicePropertyName = attribute.NamedArguments.FirstOrDefault(kvp => kvp.Key == "ServicePropertyName").Value.Value as string;
+            var servicePropertyName =
+                attribute.NamedArguments.FirstOrDefault(kvp => kvp.Key == "ServicePropertyName").Value.Value as string;
             if (string.IsNullOrEmpty(servicePropertyName))
             {
                 if (ctorArgs.Length >= 9 && ctorArgs[8].Value is string s && !string.IsNullOrWhiteSpace(s))
@@ -206,7 +222,8 @@ public static class AttributeAnalyzer
                 EmitArchiveRegistration: emitArchiveRegistration,
                 ColumnNames: columnNames,
                 EntityType: classSymbol,
-                ServicePropertyName: servicePropertyName);
+                ServicePropertyName: servicePropertyName
+            );
         }
         catch
         {
@@ -225,33 +242,47 @@ public static class AttributeAnalyzer
         foreach (var syntaxTree in compilation.SyntaxTrees)
         {
             var semanticModel = compilation.GetSemanticModel(syntaxTree);
-            var classDeclarations = syntaxTree.GetRoot()
-                .DescendantNodes()
-                .OfType<ClassDeclarationSyntax>();
+            var classDeclarations = syntaxTree.GetRoot().DescendantNodes().OfType<ClassDeclarationSyntax>();
 
             foreach (var classDecl in classDeclarations)
             {
                 var classSymbol = semanticModel.GetDeclaredSymbol(classDecl) as INamedTypeSymbol;
-                if (classSymbol == null) continue;
+                if (classSymbol == null)
+                    continue;
 
                 // Check classes and their methods
-                var eventGenAttrOnClass = classSymbol.GetAttributes()
+                var eventGenAttrOnClass = classSymbol
+                    .GetAttributes()
                     .FirstOrDefault(attr => attr.AttributeClass?.ToDisplayString() == AttributeNames.EventGenerator);
                 if (eventGenAttrOnClass != null)
                 {
                     var metadata = ExtractEventGeneratorInfo(classSymbol, eventGenAttrOnClass, isMethod: false);
-                    if (metadata != null) eventGenerators.Add(metadata);
+                    if (metadata != null)
+                        eventGenerators.Add(metadata);
                 }
 
-                foreach (var method in classSymbol.GetMembers().OfType<IMethodSymbol>()
-                    .Where(m => m.DeclaredAccessibility == Accessibility.Public && !m.IsStatic))
+                foreach (
+                    var method in classSymbol
+                        .GetMembers()
+                        .OfType<IMethodSymbol>()
+                        .Where(m => m.DeclaredAccessibility == Accessibility.Public && !m.IsStatic)
+                )
                 {
-                    var eventGenAttrOnMethod = method.GetAttributes()
-                        .FirstOrDefault(attr => attr.AttributeClass?.ToDisplayString() == AttributeNames.EventGenerator);
+                    var eventGenAttrOnMethod = method
+                        .GetAttributes()
+                        .FirstOrDefault(attr =>
+                            attr.AttributeClass?.ToDisplayString() == AttributeNames.EventGenerator
+                        );
                     if (eventGenAttrOnMethod != null)
                     {
-                        var metadata = ExtractEventGeneratorInfo(classSymbol, eventGenAttrOnMethod, isMethod: true, methodSymbol: method);
-                        if (metadata != null) eventGenerators.Add(metadata);
+                        var metadata = ExtractEventGeneratorInfo(
+                            classSymbol,
+                            eventGenAttrOnMethod,
+                            isMethod: true,
+                            methodSymbol: method
+                        );
+                        if (metadata != null)
+                            eventGenerators.Add(metadata);
                     }
                 }
             }
@@ -267,25 +298,30 @@ public static class AttributeAnalyzer
         INamedTypeSymbol classSymbol,
         AttributeData attribute,
         bool isMethod,
-        IMethodSymbol? methodSymbol = null)
+        IMethodSymbol? methodSymbol = null
+    )
     {
         try
         {
             // Parse generationTargets: string[] to List<GenerationTargets> via Enum.Parse
-            var genTargetsArg = attribute.ConstructorArguments
-                .FirstOrDefault().Value as string[] ?? Array.Empty<string>();
-            var generationTargets = genTargetsArg.Length > 0
-                ? genTargetsArg.Select(gt => (GenerationTargets)Enum
-                    .Parse(typeof(GenerationTargets), gt, ignoreCase: true))
-                    .ToList() : new List<GenerationTargets>();
+            var genTargetsArg =
+                attribute.ConstructorArguments.FirstOrDefault().Value as string[] ?? Array.Empty<string>();
+            var generationTargets =
+                genTargetsArg.Length > 0
+                    ? genTargetsArg
+                        .Select(gt => (GenerationTargets)Enum.Parse(typeof(GenerationTargets), gt, ignoreCase: true))
+                        .ToList()
+                    : new List<GenerationTargets>();
 
             // Parse eventTargets: string[] to EventTargets (combine with | for Flags)
-            var evtTargetsArg = attribute.ConstructorArguments
-                .Skip(1).FirstOrDefault().Value as string[] ?? new[] { "Global" }; // Default
-            var eventTargets = evtTargetsArg.Length > 0
-                ? evtTargetsArg.Select(et => (EventTargets)Enum
-                    .Parse(typeof(EventTargets), et, ignoreCase: true))
-                    .Aggregate((a, b) => a | b) : EventTargets.Global;
+            var evtTargetsArg =
+                attribute.ConstructorArguments.Skip(1).FirstOrDefault().Value as string[] ?? new[] { "Global" }; // Default
+            var eventTargets =
+                evtTargetsArg.Length > 0
+                    ? evtTargetsArg
+                        .Select(et => (EventTargets)Enum.Parse(typeof(EventTargets), et, ignoreCase: true))
+                        .Aggregate((a, b) => a | b)
+                    : EventTargets.Global;
 
             // Bool flags from named args or constructor (order: generateEvents, generatePublishers, etc.)
             var generateEvents = (bool)(attribute.ConstructorArguments.ElementAtOrDefault(2).Value ?? false);
@@ -293,23 +329,36 @@ public static class AttributeAnalyzer
             var generateSubscribers = (bool)(attribute.ConstructorArguments.ElementAtOrDefault(4).Value ?? false);
 
             // Fallback to named args for bools
-            generateEvents = generateEvents || (bool)(attribute.NamedArguments
-                .FirstOrDefault(kvp => kvp.Key == "GenerateEvents").Value.Value ?? false);
-            generatePublishers = generatePublishers || (bool)(attribute.NamedArguments
-                .FirstOrDefault(kvp => kvp.Key == "GeneratePublishers").Value.Value ?? false);
-            generateSubscribers = generateSubscribers || (bool)(attribute.NamedArguments
-                .FirstOrDefault(kvp => kvp.Key == "GenerateSubscribers").Value.Value ?? false);
+            generateEvents =
+                generateEvents
+                || (bool)(
+                    attribute.NamedArguments.FirstOrDefault(kvp => kvp.Key == "GenerateEvents").Value.Value ?? false
+                );
+            generatePublishers =
+                generatePublishers
+                || (bool)(
+                    attribute.NamedArguments.FirstOrDefault(kvp => kvp.Key == "GeneratePublishers").Value.Value ?? false
+                );
+            generateSubscribers =
+                generateSubscribers
+                || (bool)(
+                    attribute.NamedArguments.FirstOrDefault(kvp => kvp.Key == "GenerateSubscribers").Value.Value
+                    ?? false
+                );
 
-            var enableMetrics = (bool)(attribute.NamedArguments
-                .FirstOrDefault(kvp => kvp.Key == "EnableMetrics").Value.Value ?? true);
-            var enableErrorHandling = (bool)(attribute.NamedArguments
-                .FirstOrDefault(kvp => kvp.Key == "EnableErrorHandling").Value.Value ?? true);
-            var enableLogging = (bool)(attribute.NamedArguments
-                .FirstOrDefault(kvp => kvp.Key == "EnableLogging").Value.Value ?? true);
+            var enableMetrics = (bool)(
+                attribute.NamedArguments.FirstOrDefault(kvp => kvp.Key == "EnableMetrics").Value.Value ?? true
+            );
+            var enableErrorHandling = (bool)(
+                attribute.NamedArguments.FirstOrDefault(kvp => kvp.Key == "EnableErrorHandling").Value.Value ?? true
+            );
+            var enableLogging = (bool)(
+                attribute.NamedArguments.FirstOrDefault(kvp => kvp.Key == "EnableLogging").Value.Value ?? true
+            );
 
             // Get custom event name if provided
-            var customEventName = attribute.NamedArguments
-                .FirstOrDefault(kvp => kvp.Key == "EventName").Value.Value as string;
+            var customEventName =
+                attribute.NamedArguments.FirstOrDefault(kvp => kvp.Key == "EventName").Value.Value as string;
 
             // Get namespace
             var namespaceName = classSymbol.ContainingNamespace?.ToDisplayString() ?? "Generated";
@@ -329,7 +378,8 @@ public static class AttributeAnalyzer
                 enableMetrics: enableMetrics,
                 enableErrorHandling: enableErrorHandling,
                 enableLogging: enableLogging,
-                customEventName: customEventName);
+                customEventName: customEventName
+            );
         }
         catch
         {
@@ -391,7 +441,8 @@ public class EventGeneratorInfo
         bool enableMetrics,
         bool enableErrorHandling,
         bool enableLogging,
-        string? customEventName = null)
+        string? customEventName = null
+    )
     {
         ClassName = className;
         Namespace = @namespace;
@@ -418,7 +469,11 @@ public class CompilationAnalysisResult
 {
     public IEnumerable<EntityMetadataInfo> Entities { get; }
     public IEnumerable<EventGeneratorInfo> EventGenerators { get; }
-    public CompilationAnalysisResult(IEnumerable<EntityMetadataInfo> entities, IEnumerable<EventGeneratorInfo> eventGenerators)
+
+    public CompilationAnalysisResult(
+        IEnumerable<EntityMetadataInfo> entities,
+        IEnumerable<EventGeneratorInfo> eventGenerators
+    )
     {
         Entities = entities;
         EventGenerators = eventGenerators;

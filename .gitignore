@@ -401,13 +401,12 @@ FodyWeavers.xsd
 
 # Misc
 Scrimmage_backup.txt
-.editorconfig
 rating_simulator.py
 rating_simulator_backup.py
 plot_win_probabilities.py
 win_probability_curves.png
 !*.template.json
-*.json
+
 *.cursor/
 *src/WabbitBot.Old
 *src/deprecated
@@ -422,9 +421,11 @@ src/output/bin/
 src/output/config.json
 !src/output/config.template.json
 
-# Configuration files (ignore actual config, allow templates)
-src/config.json
-!src/config.template.json
+# Ignore all environment configs
+appsettings.*.json
+# Allow the safe defaults and template
+!appsettings.json
+!appsettings.Development.json.template
 
 # Backup tool configuration
 dev/tools/local_backup/logs/
@@ -434,8 +435,3 @@ dev/tools/local_backup/logs/
 # Custom map configurations
 src/WabbitBot.Core/Config/maps.json
 !src/WabbitBot.Core/Config/maps.default.json
-
-# Generated source code
-Generated/
-
-# data

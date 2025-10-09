@@ -17,7 +17,7 @@ public class ConfigurationService
         private static readonly JsonSerializerOptions JsonOptions = new()
         {
             WriteIndented = true,
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         };
 
         /// <summary>
@@ -41,7 +41,11 @@ public class ConfigurationService
             }
             catch (Exception ex)
             {
-                await CoreService.ErrorHandler.CaptureAsync(ex, "Error saving configuration", nameof(SaveConfigurationAsync));
+                await CoreService.ErrorHandler.CaptureAsync(
+                    ex,
+                    "Error saving configuration",
+                    nameof(SaveConfigurationAsync)
+                );
                 return false;
             }
         }
@@ -57,7 +61,14 @@ public class ConfigurationService
                 var currentConfig = await LoadConfigurationAsync();
                 if (currentConfig == null)
                 {
-                    await CoreService.ErrorHandler.HandleAsync(new WabbitBot.Common.ErrorService.ErrorContext("Failed to load current configuration", WabbitBot.Common.ErrorService.ErrorSeverity.Warning, nameof(SaveMapsConfigurationAsync)), WabbitBot.Common.ErrorService.ErrorComponent.Logging);
+                    await CoreService.ErrorHandler.HandleAsync(
+                        new WabbitBot.Common.ErrorService.ErrorContext(
+                            "Failed to load current configuration",
+                            WabbitBot.Common.ErrorService.ErrorSeverity.Warning,
+                            nameof(SaveMapsConfigurationAsync)
+                        ),
+                        WabbitBot.Common.ErrorService.ErrorComponent.Logging
+                    );
                     return false;
                 }
 
@@ -69,7 +80,11 @@ public class ConfigurationService
             }
             catch (Exception ex)
             {
-                await CoreService.ErrorHandler.CaptureAsync(ex, "Error saving maps configuration", nameof(SaveMapsConfigurationAsync));
+                await CoreService.ErrorHandler.CaptureAsync(
+                    ex,
+                    "Error saving maps configuration",
+                    nameof(SaveMapsConfigurationAsync)
+                );
                 return false;
             }
         }
@@ -84,7 +99,14 @@ public class ConfigurationService
                 var fullPath = Path.GetFullPath(AppSettingsFile);
                 if (!File.Exists(fullPath))
                 {
-                    await CoreService.ErrorHandler.HandleAsync(new WabbitBot.Common.ErrorService.ErrorContext($"Configuration file not found at: {fullPath}", WabbitBot.Common.ErrorService.ErrorSeverity.Warning, nameof(LoadConfigurationAsync)), WabbitBot.Common.ErrorService.ErrorComponent.Logging);
+                    await CoreService.ErrorHandler.HandleAsync(
+                        new WabbitBot.Common.ErrorService.ErrorContext(
+                            $"Configuration file not found at: {fullPath}",
+                            WabbitBot.Common.ErrorService.ErrorSeverity.Warning,
+                            nameof(LoadConfigurationAsync)
+                        ),
+                        WabbitBot.Common.ErrorService.ErrorComponent.Logging
+                    );
                     return null;
                 }
 
@@ -93,7 +115,11 @@ public class ConfigurationService
             }
             catch (Exception ex)
             {
-                await CoreService.ErrorHandler.CaptureAsync(ex, "Error loading configuration", nameof(LoadConfigurationAsync));
+                await CoreService.ErrorHandler.CaptureAsync(
+                    ex,
+                    "Error loading configuration",
+                    nameof(LoadConfigurationAsync)
+                );
                 return null;
             }
         }
@@ -117,7 +143,10 @@ public class ConfigurationService
             }
             catch (Exception ex)
             {
-                CoreService.ErrorHandler.CaptureAsync(ex, "Error creating configuration backup", nameof(CreateBackup)).GetAwaiter().GetResult();
+                CoreService
+                    .ErrorHandler.CaptureAsync(ex, "Error creating configuration backup", nameof(CreateBackup))
+                    .GetAwaiter()
+                    .GetResult();
                 return null;
             }
         }

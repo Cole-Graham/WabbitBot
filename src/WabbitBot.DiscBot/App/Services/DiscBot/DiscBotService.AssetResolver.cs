@@ -23,7 +23,8 @@ namespace WabbitBot.DiscBot.App.Services.DiscBot
             public static async Task<(string? cdnUrl, AttachmentHint? attachmentHint)> ResolveAssetAsync(
                 string assetType,
                 string assetId,
-                TimeSpan? timeout = null)
+                TimeSpan? timeout = null
+            )
             {
                 try
                 {
@@ -36,7 +37,8 @@ namespace WabbitBot.DiscBot.App.Services.DiscBot
                     // Send request and wait for response
                     var response = await globalBus.RequestAsync<AssetResolveRequested, AssetResolved>(
                         request,
-                        timeout ?? TimeSpan.FromSeconds(5));
+                        timeout ?? TimeSpan.FromSeconds(5)
+                    );
 
                     if (response is null)
                     {
@@ -44,7 +46,8 @@ namespace WabbitBot.DiscBot.App.Services.DiscBot
                         await DiscBotService.ErrorHandler.CaptureAsync(
                             new TimeoutException($"Asset resolution timed out for {assetType}/{assetId}"),
                             $"Failed to resolve asset: {assetType}/{assetId}",
-                            nameof(ResolveAssetAsync));
+                            nameof(ResolveAssetAsync)
+                        );
                         return (null, null);
                     }
 
@@ -69,7 +72,8 @@ namespace WabbitBot.DiscBot.App.Services.DiscBot
                     await DiscBotService.ErrorHandler.CaptureAsync(
                         ex,
                         $"Failed to resolve asset: {assetType}/{assetId}",
-                        nameof(ResolveAssetAsync));
+                        nameof(ResolveAssetAsync)
+                    );
                     return (null, null);
                 }
             }
@@ -79,7 +83,9 @@ namespace WabbitBot.DiscBot.App.Services.DiscBot
             /// </summary>
             /// <param name="mapName">Name of the map</param>
             /// <returns>Tuple of (cdnUrl, attachmentHint)</returns>
-            public static Task<(string? cdnUrl, AttachmentHint? attachmentHint)> ResolveMapThumbnailAsync(string mapName)
+            public static Task<(string? cdnUrl, AttachmentHint? attachmentHint)> ResolveMapThumbnailAsync(
+                string mapName
+            )
             {
                 return ResolveAssetAsync("mapthumbnail", mapName);
             }
@@ -89,7 +95,9 @@ namespace WabbitBot.DiscBot.App.Services.DiscBot
             /// </summary>
             /// <param name="divisionRank">Division rank (e.g., "bronze", "silver", "gold")</param>
             /// <returns>Tuple of (cdnUrl, attachmentHint)</returns>
-            public static Task<(string? cdnUrl, AttachmentHint? attachmentHint)> ResolveDivisionIconAsync(string divisionRank)
+            public static Task<(string? cdnUrl, AttachmentHint? attachmentHint)> ResolveDivisionIconAsync(
+                string divisionRank
+            )
             {
                 return ResolveAssetAsync("divisionicon", divisionRank);
             }

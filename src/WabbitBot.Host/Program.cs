@@ -1,10 +1,11 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using DotNetEnv;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using WabbitBot.Common.Configuration;
+using WabbitBot.Common.ErrorService;
 using WabbitBot.Common.Events;
 using WabbitBot.Common.Events.Interfaces;
-using WabbitBot.Common.ErrorService;
 using WabbitBot.Common.Utilities;
 using WabbitBot.Core.Common.BotCore;
 using WabbitBot.Core.Common.Database;
@@ -46,7 +47,23 @@ public static class Program
 
             // Load modern configuration
             var configuration = BuildConfiguration();
-            var botOptions = configuration.GetSection(BotOptions.SectionName).Get<BotOptions>()
+
+            // Echo current environment for visibility
+            var currentEnv =
+                configuration["ASPNETCORE_ENVIRONMENT"]
+                ?? Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")
+                ?? "Development";
+            Console.WriteLine($"🌍 Current environment: {currentEnv}");
+
+            // Fail fast on missing critical secrets (Discord bot token)
+            var token = configuration["Bot:Token"];
+            if (string.IsNullOrWhiteSpace(token))
+                throw new InvalidOperationException(
+                    "Missing Bot:Token. Provide it via user-secrets (Dev) or .env (Cybrancee)."
+                );
+
+            var botOptions =
+                configuration.GetSection(BotOptions.SectionName).Get<BotOptions>()
                 ?? throw new InvalidOperationException("Failed to load bot configuration");
 
             // Create configuration service
@@ -90,14 +107,35 @@ public static class Program
 
     private static IConfiguration BuildConfiguration()
     {
+        // 1) Load .env first so its values are present as environment variables
+        //    (Cybrancee places secrets in a .env file alongside your app)
+        Env.Load();
+
         var environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Development";
 
-        return new ConfigurationBuilder()
+        var builder = new ConfigurationBuilder()
             .SetBasePath(AppContext.BaseDirectory)
+            // 2) Base JSON (checked in)
             .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-            .AddJsonFile($"appsettings.{environment}.json", optional: true, reloadOnChange: true)
-            .AddEnvironmentVariables("WABBITBOT_")
-            .Build();
+            // 3) Environment JSON (Dev overrides only; file is optional/ignored in git)
+            .AddJsonFile($"appsettings.{environment}.json", optional: true, reloadOnChange: true);
+
+        // 4) User Secrets (local dev only)
+        if (string.Equals(environment, "Development", StringComparison.OrdinalIgnoreCase))
+        {
+            builder.AddUserSecrets(typeof(Program).Assembly, optional: true);
+        }
+
+        // 5) Environment variables (supports Bot__Token, etc.)
+        builder.AddEnvironmentVariables();
+
+        // (Optional) command-line args could be added here if you ever pass overrides
+
+        var config = builder.Build();
+
+        // Persist the resolved environment in config so we can print it even if only set via default
+        var dict = new Dictionary<string, string?> { ["ASPNETCORE_ENVIRONMENT"] = environment };
+        return new ConfigurationBuilder().AddConfiguration(config).AddInMemoryCollection(dict).Build();
     }
 
     private static async Task InitializeCoreAsync(IConfiguration configuration)
@@ -122,24 +160,26 @@ public static class Program
             await InitializeCoreServices();
 
             // Publish core services initialized event
-            var initializedServices = new[] { "Database", "DatabaseServices", "CoreServices", };
+            var initializedServices = new[] { "Database", "DatabaseServices", "CoreServices" };
             await CoreEventBus.PublishAsync(new CoreServicesInitializedEvent(initializedServices));
 
             // Signal that the core system is ready
             await CoreEventBus.PublishAsync(new CoreStartupCompletedEvent());
 
             // Initialize features
-            var features = new[] { "Tournaments", "Matches", "Leaderboards", };
+            var features = new[] { "Tournaments", "Matches", "Leaderboards" };
             foreach (var feature in features)
             {
-                await CoreEventBus.PublishAsync(new CoreFeatureReadyEvent(feature));
+                await GlobalEventBus.PublishAsync(new CoreFeatureReadyEvent(feature));
             }
 
             // Start archive retention on a timer from configuration
             _ = Task.Run(async () =>
             {
-                var retentionOptions = WabbitBot.Common.Configuration.ConfigurationProvider
-                    .GetSection<RetentionOptions>(RetentionOptions.SectionName);
+                var retentionOptions =
+                    WabbitBot.Common.Configuration.ConfigurationProvider.GetSection<RetentionOptions>(
+                        RetentionOptions.SectionName
+                    );
                 var retention = TimeSpan.FromDays(Math.Max(1, retentionOptions.ArchiveRetentionDays));
                 var interval = TimeSpan.FromHours(Math.Max(1, retentionOptions.JobIntervalHours));
                 while (true)
@@ -150,7 +190,11 @@ public static class Program
                     }
                     catch (Exception ex)
                     {
-                        await ErrorService.CaptureAsync(ex, "Archive retention timer failure", nameof(InitializeCoreAsync));
+                        await ErrorService.CaptureAsync(
+                            ex,
+                            "Archive retention timer failure",
+                            nameof(InitializeCoreAsync)
+                        );
                     }
                     await Task.Delay(interval);
                 }

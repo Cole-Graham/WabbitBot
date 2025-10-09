@@ -19,7 +19,9 @@ namespace WabbitBot.Common.Data.Schema.Migrations
             try
             {
                 // Create MatchStateSnapshots table
-                await QueryUtil.ExecuteNonQueryAsync(conn, @"
+                await QueryUtil.ExecuteNonQueryAsync(
+                    conn,
+                    @"
                     CREATE TABLE IF NOT EXISTS MatchStateSnapshots (
                         Id TEXT PRIMARY KEY,
                         CreatedAt DATETIME NOT NULL,
@@ -58,17 +60,40 @@ namespace WabbitBot.Common.Data.Schema.Migrations
                         Team2BansConfirmed BOOLEAN NOT NULL DEFAULT 0,
                         FinalMapPool TEXT NULL, -- JSON serialized list
                         FOREIGN KEY (MatchId) REFERENCES Matches(Id) ON DELETE CASCADE
-                    )", new { }, transaction);
+                    )",
+                    new { },
+                    transaction
+                );
 
                 // Create indexes for faster lookups
-                await QueryUtil.ExecuteNonQueryAsync(conn, @"
-                    CREATE INDEX IF NOT EXISTS idx_matchstatesnapshots_matchid ON MatchStateSnapshots(MatchId)", new { }, transaction);
-                await QueryUtil.ExecuteNonQueryAsync(conn, @"
-                    CREATE INDEX IF NOT EXISTS idx_matchstatesnapshots_timestamp ON MatchStateSnapshots(Timestamp)", new { }, transaction);
-                await QueryUtil.ExecuteNonQueryAsync(conn, @"
-                    CREATE INDEX IF NOT EXISTS idx_matchstatesnapshots_userid ON MatchStateSnapshots(UserId)", new { }, transaction);
-                await QueryUtil.ExecuteNonQueryAsync(conn, @"
-                    CREATE INDEX IF NOT EXISTS idx_matchstatesnapshots_createdat ON MatchStateSnapshots(CreatedAt)", new { }, transaction);
+                await QueryUtil.ExecuteNonQueryAsync(
+                    conn,
+                    @"
+                    CREATE INDEX IF NOT EXISTS idx_matchstatesnapshots_matchid ON MatchStateSnapshots(MatchId)",
+                    new { },
+                    transaction
+                );
+                await QueryUtil.ExecuteNonQueryAsync(
+                    conn,
+                    @"
+                    CREATE INDEX IF NOT EXISTS idx_matchstatesnapshots_timestamp ON MatchStateSnapshots(Timestamp)",
+                    new { },
+                    transaction
+                );
+                await QueryUtil.ExecuteNonQueryAsync(
+                    conn,
+                    @"
+                    CREATE INDEX IF NOT EXISTS idx_matchstatesnapshots_userid ON MatchStateSnapshots(UserId)",
+                    new { },
+                    transaction
+                );
+                await QueryUtil.ExecuteNonQueryAsync(
+                    conn,
+                    @"
+                    CREATE INDEX IF NOT EXISTS idx_matchstatesnapshots_createdat ON MatchStateSnapshots(CreatedAt)",
+                    new { },
+                    transaction
+                );
 
                 transaction.Commit();
             }
@@ -86,7 +111,12 @@ namespace WabbitBot.Common.Data.Schema.Migrations
 
             try
             {
-                await QueryUtil.ExecuteNonQueryAsync(conn, "DROP TABLE IF EXISTS MatchStateSnapshots", new { }, transaction);
+                await QueryUtil.ExecuteNonQueryAsync(
+                    conn,
+                    "DROP TABLE IF EXISTS MatchStateSnapshots",
+                    new { },
+                    transaction
+                );
                 transaction.Commit();
             }
             catch

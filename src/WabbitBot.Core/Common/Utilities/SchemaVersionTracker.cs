@@ -31,7 +31,8 @@ namespace WabbitBot.Core.Common.Utilities
             if (!ApplicationInfo.IsCompatibleWithSchema(schemaVersion))
             {
                 throw new IncompatibleVersionException(
-                    $"Application version {appVersion} is incompatible with database schema version {schemaVersion}.");
+                    $"Application version {appVersion} is incompatible with database schema version {schemaVersion}."
+                );
             }
         }
 
@@ -49,6 +50,7 @@ namespace WabbitBot.Core.Common.Utilities
 
     public class IncompatibleVersionException : Exception
     {
-        public IncompatibleVersionException(string message) : base(message) { }
+        public IncompatibleVersionException(string message)
+            : base(message) { }
     }
 }

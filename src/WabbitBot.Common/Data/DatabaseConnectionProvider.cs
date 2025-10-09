@@ -1,5 +1,5 @@
-using Npgsql;
 using System.Data;
+using Npgsql;
 
 namespace WabbitBot.Common.Data
 {
@@ -28,7 +28,8 @@ namespace WabbitBot.Common.Data
             if (_connectionString is null)
             {
                 throw new InvalidOperationException(
-                    "DatabaseConnectionProvider has not been initialized. Call Initialize() first.");
+                    "DatabaseConnectionProvider has not been initialized. Call Initialize() first."
+                );
             }
 
             // For now, create new connections. In production, consider connection pooling.
@@ -45,7 +46,8 @@ namespace WabbitBot.Common.Data
             if (_connectionString is null)
             {
                 throw new InvalidOperationException(
-                    "DatabaseConnectionProvider has not been initialized. Call Initialize() first.");
+                    "DatabaseConnectionProvider has not been initialized. Call Initialize() first."
+                );
             }
 
             if (_sharedConnection is null || _sharedConnection.State != ConnectionState.Open)

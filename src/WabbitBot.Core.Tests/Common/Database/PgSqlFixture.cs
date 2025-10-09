@@ -37,14 +37,20 @@ namespace WabbitBot.Core.Common.Database.Tests
         {
             if (_container is not null)
             {
-                try { await _container.StopAsync(); } catch { }
-                try { await _container.DisposeAsync(); } catch { }
+                try
+                {
+                    await _container.StopAsync();
+                }
+                catch { }
+                try
+                {
+                    await _container.DisposeAsync();
+                }
+                catch { }
             }
         }
     }
 
     [CollectionDefinition("pgsql", DisableParallelization = true)]
-    public sealed class PgSqlCollection : ICollectionFixture<PgSqlFixture>
-    {
-    }
+    public sealed class PgSqlCollection : ICollectionFixture<PgSqlFixture> { }
 }

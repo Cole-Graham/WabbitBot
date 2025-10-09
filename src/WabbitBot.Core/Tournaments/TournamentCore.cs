@@ -1,15 +1,15 @@
 using System;
 using System.Threading.Tasks;
+using WabbitBot.Common.Data.Service;
+using WabbitBot.Common.ErrorService;
+using WabbitBot.Common.Events.Interfaces;
+using WabbitBot.Common.Models;
 using WabbitBot.Core.Common.BotCore;
+using WabbitBot.Core.Common.Database;
+using WabbitBot.Core.Common.Interfaces;
 using WabbitBot.Core.Common.Models.Common;
 using WabbitBot.Core.Common.Models.Tournament;
 using WabbitBot.Core.Common.Services;
-using WabbitBot.Common.Events.Interfaces;
-using WabbitBot.Common.Data.Service;
-using WabbitBot.Common.ErrorService;
-using WabbitBot.Common.Models;
-using WabbitBot.Core.Common.Database;
-using WabbitBot.Core.Common.Interfaces;
 
 namespace WabbitBot.Core.Tournaments
 {
@@ -22,7 +22,9 @@ namespace WabbitBot.Core.Tournaments
         public Task ValidateAsync() => Task.CompletedTask;
 
         public static class Validation { }
+
         public static class Accessors { }
+
         public static class State
         {
             private static readonly Dictionary<Guid, TournamentStateSnapshot> _currentState = new();
@@ -43,7 +45,8 @@ namespace WabbitBot.Core.Tournaments
 
             public static void AddOrUpdateTournament(Tournament tournament)
             {
-                if (tournament is null) throw new ArgumentNullException(nameof(tournament));
+                if (tournament is null)
+                    throw new ArgumentNullException(nameof(tournament));
                 var snap = CreateSnapshotFromTournament(tournament);
                 _currentState[tournament.Id] = snap;
             }

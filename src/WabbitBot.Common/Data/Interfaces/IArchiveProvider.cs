@@ -8,7 +8,8 @@ namespace WabbitBot.Common.Data.Interfaces
     /// <summary>
     /// Pluggable archive provider for immutable history snapshots.
     /// </summary>
-    public interface IArchiveProvider<TEntity> where TEntity : Entity
+    public interface IArchiveProvider<TEntity>
+        where TEntity : Entity
     {
         Task SaveSnapshotAsync(TEntity entity, Guid archivedBy, string? reason);
         Task<IEnumerable<TEntity>> GetHistoryAsync(Guid entityId, int? limit = null);
@@ -17,5 +18,3 @@ namespace WabbitBot.Common.Data.Interfaces
         Task PurgeAsync(Guid entityId, DateTime? olderThan = null);
     }
 }
-
-

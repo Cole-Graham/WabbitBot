@@ -18,7 +18,7 @@ namespace WabbitBot.Common.Events.Interfaces
         /// <summary>
         /// Discord event bus for Discord-specific events.
         /// </summary>
-        DiscBot
+        DiscBot,
     }
 
     /// <summary>

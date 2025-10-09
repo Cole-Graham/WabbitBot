@@ -19,7 +19,9 @@ namespace WabbitBot.Common.Data.Schema
             try
             {
                 // Create Teams table
-                await QueryUtil.ExecuteNonQueryAsync(conn, @"
+                await QueryUtil.ExecuteNonQueryAsync(
+                    conn,
+                    @"
                     CREATE TABLE IF NOT EXISTS Teams (
                         Id TEXT PRIMARY KEY,
                         Name TEXT NOT NULL,
@@ -34,15 +36,33 @@ namespace WabbitBot.Common.Data.Schema
                         CreatedAt DATETIME NOT NULL,
                         UpdatedAt DATETIME NOT NULL,
                         SchemaVersion INTEGER NOT NULL DEFAULT 1
-                    )", new { }, transaction);
+                    )",
+                    new { },
+                    transaction
+                );
 
                 // Create indexes for faster lookups
-                await QueryUtil.ExecuteNonQueryAsync(conn, @"
-                    CREATE INDEX IF NOT EXISTS idx_teams_name ON Teams(Name)", new { }, transaction);
-                await QueryUtil.ExecuteNonQueryAsync(conn, @"
-                    CREATE INDEX IF NOT EXISTS idx_teams_captain ON Teams(TeamCaptainId)", new { }, transaction);
-                await QueryUtil.ExecuteNonQueryAsync(conn, @"
-                    CREATE INDEX IF NOT EXISTS idx_teams_last_active ON Teams(LastActive)", new { }, transaction);
+                await QueryUtil.ExecuteNonQueryAsync(
+                    conn,
+                    @"
+                    CREATE INDEX IF NOT EXISTS idx_teams_name ON Teams(Name)",
+                    new { },
+                    transaction
+                );
+                await QueryUtil.ExecuteNonQueryAsync(
+                    conn,
+                    @"
+                    CREATE INDEX IF NOT EXISTS idx_teams_captain ON Teams(TeamCaptainId)",
+                    new { },
+                    transaction
+                );
+                await QueryUtil.ExecuteNonQueryAsync(
+                    conn,
+                    @"
+                    CREATE INDEX IF NOT EXISTS idx_teams_last_active ON Teams(LastActive)",
+                    new { },
+                    transaction
+                );
 
                 transaction.Commit();
             }
