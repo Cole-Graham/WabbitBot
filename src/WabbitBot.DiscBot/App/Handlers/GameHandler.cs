@@ -30,7 +30,7 @@ namespace WabbitBot.DiscBot.App.Handlers
         /// Returns Result indicating success/failure for immediate feedback.
         /// Publishes events for cross-boundary communication.
         /// </summary>
-        public static async Task<Result> HandleButtonInteractionAsync(
+        public static async Task<Result> ProcessButtonInteractionAsync(
             DiscordClient client,
             ComponentInteractionCreatedEventArgs args
         )
@@ -53,7 +53,7 @@ namespace WabbitBot.DiscBot.App.Handlers
                 await DiscBotService.ErrorHandler.CaptureAsync(
                     ex,
                     $"Failed to handle button interaction: {customId}",
-                    nameof(HandleButtonInteractionAsync)
+                    nameof(ProcessButtonInteractionAsync)
                 );
 
                 // Try to respond with error - may fail if response was already sent

@@ -604,65 +604,15 @@ namespace WabbitBot.SourceGenerators.Generators.Event
 
             foreach (var evt in events)
             {
-                var evtFullName = $"{evt.EventNamespace}.{evt.EventClassName}";
                 var handlerName = $"Handle{evt.EventClassName}Async";
 
-                // Try to detect an existing static handler with the expected signature
-                var hasExistingHandler = targetSymbol
-                    .GetMembers(handlerName)
-                    .OfType<IMethodSymbol>()
-                    .Any(m =>
-                        m.IsStatic
-                        && m.Parameters.Length == 1
-                        && string.Equals(m.Parameters[0].Type.ToDisplayString(), evtFullName, StringComparison.Ordinal)
-                    );
-
-                if (hasExistingHandler)
-                {
-                    sb.AppendLine(
-                        $"            {busAccessor}.Subscribe<{evt.EventClassName}>(async evt => await {targetClassName}.{handlerName}(evt));"
-                    );
-                }
-                else
-                {
-                    // Wire to a generated local handler stub to keep compile green
-                    sb.AppendLine(
-                        $"            {busAccessor}.Subscribe<{evt.EventClassName}>(async evt => await {handlerName}(evt));"
-                    );
-                }
+                // Wire subscription to the handler method - build will fail if handler doesn't exist
+                sb.AppendLine(
+                    $"            {busAccessor}.Subscribe<{evt.EventClassName}>(async evt => await {targetClassName}.{handlerName}(evt));"
+                );
             }
 
             sb.AppendLine("        }");
-            sb.AppendLine();
-
-            // Emit handler stubs for any events without an existing handler
-            foreach (var evt in events)
-            {
-                var evtFullName = $"{evt.EventNamespace}.{evt.EventClassName}";
-                var handlerName = $"Handle{evt.EventClassName}Async";
-
-                var hasExistingHandler = targetSymbol
-                    .GetMembers(handlerName)
-                    .OfType<IMethodSymbol>()
-                    .Any(m =>
-                        m.IsStatic
-                        && m.Parameters.Length == 1
-                        && string.Equals(m.Parameters[0].Type.ToDisplayString(), evtFullName, StringComparison.Ordinal)
-                    );
-
-                if (!hasExistingHandler)
-                {
-                    sb.AppendLine("        /// <summary>");
-                    sb.AppendLine($"        /// Auto-generated placeholder handler for {evt.EventClassName}.");
-                    sb.AppendLine("        /// Replace body with actual handling logic.");
-                    sb.AppendLine("        /// </summary>");
-                    sb.AppendLine($"        private static async Task {handlerName}({evt.EventClassName} evt)");
-                    sb.AppendLine("        {");
-                    sb.AppendLine("            await Task.CompletedTask;");
-                    sb.AppendLine("        }");
-                    sb.AppendLine();
-                }
-            }
 
             sb.AppendLine("    }");
             if (!string.IsNullOrEmpty(targetNamespace))

@@ -1,3 +1,4 @@
+using WabbitBot.Common.Configuration;
 using WabbitBot.Common.Data.Interfaces;
 using WabbitBot.Common.Data.Service;
 using WabbitBot.Common.Events.Interfaces;
@@ -219,107 +220,101 @@ namespace WabbitBot.Core.Common.Models.Common
         /// <param name="scrimmageId"></param>
         /// <param name="scrimmageChannelId"></param>
         /// <returns></returns>
-        public async Task<Result<Match>> CreateScrimmageMatchAsync(Guid scrimmageId, ulong scrimmageChannelId)
+        public static async Task<Result<Match>> CreateScrimmageMatchAsync(Guid scrimmageId)
         {
             try
             {
                 // 1) Load scrimmage
-                var scrimmageResult = await CoreService.Scrimmages.GetByIdAsync(
-                    scrimmageId,
-                    DatabaseComponent.Repository
-                );
-                if (!scrimmageResult.Success || scrimmageResult.Data is null)
+                var getScrimmage = await CoreService.Scrimmages.GetByIdAsync(scrimmageId, DatabaseComponent.Repository);
+                if (!getScrimmage.Success || getScrimmage.Data is null)
                     return Result<Match>.Failure("Scrimmage not found");
 
-                var scrimmage = scrimmageResult.Data;
+                var Scrimmage = getScrimmage.Data;
 
                 // 2) Build match (parent linkage + initial state),
                 //    then set teams/players from the scrimmage
-                var match = Factory.CreateMatch(
-                    scrimmage.TeamSize,
-                    scrimmage.Id,
+                var NewMatch = Factory.CreateMatch(
+                    Scrimmage.TeamSize,
+                    Scrimmage.Id,
                     MatchParentType.Scrimmage,
-                    scrimmage.BestOf
+                    Scrimmage.BestOf
                 );
 
-                match.ChannelId = scrimmageChannelId;
-
-                match.Team1Id = scrimmage.Team1Id;
-                match.Team2Id = scrimmage.Team2Id;
-                match.Team1PlayerIds = [.. scrimmage.Team1PlayerIds];
-                match.Team2PlayerIds = [.. scrimmage.Team2PlayerIds];
-                var team1Result = await CoreService.Teams.GetByIdAsync(scrimmage.Team1Id, DatabaseComponent.Repository);
-                if (!team1Result.Success || team1Result.Data is null)
-                    return Result<Match>.Failure("Team 1 not found");
-                var team1 = team1Result.Data;
-                var team2Result = await CoreService.Teams.GetByIdAsync(scrimmage.Team2Id, DatabaseComponent.Repository);
-                if (!team2Result.Success || team2Result.Data is null)
+                NewMatch.Team1Id = Scrimmage.ChallengerTeamId;
+                NewMatch.Team2Id = Scrimmage.OpponentTeamId;
+                NewMatch.Team1PlayerIds = [.. Scrimmage.ChallengerTeamPlayerIds];
+                NewMatch.Team2PlayerIds = [.. Scrimmage.OpponentTeamPlayerIds];
+                var getChallengerTeam = await CoreService.Teams.GetByIdAsync(
+                    Scrimmage.ChallengerTeamId,
+                    DatabaseComponent.Repository
+                );
+                if (!getChallengerTeam.Success || getChallengerTeam.Data is null)
+                    return Result<Match>.Failure("Challenger team not found");
+                var ChallengerTeam = getChallengerTeam.Data;
+                var getOpponentTeam = await CoreService.Teams.GetByIdAsync(
+                    Scrimmage.OpponentTeamId,
+                    DatabaseComponent.Repository
+                );
+                if (!getOpponentTeam.Success || getOpponentTeam.Data is null)
                     return Result<Match>.Failure("Team 2 not found");
-                var team2 = team2Result.Data;
-                match.Team1 = team1;
-                match.Team2 = team2;
+                var OpponentTeam = getOpponentTeam.Data;
+                NewMatch.Team1 = ChallengerTeam;
+                NewMatch.Team2 = OpponentTeam;
 
                 // Build Match Participants
-                var team1Players = new List<Player>();
-                var team2Players = new List<Player>();
-                foreach (var playerId in scrimmage.Team1PlayerIds)
+                var Team1Players = new List<Player>();
+                var Team2Players = new List<Player>();
+                foreach (var playerId in Scrimmage.ChallengerTeamPlayerIds)
                 {
                     var playerResult = await CoreService.Players.GetByIdAsync(playerId, DatabaseComponent.Repository);
                     if (!playerResult.Success || playerResult.Data is null)
                         return Result<Match>.Failure("Player not found");
-                    team1Players.Add(playerResult.Data);
+                    Team1Players.Add(playerResult.Data);
                 }
-                foreach (var playerId in scrimmage.Team2PlayerIds)
+                foreach (var playerId in Scrimmage.OpponentTeamPlayerIds)
                 {
                     var playerResult = await CoreService.Players.GetByIdAsync(playerId, DatabaseComponent.Repository);
                     if (!playerResult.Success || playerResult.Data is null)
                         return Result<Match>.Failure("Player not found");
-                    team2Players.Add(playerResult.Data);
+                    Team2Players.Add(playerResult.Data);
                 }
-                match.Participants.Add(
+                NewMatch.Participants.Add(
                     new MatchParticipant
                     {
-                        MatchId = match.Id,
-                        Match = match,
-                        TeamId = team1.Id,
-                        Team = team1,
-                        PlayerIds = [.. scrimmage.Team1PlayerIds],
-                        Players = team1Players,
+                        MatchId = NewMatch.Id,
+                        Match = NewMatch,
+                        TeamId = ChallengerTeam.Id,
+                        Team = ChallengerTeam,
+                        PlayerIds = [.. Scrimmage.ChallengerTeamPlayerIds],
+                        Players = Team1Players,
                         TeamNumber = 1,
                     }
                 );
-                match.Participants.Add(
+                NewMatch.Participants.Add(
                     new MatchParticipant
                     {
-                        MatchId = match.Id,
-                        Match = match,
-                        TeamId = team2.Id,
-                        Team = team2,
-                        PlayerIds = [.. scrimmage.Team2PlayerIds],
-                        Players = team2Players,
+                        MatchId = NewMatch.Id,
+                        Match = NewMatch,
+                        TeamId = OpponentTeam.Id,
+                        Team = OpponentTeam,
+                        PlayerIds = [.. Scrimmage.OpponentTeamPlayerIds],
+                        Players = Team2Players,
                         TeamNumber = 2,
                     }
                 );
 
                 // 3) Persist
-                var createResult = await CoreService.Matches.CreateAsync(match, DatabaseComponent.Repository);
+                var createResult = await CoreService.Matches.CreateAsync(NewMatch, DatabaseComponent.Repository);
                 if (!createResult.Success || createResult.Data is null)
                     return Result<Match>.Failure("Failed to create match");
 
-                match = createResult.Data;
+                NewMatch = createResult.Data;
 
                 // Optional: link back to scrimmage entity and persist if needed
-                scrimmage.Match = match;
-                await CoreService.Scrimmages.UpdateAsync(scrimmage, DatabaseComponent.Repository);
+                Scrimmage.Match = NewMatch;
+                await CoreService.Scrimmages.UpdateAsync(Scrimmage, DatabaseComponent.Repository);
 
-                // Commented out pending generator publishers
-                var pubResult = await PublishScrimmageMatchCreatedAsync(scrimmageChannelId, match.Id);
-                if (!pubResult.Success)
-                {
-                    return Result<Match>.Failure("Failed to publish scrimmage match created");
-                }
-
-                return Result<Match>.CreateSuccess(match);
+                return Result<Match>.CreateSuccess(NewMatch);
             }
             catch (Exception ex)
             {

@@ -25,102 +25,102 @@ namespace WabbitBot.DiscBot.App.Handlers
     /// </summary>
     public static partial class ScrimmageHandler
     {
-        public static async Task<Result> HandleChallengeAcceptedAsync(ChallengeAccepted evt)
+        public static async Task HandleChallengeCreatedAsync(ChallengeCreated evt)
         {
-            // Get scrimmage channel from config
-            var scrimmageChannelId = ConfigurationProvider
-                .GetSection<ChannelsOptions>(ChannelsOptions.SectionName)
-                .ScrimmageChannel;
-            if (scrimmageChannelId is null)
-            {
-                return Result.Failure("Scrimmage channel not found");
-            }
-
-            // Update scrimmage to accepted
-            var challengeId = evt.ChallengeId;
-            var challengeResult = await CoreService.ScrimmageChallenges.GetByIdAsync(
-                challengeId,
+            var challenge = await CoreService.ScrimmageChallenges.GetByIdAsync(
+                evt.ChallengeId,
                 DatabaseComponent.Repository
             );
-            if (!challengeResult.Success)
-            {
-                return Result.Failure("Failed to get challenge");
-            }
-            var challenge = challengeResult.Data;
-            if (challenge == null)
-            {
-                return Result.Failure("Challenge not found");
-            }
-            challenge.ChallengeStatus = ScrimmageChallengeStatus.Accepted;
-            var updateResult = await CoreService.ScrimmageChallenges.UpdateAsync(
-                challenge,
-                DatabaseComponent.Repository
-            );
-            if (!updateResult.Success)
-            {
-                return Result.Failure("Failed to update scrimmage challenge");
-            }
-
-            // Commented out pending generator publishers
-            // await PublishMatchProvisioningRequestedAsync(scrimmageChannelId.Value, scrimmage.Match.Id, scrimmage.Id);
-
-            return Result.CreateSuccess("Scrimmage challenge accepted");
-        }
-
-        /// <summary>
-        /// Handles button interactions (accept/decline challenge, confirm selections).
-        /// Returns Result indicating success/failure for immediate feedback.
-        /// Publishes events for cross-boundary communication.
-        /// </summary>
-        public static async Task<Result> HandleButtonInteractionAsync(
-            DiscordClient client,
-            ComponentInteractionCreatedEventArgs args
-        )
-        {
-            var interaction = args.Interaction;
-            var customId = interaction.Data.CustomId;
-
-            try
-            {
-                // Accept challenge button
-                if (customId.StartsWith("accept_challenge_", StringComparison.Ordinal))
-                {
-                    return await HandleAcceptChallengeButtonAsync(interaction, customId);
-                }
-
-                // Decline challenge button
-                if (customId.StartsWith("decline_challenge_", StringComparison.Ordinal))
-                {
-                    return await HandleDeclineChallengeButtonAsync(interaction, customId);
-                }
-
-                return Result.Failure($"Unknown custom ID: {customId}");
-            }
-            catch (Exception ex)
+            if (!challenge.Success)
             {
                 await DiscBotService.ErrorHandler.CaptureAsync(
-                    ex,
-                    $"Failed to handle button interaction: {customId}",
-                    nameof(HandleButtonInteractionAsync)
+                    new InvalidOperationException("Failed to get challenge"),
+                    "Failed to get challenge",
+                    nameof(HandleChallengeCreatedAsync)
                 );
-
-                // Try to respond with error - may fail if response was already sent
-                try
-                {
-                    await interaction.CreateResponseAsync(
-                        DiscordInteractionResponseType.ChannelMessageWithSource,
-                        new DiscordInteractionResponseBuilder()
-                            .WithContent("An error occurred while processing your interaction. Please try again.")
-                            .AsEphemeral()
-                    );
-                }
-                catch
-                {
-                    // Response was already sent, ignore
-                }
-
-                return Result.Failure($"Failed to handle button interaction: {ex.Message}");
+                return;
             }
+            var challengeData = challenge.Data;
+            if (challengeData == null)
+            {
+                await DiscBotService.ErrorHandler.CaptureAsync(
+                    new InvalidOperationException("Challenge not found"),
+                    "Challenge not found",
+                    nameof(HandleChallengeCreatedAsync)
+                );
+                return;
+            }
+            if (challengeData.ChallengerTeam == null)
+            {
+                await DiscBotService.ErrorHandler.CaptureAsync(
+                    new InvalidOperationException("Challenger team not found"),
+                    "Challenger team not found",
+                    nameof(HandleChallengeCreatedAsync)
+                );
+                return;
+            }
+            if (challengeData.OpponentTeam == null)
+            {
+                await DiscBotService.ErrorHandler.CaptureAsync(
+                    new InvalidOperationException("Opponent team not found"),
+                    "Opponent team not found",
+                    nameof(HandleChallengeCreatedAsync)
+                );
+                return;
+            }
+            var containerResult = await ScrimmageApp.CreateChallengeContainerAsync(
+                challengeData.Id,
+                challengeData.TeamSize,
+                challengeData.ChallengerTeam.Name,
+                challengeData.OpponentTeam.Name
+            );
+            if (!containerResult.Success)
+            {
+                await DiscBotService.ErrorHandler.CaptureAsync(
+                    new InvalidOperationException("Failed to create challenge container"),
+                    "Failed to create challenge container",
+                    nameof(HandleChallengeCreatedAsync)
+                );
+                return;
+            }
+            // var pubResult = await PublishChallengeContainerCreatedAsync(
+            //     challengeData.Id,
+            //     containerResult.Data!.ChallengeChannel.Id
+            // );
+            // if (!pubResult.Success)
+            // {
+            //     await DiscBotService.ErrorHandler.CaptureAsync(
+            //         new InvalidOperationException("Failed to publish challenge container created"),
+            //         "Failed to publish challenge container created",
+            //         nameof(HandleChallengeCreatedAsync)
+            //     );
+            //     return;
+            // }
+            return;
+        }
+
+        public static async Task HandleChallengeDeclinedAsync(ChallengeDeclined evt)
+        {
+            // TODO: Implement challenge declined notification
+            await Task.CompletedTask;
+        }
+
+        public static async Task HandleChallengeCancelledAsync(ChallengeCancelled evt)
+        {
+            // TODO: Implement challenge cancelled notification
+            await Task.CompletedTask;
+        }
+
+        public static async Task HandleScrimmageCreatedAsync(ScrimmageCreated evt)
+        {
+            // TODO: Implement scrimmage created notification
+            await Task.CompletedTask;
+        }
+
+        public static async Task HandleMatchProvisioningRequestedAsync(MatchProvisioningRequested evt)
+        {
+            // TODO: Implement match provisioning
+            await Task.CompletedTask;
         }
 
         /// <summary>
@@ -208,52 +208,49 @@ namespace WabbitBot.DiscBot.App.Handlers
             }
         }
 
-        private static async Task<Result> HandleAcceptChallengeButtonAsync(
-            DiscordInteraction interaction,
-            string customId
-        )
+        private static async Task HandleScrimmageMatchCreatedAsync(ScrimmageMatchCreated evt)
         {
-            // Parse challenge ID from custom ID: "accept_challenge_{challengeId}"
-            var challengeIdStr = customId.Replace("accept_challenge_", "", StringComparison.Ordinal);
-            if (!Guid.TryParse(challengeIdStr, out var challengeId))
+            var threadsResult = await ScrimmageApp.CreateScrimmageThreadsAsync(evt.ScrimmageId, evt.MatchId);
+            if (!threadsResult.Success)
             {
-                await interaction.CreateResponseAsync(
-                    DiscordInteractionResponseType.ChannelMessageWithSource,
-                    new DiscordInteractionResponseBuilder().WithContent("Invalid challenge ID.").AsEphemeral()
+                await DiscBotService.ErrorHandler.CaptureAsync(
+                    new InvalidOperationException("Failed to create scrimmage threads"),
+                    "Failed to create scrimmage threads, result is failure",
+                    nameof(HandleScrimmageMatchCreatedAsync)
                 );
-                return Result.Failure("Invalid challenge ID");
+                return;
             }
-
-            // Acknowledge interaction
-            await interaction.CreateResponseAsync(DiscordInteractionResponseType.DeferredMessageUpdate);
-
-            // Publish ScrimmageAccepted (Global) to Core
-            // await PublishChallengeAcceptedAsync(challengeId, interaction.User.Id);
-
-            return Result.CreateSuccess("Challenge accepted");
+            if (threadsResult.Data == null)
+            {
+                await DiscBotService.ErrorHandler.CaptureAsync(
+                    new InvalidOperationException("Failed to create scrimmage threads"),
+                    "Failed to create scrimmage threads, data is null",
+                    nameof(HandleScrimmageMatchCreatedAsync)
+                );
+                return;
+            }
+            var pubResult = await PublishScrimmageThreadsCreatedAsync(
+                evt.MatchId,
+                DiscBotService.ScrimmageChannel.Id,
+                threadsResult.Data.ChallengerThread.Id,
+                threadsResult.Data.OpponentThread.Id
+            );
+            if (!pubResult.Success)
+            {
+                await DiscBotService.ErrorHandler.CaptureAsync(
+                    new InvalidOperationException("Failed to publish scrimmage threads created"),
+                    "Failed to publish scrimmage threads created, result is failure",
+                    nameof(HandleScrimmageMatchCreatedAsync)
+                );
+                return;
+            }
+            return;
         }
 
-        private static async Task<Result> HandleDeclineChallengeButtonAsync(
-            DiscordInteraction interaction,
-            string customId
-        )
+        private static async Task HandleScrimmageThreadsCreatedAsync(ScrimmageThreadsCreated evt)
         {
-            var challengeIdStr = customId.Replace("decline_challenge_", "", StringComparison.Ordinal);
-            if (!Guid.TryParse(challengeIdStr, out var challengeId))
-            {
-                await interaction.CreateResponseAsync(
-                    DiscordInteractionResponseType.ChannelMessageWithSource,
-                    new DiscordInteractionResponseBuilder().WithContent("Invalid challenge ID.").AsEphemeral()
-                );
-                return Result.Failure("Invalid challenge ID");
-            }
-
-            await interaction.CreateResponseAsync(DiscordInteractionResponseType.DeferredMessageUpdate);
-
-            // Publish ScrimmageDeclined (Global) to Core
-            // await PublishChallengeDeclinedAsync(challengeId, interaction.User.Id);
-
-            return Result.CreateSuccess("Challenge declined");
+            // TODO: Implement scrimmage threads created notification
+            await Task.CompletedTask;
         }
     }
 }

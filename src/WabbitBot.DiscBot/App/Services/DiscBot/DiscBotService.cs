@@ -1,4 +1,6 @@
 using DSharpPlus;
+using DSharpPlus.Entities;
+using WabbitBot.Common.Configuration;
 using WabbitBot.Common.ErrorService;
 using WabbitBot.Common.Events.Interfaces;
 using WabbitBot.Common.Models;
@@ -14,15 +16,99 @@ namespace WabbitBot.DiscBot.App.Services.DiscBot
     {
         private static Lazy<IDiscBotEventBus>? _lazyEventBus;
         private static Lazy<IErrorService>? _lazyErrorHandler;
+        private static Lazy<WabbitBot.Core.Common.Services.FileSystemService>? _lazyFileSystemService;
 
         // Static service instances accessible across all projects
         public static IDiscBotEventBus EventBus => _lazyEventBus!.Value;
         public static IErrorService ErrorHandler => _lazyErrorHandler!.Value;
+        public static WabbitBot.Core.Common.Services.FileSystemService FileSystem => _lazyFileSystemService!.Value;
 
         /// <summary>
         /// Gets the Discord client instance
         /// </summary>
         public static DiscordClient Client => DiscordClientProvider.GetClient();
+
+        /// <summary>
+        /// Scrimmage channel ID cached from configuration (validated to exist in Discord)
+        /// </summary>
+        private static ulong? _scrimmageChannelId;
+
+        /// <summary>
+        /// Gets the scrimmage channel (throws with helpful message if not configured)
+        /// </summary>
+        public static DiscordChannel ScrimmageChannel
+        {
+            get
+            {
+                if (_scrimmageChannelId is null)
+                {
+                    throw new InvalidOperationException(
+                        "Scrimmage channel not configured. Please configure it using the bot setup commands."
+                    );
+                }
+
+                try
+                {
+                    return Client.GetChannelAsync(_scrimmageChannelId.Value).Result;
+                }
+                catch (Exception ex)
+                {
+                    throw new InvalidOperationException(
+                        $"Failed to access scrimmage channel {_scrimmageChannelId}. Channel may have been deleted"
+                            + " or bot lacks permissions.",
+                        ex
+                    );
+                }
+            }
+        }
+
+        /// <summary>
+        /// Initializes or refreshes the cached channel configuration values
+        /// Fails gracefully if configuration is invalid or missing
+        /// Call this at startup and whenever channel configuration changes
+        /// </summary>
+        public static void RefreshChannelConfiguration()
+        {
+            try
+            {
+                var configService = ConfigurationProvider.GetConfigurationService();
+                var channelsConfig = configService.GetSection<ChannelsOptions>("Bot:Channels");
+                _scrimmageChannelId = channelsConfig.ScrimmageChannel;
+            }
+            catch (InvalidOperationException ex)
+                when (ex.Message.Contains("Configuration service has not been initialized"))
+            {
+                _scrimmageChannelId = null;
+                LogConfigurationError(
+                    "Configuration service not initialized. This should be called after"
+                        + " ConfigurationProvider.Initialize().",
+                    ex
+                );
+            }
+            catch (Exception ex)
+                when (ex.Message.Contains("Bot:Channels") || ex.GetType().Name.Contains("Configuration"))
+            {
+                _scrimmageChannelId = null;
+                LogConfigurationError(
+                    "Bot:Channels section not found or invalid in configuration. Please check appsettings.json.",
+                    ex
+                );
+            }
+            catch (Exception ex)
+            {
+                _scrimmageChannelId = null;
+                LogConfigurationError(
+                    "Unexpected error loading scrimmage channel configuration. Please check configuration format.",
+                    ex
+                );
+            }
+        }
+
+        private static void LogConfigurationError(string message, Exception ex)
+        {
+            // Fire and forget - if logging fails, it's a systemic issue beyond our control
+            _ = ErrorHandler.CaptureAsync(ex, message, nameof(RefreshChannelConfiguration));
+        }
 
         /// <summary>
         /// Initializes DiscBotService with required dependencies.
@@ -40,6 +126,13 @@ namespace WabbitBot.DiscBot.App.Services.DiscBot
                 () => errorHandler,
                 LazyThreadSafetyMode.ExecutionAndPublication
             );
+            _lazyFileSystemService = new Lazy<WabbitBot.Core.Common.Services.FileSystemService>(
+                () => new WabbitBot.Core.Common.Services.FileSystemService(),
+                LazyThreadSafetyMode.ExecutionAndPublication
+            );
+
+            // Initialize cached configuration values
+            RefreshChannelConfiguration();
         }
 
         // Testability Hooks

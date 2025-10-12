@@ -28,41 +28,34 @@ namespace WabbitBot.DiscBot.App.Renderers
         /// <param name="channel">Channel to post container in</param>
         /// <param name="matchId">Match ID</param>
         /// <returns>Result indicating success/failure</returns>
-        public static async Task<Result> RenderMatchContainerAsync(
-            DiscordClient client,
-            DiscordChannel channel,
-            DiscordMessageBuilder challengerBuilder,
-            DiscordMessageBuilder opponentBuilder,
-            List<Player> selectedTeam1Players,
-            List<Player> selectedTeam2Players,
-            Guid matchId
+        public static async Task<Result<MatchContainersResult>> RenderScrimmageMatchContainersAsync(
+            Guid matchId,
+            Player[] ChallengerTeamPlayers,
+            Player[] OpponentTeamPlayers
         )
         {
             try
             {
-                // Fetch match data
-                var matchResult = await CoreService.Matches.GetByIdAsync(matchId, DatabaseComponent.Repository);
-                if (!matchResult.Success)
+                var getMatch = await CoreService.Matches.GetByIdAsync(matchId, DatabaseComponent.Repository);
+                if (!getMatch.Success)
                 {
-                    return Result.Failure("Match not found");
+                    return Result<MatchContainersResult>.Failure("Match not found");
                 }
-                var match = matchResult.Data!;
-
-                // Fetch team1 data
-                var challengerTeamResult = await CoreService.Teams.GetByIdAsync(
-                    match.Team1Id,
+                var Match = getMatch.Data!;
+                var getChallengerTeam = await CoreService.Teams.GetByIdAsync(
+                    Match.Team1Id,
                     DatabaseComponent.Repository
                 );
-                if (!challengerTeamResult.Success)
+                if (!getChallengerTeam.Success || getChallengerTeam.Data is null)
                 {
-                    return Result.Failure("Challenger team not found");
+                    return Result<MatchContainersResult>.Failure("Challenger team not found or null");
                 }
-                var challengerTeam = challengerTeamResult.Data!;
-                var challengerRating = (int)Math.Round(challengerTeam.ScrimmageTeamStats[match.TeamSize].CurrentRating);
+                var ChallengerTeam = getChallengerTeam.Data;
+                var challengerRating = (int)Math.Round(ChallengerTeam.ScrimmageTeamStats[Match.TeamSize].CurrentRating);
                 var challengerTeamInfo = new Dictionary<ulong, Dictionary<string, string>>();
-                for (int i1 = 0; i1 < selectedTeam1Players.Count; i1++)
+                for (int i1 = 0; i1 < ChallengerTeamPlayers.Length; i1++)
                 {
-                    var team1Player = selectedTeam1Players.ElementAt(i1);
+                    var team1Player = ChallengerTeamPlayers.ElementAt(i1);
                     var team1User = team1Player.MashinaUser;
                     challengerTeamInfo[team1User.DiscordUserId] = new Dictionary<string, string>
                     {
@@ -78,20 +71,17 @@ namespace WabbitBot.DiscBot.App.Renderers
                 }
 
                 // Fetch team2 data
-                var opponentTeamResult = await CoreService.Teams.GetByIdAsync(
-                    match.Team2Id,
-                    DatabaseComponent.Repository
-                );
-                if (!opponentTeamResult.Success)
+                var getOpponentTeam = await CoreService.Teams.GetByIdAsync(Match.Team2Id, DatabaseComponent.Repository);
+                if (!getOpponentTeam.Success || getOpponentTeam.Data is null)
                 {
-                    return Result.Failure("Opponent team not found");
+                    return Result<MatchContainersResult>.Failure("Opponent team not found or null");
                 }
-                var opponentTeam = opponentTeamResult.Data!;
-                var opponentRating = (int)Math.Round(opponentTeam.ScrimmageTeamStats[match.TeamSize].CurrentRating);
+                var OpponentTeam = getOpponentTeam.Data;
+                var opponentRating = (int)Math.Round(OpponentTeam.ScrimmageTeamStats[Match.TeamSize].CurrentRating);
                 var opponentTeamInfo = new Dictionary<ulong, Dictionary<string, string>>();
-                for (int i2 = 0; i2 < selectedTeam2Players.Count; i2++)
+                for (int i2 = 0; i2 < OpponentTeamPlayers.Length; i2++)
                 {
-                    var team2Player = selectedTeam2Players.ElementAt(i2);
+                    var team2Player = OpponentTeamPlayers.ElementAt(i2);
                     var team2User = team2Player.MashinaUser;
                     opponentTeamInfo[team2User.DiscordUserId] = new Dictionary<string, string>
                     {
@@ -108,10 +98,10 @@ namespace WabbitBot.DiscBot.App.Renderers
 
                 // Placeholder for map pool (use match.AvailableMaps or fetch)
                 var mapPool =
-                    match.AvailableMaps
+                    Match.AvailableMaps
                     ?? new List<string> { "Echeneis", "Glittering Lagoon", "Silent Sanctum", "Thornwood" }; // Placeholder
-                var teamSize = match.TeamSize;
-                var matchLength = match.BestOf != 0 ? match.BestOf : 3; // Assume bo3, placeholder - adjust property name
+                var teamSize = Match.TeamSize;
+                var matchLength = Match.BestOf != 0 ? Match.BestOf : 3; // Assume bo3, placeholder - adjust property name
 
                 // Placeholder for map ban config retrieval
                 // var banConfig = await GetMapBanConfigAsync(teamSize, matchLength); // Placeholder
@@ -128,8 +118,8 @@ namespace WabbitBot.DiscBot.App.Renderers
                     mapPoolText += $" - {statusEmoji} {map},\n";
                 }
                 mapPoolText += "**Ban status:**\n";
-                mapPoolText += $"{challengerTeam.Name} In Progress\n";
-                mapPoolText += $"{opponentTeam.Name} In Progress\n";
+                mapPoolText += $"{ChallengerTeam.Name} In Progress\n";
+                mapPoolText += $"{OpponentTeam.Name} In Progress\n";
 
                 // Placeholder for ban instructions
                 var banInstructions =
@@ -149,12 +139,12 @@ namespace WabbitBot.DiscBot.App.Renderers
 
                 // 2. Match info text
                 var challengerMatchInfoText =
-                    $"## {challengerTeam.Name} ({challengerRating})\n vs. {opponentTeam.Name} ({opponentRating})\n"
+                    $"## {ChallengerTeam.Name} ({challengerRating})\n vs. {OpponentTeam.Name} ({opponentRating})\n"
                     + $"{string.Join(" ", challengerMentions)}\n"
                     + $"**Best of {matchLength}**";
                 challengerContainerComponents.Add(new DiscordTextDisplayComponent(challengerMatchInfoText));
                 var opponentMatchInfoText =
-                    $"## {opponentTeam.Name} ({opponentRating})\n vs. {challengerTeam.Name} ({challengerRating})\n"
+                    $"## {OpponentTeam.Name} ({opponentRating})\n vs. {ChallengerTeam.Name} ({challengerRating})\n"
                     + $"{string.Join(" ", opponentMentions)}\n"
                     + $"**Best of {matchLength}**";
                 opponentContainerComponents.Add(new DiscordTextDisplayComponent(opponentMatchInfoText));
@@ -175,12 +165,12 @@ namespace WabbitBot.DiscBot.App.Renderers
 
                 // 6. Instructions text
                 var instructionsText =
-                    $"## Map bans - {challengerTeam.Name} vs." + $"{opponentTeam.Name}\n\n{banInstructions}";
+                    $"## Map bans - {ChallengerTeam.Name} vs." + $"{OpponentTeam.Name}\n\n{banInstructions}";
                 challengerContainerComponents.Add(new DiscordTextDisplayComponent(instructionsText));
                 opponentContainerComponents.Add(new DiscordTextDisplayComponent(instructionsText));
 
                 // 7. Select menu for bans (custom id based on team thread to distinguish - but since same content, use generic for now, handler will distinguish)
-                var selectId = $"ban_select_{matchId}_{challengerTeam.Id}"; // Customize per thread
+                var selectId = $"ban_select_{matchId}_{ChallengerTeam.Id}"; // Customize per thread
                 var selectOptions = mapPool
                     .Select(map => new DiscordSelectComponentOption(map, map, isDefault: false))
                     .ToList();
@@ -224,28 +214,29 @@ namespace WabbitBot.DiscBot.App.Renderers
                 var challengerContainer = new DiscordContainerComponent(challengerContainerComponents);
                 var opponentContainer = new DiscordContainerComponent(opponentContainerComponents);
 
-                // Send to both team threads (same content for now, refresh will update status)
-                challengerBuilder.AddContainerComponent(challengerContainer);
-                opponentBuilder.AddContainerComponent(opponentContainer);
-
-                // Publish MatchProvisioned (update event to include both threads if needed)
-                // await DiscBotService.PublishAsync(new MatchProvisioned(
-                //     matchId,
-                //     ));
-
-                return Result.CreateSuccess("Match container created");
+                return Result<MatchContainersResult>.CreateSuccess(
+                    new MatchContainersResult(challengerContainer, opponentContainer),
+                    "Match containers created"
+                );
             }
             catch (Exception ex)
             {
                 await DiscBotService.ErrorHandler.CaptureAsync(
                     ex,
                     $"Failed to render match container for {matchId}",
-                    nameof(RenderMatchContainerAsync)
+                    nameof(RenderScrimmageMatchContainersAsync)
                 );
-                return Result.Failure($"Failed to create match container: {ex.Message}");
+                return Result<MatchContainersResult>.Failure($"Failed to create match container: {ex.Message}");
             }
         }
 
         // Old DM rendering removed - map bans now handled in threads
     }
+
+    #region Result Types
+    public record MatchContainersResult(
+        DiscordContainerComponent ChallengerContainer,
+        DiscordContainerComponent OpponentContainer
+    );
+    #endregion
 }

@@ -5,20 +5,6 @@ namespace WabbitBot.DiscBot.App.Events
 {
     #region Match Provisioning
     /// <summary>
-    /// DiscBot-local event requesting thread creation for a match.
-    /// </summary>
-    [EventGenerator(
-        pubTargetClass: "WabbitBot.DiscBot.App.Handlers.MatchHandler",
-        subTargetClasses: ["WabbitBot.DiscBot.App.Handlers.MatchHandler"]
-    )]
-    public record ScrimThreadCreateRequested(ulong ScrimmageChannelId, Guid MatchId) : IEvent
-    {
-        public Guid EventId { get; init; } = Guid.NewGuid();
-        public DateTime Timestamp { get; init; } = DateTime.UtcNow;
-        public EventBusType EventBusType { get; init; } = EventBusType.DiscBot;
-    }
-
-    /// <summary>
     /// DiscBot-local event requesting container creation for a match.
     /// </summary>
     public record MatchContainerRequested(Guid MatchId, ulong ChannelId, ulong Team1ThreadId, ulong Team2ThreadId)

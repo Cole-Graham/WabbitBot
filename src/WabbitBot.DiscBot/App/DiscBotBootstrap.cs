@@ -177,15 +177,15 @@ namespace WabbitBot.DiscBot.App
                     || customId.StartsWith("decline_challenge_", StringComparison.Ordinal)
                 )
                 {
-                    result = await Handlers.ScrimmageHandler.HandleButtonInteractionAsync(client, args);
+                    result = await ScrimmageApp.ProcessButtonInteractionAsync(client, args);
                 }
                 else if (customId.StartsWith("match_", StringComparison.Ordinal))
                 {
-                    result = await Handlers.MatchHandler.HandleButtonInteractionAsync(client, args);
+                    result = await MatchApp.ProcessButtonInteractionAsync(client, args);
                 }
                 else if (customId.StartsWith("game_", StringComparison.Ordinal))
                 {
-                    result = await Handlers.GameHandler.HandleButtonInteractionAsync(client, args);
+                    result = await Handlers.GameHandler.ProcessButtonInteractionAsync(client, args);
                 }
                 // Add more handlers as needed
 

@@ -23,13 +23,13 @@ namespace WabbitBot.Core.Common.Models.Common
 
         // Discord properties
         public ulong DiscordUserId { get; set; }
-        public string DiscordUsername { get; set; } = string.Empty;
-        public List<string> PreviousDiscordUsernames { get; set; } = new();
-        public string DiscordGlobalname { get; set; } = string.Empty;
-        public List<string> PreviousDiscordGlobalnames { get; set; } = new();
-        public string DiscordMention { get; set; } = string.Empty;
-        public List<string> PreviousDiscordMentions { get; set; } = new();
-        public string DiscordAvatarUrl { get; set; } = string.Empty;
+        public string? DiscordUsername { get; set; }
+        public List<string> PreviousDiscordUsernames { get; set; } = [];
+        public string? DiscordGlobalname { get; set; }
+        public List<string> PreviousDiscordGlobalnames { get; set; } = [];
+        public string? DiscordMention { get; set; }
+        public List<string> PreviousDiscordMentions { get; set; } = [];
+        public string? DiscordAvatarUrl { get; set; }
 
         // Data properties
         public DateTime JoinedAt { get; set; }

@@ -14,22 +14,15 @@ namespace WabbitBot.Core.Scrimmages
 {
     public static partial class ScrimmageHandler
     {
-        public static async Task<Result> HandleChallengeRequestedAsync(
-            int TeamSize,
-            string ChallengerTeamName,
-            string OpponentTeamName,
-            string[] SelectedPlayerNames,
-            ulong IssuedByDiscordUserId,
-            int BestOf
-        )
+        public static async Task<Result> HandleChallengeRequestedAsync(ChallengeRequested evt)
         {
             // Convert to entities
             var challengerTeamResult = await CoreService.Teams.GetByNameAsync(
-                ChallengerTeamName,
+                evt.ChallengerTeamName,
                 DatabaseComponent.Repository
             );
             var opponentTeamResult = await CoreService.Teams.GetByNameAsync(
-                OpponentTeamName,
+                evt.OpponentTeamName,
                 DatabaseComponent.Repository
             );
             if (!challengerTeamResult.Success || challengerTeamResult.Data == null)
@@ -44,7 +37,7 @@ namespace WabbitBot.Core.Scrimmages
             var OpponentTeam = opponentTeamResult.Data;
             await using var db = WabbitBotDbContextProvider.CreateDbContext();
             var mashinaUser = await db.Set<MashinaUser>()
-                .Where(u => u.DiscordUserId == IssuedByDiscordUserId)
+                .Where(u => u.DiscordUserId == evt.IssuedByDiscordUserId)
                 .FirstOrDefaultAsync();
             if (mashinaUser == null || mashinaUser.Player == null)
             {
@@ -52,10 +45,10 @@ namespace WabbitBot.Core.Scrimmages
             }
             var IssuedByPlayer = mashinaUser.Player;
             var selectedPlayersResult = new List<Player>();
-            for (int i = 0; i < SelectedPlayerNames.Length; i++)
+            for (int i = 0; i < evt.SelectedPlayerNames.Length; i++)
             {
                 var playerResult = await CoreService.Players.GetByNameAsync(
-                    SelectedPlayerNames[i],
+                    evt.SelectedPlayerNames[i],
                     DatabaseComponent.Repository
                 );
                 if (!playerResult.Success || playerResult.Data == null)
@@ -64,7 +57,7 @@ namespace WabbitBot.Core.Scrimmages
                 }
                 selectedPlayersResult.Add(playerResult.Data);
             }
-            if (selectedPlayersResult.Count != SelectedPlayerNames.Length)
+            if (selectedPlayersResult.Count != evt.SelectedPlayerNames.Length)
             {
                 return Result.Failure("Player not found");
             }
@@ -79,8 +72,8 @@ namespace WabbitBot.Core.Scrimmages
                 OpponentTeam,
                 IssuedByPlayer,
                 SelectedPlayers,
-                (TeamSize)TeamSize,
-                BestOf
+                (TeamSize)evt.TeamSize,
+                evt.BestOf
             );
             if (!challengeResult.Success)
             {
@@ -105,89 +98,103 @@ namespace WabbitBot.Core.Scrimmages
             Guid ChallengeId,
             Guid OpponentTeamId,
             Guid[] OpponentSelectedPlayerIds,
-            Guid acceptedByPlayerId
+            Guid AcceptedByPlayerId
         )
         {
-            var challengeResult = await CoreService.ScrimmageChallenges.GetByIdAsync(
+            var getChallenge = await CoreService.ScrimmageChallenges.GetByIdAsync(
                 ChallengeId,
                 DatabaseComponent.Repository
             );
-            if (!challengeResult.Success)
+            if (!getChallenge.Success)
             {
                 return Result.Failure("Failed to get challenge");
             }
-            var challenge = challengeResult.Data;
-            if (challenge == null)
+            var Challenge = getChallenge.Data;
+            if (Challenge == null)
             {
                 return Result.Failure("Challenge not found");
             }
-            var opponentTeamResult = await CoreService.Teams.GetByIdAsync(OpponentTeamId, DatabaseComponent.Repository);
-            if (!opponentTeamResult.Success || opponentTeamResult.Data == null)
+            var getOpponentTeam = await CoreService.Teams.GetByIdAsync(OpponentTeamId, DatabaseComponent.Repository);
+            if (!getOpponentTeam.Success || getOpponentTeam.Data == null)
             {
                 return Result.Failure("Opponent team not found");
             }
-            var OpponentTeam = opponentTeamResult.Data;
+            var OpponentTeam = getOpponentTeam.Data;
             if (OpponentTeam == null)
             {
                 return Result.Failure("Opponent team not found");
             }
+            Challenge.OpponentTeam = OpponentTeam;
 
-            var opponentSelectedPlayersResult = new List<Player>();
+            var OpponentSelectedPlayers = new Player[OpponentSelectedPlayerIds.Length];
             for (int i = 0; i < OpponentSelectedPlayerIds.Length; i++)
             {
-                var playerResult = await CoreService.Players.GetByIdAsync(
+                var getPlayer = await CoreService.Players.GetByIdAsync(
                     OpponentSelectedPlayerIds[i],
                     DatabaseComponent.Repository
                 );
-                if (!playerResult.Success || playerResult.Data == null)
+                if (!getPlayer.Success || getPlayer.Data == null)
                 {
                     return Result.Failure("Player not found");
                 }
-                opponentSelectedPlayersResult.Add(playerResult.Data);
+                OpponentSelectedPlayers[i] = getPlayer.Data;
             }
-            if (opponentSelectedPlayersResult.Count != OpponentSelectedPlayerIds.Length)
+            if (OpponentSelectedPlayers.Length != OpponentSelectedPlayerIds.Length)
             {
-                return Result.Failure("Player not found");
+                return Result.Failure(
+                    $"{OpponentSelectedPlayerIds.Length - OpponentSelectedPlayers.Length} Player(s) not found."
+                );
             }
-            var OpponentSelectedPlayers = opponentSelectedPlayersResult.ToArray();
 
-            var acceptedByPlayerResult = await CoreService.Players.GetByIdAsync(
-                acceptedByPlayerId,
+            var getAcceptedByPlayer = await CoreService.Players.GetByIdAsync(
+                AcceptedByPlayerId,
                 DatabaseComponent.Repository
             );
-            if (!acceptedByPlayerResult.Success)
+            if (!getAcceptedByPlayer.Success)
             {
                 return Result.Failure("Failed to get accepted by player");
             }
-            var AcceptedByPlayer = acceptedByPlayerResult.Data;
+            var AcceptedByPlayer = getAcceptedByPlayer.Data;
             if (AcceptedByPlayer == null)
             {
                 return Result.Failure("Accepted by player not found");
             }
-
-            var scrimmageCore = new ScrimmageCore();
+            Challenge.OpponentTeamPlayers = [AcceptedByPlayer, .. OpponentSelectedPlayers];
+            if (Challenge.ChallengerTeam == null)
+            {
+                return Result.Failure("Challenger team not found");
+            }
+            if (Challenge.OpponentTeam == null)
+            {
+                return Result.Failure("Opponent team not found");
+            }
+            if (Challenge.IssuedByPlayer == null)
+            {
+                return Result.Failure("Issued by player not found");
+            }
 
             // Create scrimmage
-            var scrimmageResult = await scrimmageCore.CreateScrimmageAsync(
+            var getNewScrimmage = await ScrimmageCore.CreateScrimmageAsync(
                 ChallengeId,
-                challenge.ChallengerTeam!,
+                Challenge,
+                Challenge.ChallengerTeam,
                 OpponentTeam,
-                challenge.Team1Players,
-                [.. OpponentSelectedPlayers],
-                challenge.IssuedByPlayer!,
+                Challenge.ChallengerTeamPlayers,
+                Challenge.OpponentTeamPlayers,
+                Challenge.IssuedByPlayer,
                 AcceptedByPlayer
             );
-            if (!scrimmageResult.Success)
+            if (!getNewScrimmage.Success)
             {
                 return Result.Failure("Failed to create scrimmage");
             }
-            var scrimmage = scrimmageResult.Data;
-            if (scrimmage == null)
+            var NewScrimmage = getNewScrimmage.Data;
+            if (NewScrimmage == null)
             {
-                return Result.Failure("Failed to create scrimmage");
+                return Result.Failure("Failed to create scrimmage, no data returned");
             }
 
-            var pubResult = await ScrimmageCore.PublishScrimmageCreatedAsync(scrimmage.Id);
+            var pubResult = await ScrimmageCore.PublishScrimmageCreatedAsync(NewScrimmage.Id);
             if (!pubResult.Success)
             {
                 return Result.Failure("Failed to publish scrimmage created");
@@ -201,28 +208,6 @@ namespace WabbitBot.Core.Scrimmages
             // Commented out pending generator publishers
             // var publishResult = await PublishMatchProvisioningRequestedAsync(evt.ScrimmageId);
             // if (!publishResult.Success)
-            // {
-            //     return Result.Failure("Failed to publish match provisioning requested");
-            // }
-
-            return Result.CreateSuccess();
-        }
-
-        public static async Task<Result> HandleMatchProvisioningRequestedAsync(MatchProvisioningRequested evt)
-        {
-            // Get scrimmage channel from config
-            var scrimmageChannelConfig = ConfigurationProvider
-                .GetSection<ChannelsOptions>(ChannelsOptions.SectionName)
-                .ScrimmageChannel;
-            if (scrimmageChannelConfig is null)
-            {
-                return Result.Failure("Scrimmage channel not found");
-            }
-            var scrimmageChannelId = scrimmageChannelConfig.Value;
-
-            // Commented out pending generator publishers
-            // var publishMatchResult = await PublishMatchProvisioningRequestedAsync(scrimmageChannelId, evt.ScrimmageId);
-            // if (!publishMatchResult.Success)
             // {
             //     return Result.Failure("Failed to publish match provisioning requested");
             // }

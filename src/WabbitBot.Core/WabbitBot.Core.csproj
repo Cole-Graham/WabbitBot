@@ -5,7 +5,6 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
-        <UserSecretsId>bd09b001-9207-4d13-b3e2-c36aebe362e2</UserSecretsId>
     </PropertyGroup>
     <ItemGroup>
         <ProjectReference Include="..\WabbitBot.Common\WabbitBot.Common.csproj" />

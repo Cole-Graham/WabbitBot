@@ -32,8 +32,19 @@ namespace WabbitBot.Common.Events.Core
         public EventBusType EventBusType { get; init; } = EventBusType.Global;
     }
 
+    // [EventGenerator(
+    //     pubTargetClass: "WabbitBot.DiscBot.App.Handlers.ScrimmageHandler",
+    //     subTargetClasses: ["WabbitBot.DiscBot.App.Handlers.ScrimmageHandler"]
+    // )]
+    // public record ChallengeContainerCreated(Guid ChallengeId, ulong ChallengeChannelId) : IEvent
+    // {
+    //     public Guid EventId { get; init; } = Guid.NewGuid();
+    //     public DateTime Timestamp { get; init; } = DateTime.UtcNow;
+    //     public EventBusType EventBusType { get; init; } = EventBusType.Global;
+    // }
+
     [EventGenerator(
-        pubTargetClass: "WabbitBot.DiscBot.App.Commands.ScrimmageCommands",
+        pubTargetClass: "WabbitBot.DiscBot.App.ScrimmageApp",
         subTargetClasses: ["WabbitBot.DiscBot.App.Handlers"]
     )]
     public record ChallengeAccepted(

@@ -27,17 +27,17 @@ namespace WabbitBot.Core.Common.Models.Common
         public DateTime LastActive { get; set; }
 
         public int TeamJoinLimit { get; set; }
-        public Dictionary<Guid, DateTime> TeamJoinCooldowns { get; set; } = new Dictionary<Guid, DateTime>();
-        public List<Guid> TeamIds { get; set; } = new();
+        public Dictionary<Guid, DateTime> TeamJoinCooldowns { get; set; } = [];
+        public List<Guid> TeamIds { get; set; } = [];
 
         /// <summary>
         /// Key: Platform name (e.g., "Discord", "Steam"), Value: List of user IDs from that platform.
         /// </summary>
-        public Dictionary<string, List<string>> PreviousPlatformIds { get; set; } = new();
+        public Dictionary<string, List<string>> PreviousPlatformIds { get; set; } = [];
 
         // Game usernames parsed from submitted replay data
         public string? GameUsername { get; set; }
-        public List<string> PreviousGameUsernames { get; set; } = new();
+        public List<string> PreviousGameUsernames { get; set; } = [];
 
         public override Domain Domain => Domain.Common;
     }

@@ -33,10 +33,11 @@ namespace WabbitBot.Core.Scrimmages
             // ------------------------ Factory & Initialization ---------------------------
             public static Scrimmage CreateScrimmage(
                 Guid ChallengeId,
+                ScrimmageChallenge ScrimmageChallenge,
                 Team ChallengerTeam,
                 Team OpponentTeam,
-                List<Player> Team1Players,
-                List<Player> Team2Players,
+                Player[] ChallengerTeamPlayers,
+                Player[] OpponentTeamPlayers,
                 Player IssuedByPlayer,
                 Player AcceptedByPlayer,
                 TeamSize teamSize,
@@ -47,10 +48,11 @@ namespace WabbitBot.Core.Scrimmages
                 var scrimmage = new Scrimmage
                 {
                     ChallengeId = ChallengeId,
-                    Team1Id = ChallengerTeam.Id,
-                    Team2Id = OpponentTeam.Id,
-                    Team1PlayerIds = [.. Team1Players.Select(p => p.Id)],
-                    Team2PlayerIds = [.. Team2Players.Select(p => p.Id)],
+                    ScrimmageChallenge = ScrimmageChallenge,
+                    ChallengerTeamId = ChallengerTeam.Id,
+                    OpponentTeamId = OpponentTeam.Id,
+                    ChallengerTeamPlayerIds = [.. ChallengerTeamPlayers.Select(p => p.Id)],
+                    OpponentTeamPlayerIds = [.. OpponentTeamPlayers.Select(p => p.Id)],
                     IssuedByPlayer = IssuedByPlayer,
                     AcceptedByPlayer = AcceptedByPlayer,
                     TeamSize = teamSize,
@@ -80,9 +82,7 @@ namespace WabbitBot.Core.Scrimmages
                 }
 
                 // Combine challenge issuer and selected team members
-                var Team1Players = new List<Player> { IssuedByPlayer };
-                Team1Players.AddRange(SelectedPlayers);
-
+                Player[] ChallengerTeamPlayers = [IssuedByPlayer, .. SelectedPlayers];
                 var scrimmageChallenge = new ScrimmageChallenge
                 {
                     ChallengerTeam = ChallengerTeam,
@@ -91,7 +91,7 @@ namespace WabbitBot.Core.Scrimmages
                     OpponentTeamId = OpponentTeam.Id,
                     IssuedByPlayer = IssuedByPlayer,
                     IssuedByPlayerId = IssuedByPlayer.Id,
-                    Team1Players = Team1Players,
+                    ChallengerTeamPlayers = ChallengerTeamPlayers,
                     ChallengeStatus = ScrimmageChallengeStatus.Pending,
                     TeamSize = teamSize,
                     BestOf = bestOf,
@@ -99,8 +99,8 @@ namespace WabbitBot.Core.Scrimmages
                 };
                 return Result<ScrimmageChallenge>.CreateSuccess(scrimmageChallenge);
             }
-            #endregion
         }
+        #endregion
 
         #region Accessors
         public static class Accessors
@@ -319,75 +319,79 @@ namespace WabbitBot.Core.Scrimmages
             public static async Task<Result<ScrimmageChallenge>> ValidateChallengeAsync(Guid challengeId)
             {
                 // Get challenge
-                var challengeResult = await CoreService.ScrimmageChallenges.GetByIdAsync(
+                var getChallenge = await CoreService.ScrimmageChallenges.GetByIdAsync(
                     challengeId,
                     DatabaseComponent.Repository
                 );
-                if (!challengeResult.Success)
+                if (!getChallenge.Success)
                 {
                     return Result<ScrimmageChallenge>.Failure("Challenge not found");
                 }
-                var challenge = challengeResult.Data;
+                var challenge = getChallenge.Data;
                 if (challenge == null)
                 {
                     return Result<ScrimmageChallenge>.Failure("Challenge not found");
                 }
 
                 // Get teams
-                var team1Result = await CoreService.Teams.GetByIdAsync(
+                var getChallengerTeam = await CoreService.Teams.GetByIdAsync(
                     challenge.ChallengerTeamId,
                     DatabaseComponent.Repository
                 );
-                if (!team1Result.Success)
+                if (!getChallengerTeam.Success)
                 {
                     return Result<ScrimmageChallenge>.Failure("Team 1 not found");
                 }
-                var team2Result = await CoreService.Teams.GetByIdAsync(
+                var getOpponentTeam = await CoreService.Teams.GetByIdAsync(
                     challenge.OpponentTeamId,
                     DatabaseComponent.Repository
                 );
-                if (!team2Result.Success)
+                if (!getOpponentTeam.Success)
                 {
                     return Result<ScrimmageChallenge>.Failure("Team 2 not found");
                 }
-                var team1 = team1Result.Data;
-                var team2 = team2Result.Data;
-                if (team1 == null)
+                var ChallengerTeam = getChallengerTeam.Data;
+                var OpponentTeam = getOpponentTeam.Data;
+                if (ChallengerTeam == null)
                 {
                     return Result<ScrimmageChallenge>.Failure("Team 1 not found");
                 }
-                if (team2 == null)
+                if (OpponentTeam == null)
                 {
                     return Result<ScrimmageChallenge>.Failure("Team 2 not found");
                 }
-                var issuedByPlayerResult = await CoreService.Players.GetByIdAsync(
+                var getIssuedByPlayer = await CoreService.Players.GetByIdAsync(
                     challenge.IssuedByPlayerId!,
                     DatabaseComponent.Repository
                 );
-                if (!issuedByPlayerResult.Success)
+                if (!getIssuedByPlayer.Success)
                 {
                     return Result<ScrimmageChallenge>.Failure("Issued by player not found");
                 }
-                var issuedByPlayer = issuedByPlayerResult.Data!;
-                var acceptedByPlayerResult = await CoreService.Players.GetByIdAsync(
+                var IssuedByPlayer = getIssuedByPlayer.Data!;
+                var getAcceptedByPlayer = await CoreService.Players.GetByIdAsync(
                     challenge.AcceptedByPlayerId!,
                     DatabaseComponent.Repository
                 );
-                if (!acceptedByPlayerResult.Success)
+                if (!getAcceptedByPlayer.Success)
                 {
                     return Result<ScrimmageChallenge>.Failure("Accepted by player not found");
                 }
-                var acceptedByPlayer = acceptedByPlayerResult.Data;
+                var AcceptedByPlayer = getAcceptedByPlayer.Data;
                 // Validate team player ids
-                foreach (var playerId in challenge.Team1Players.Select(p => p.Id))
+                foreach (var playerId in challenge.ChallengerTeamPlayers.Select(p => p.Id))
                 {
-                    var playerResult = await CoreService.Players.GetByIdAsync(playerId, DatabaseComponent.Repository);
-                    if (!playerResult.Success)
+                    var getPlayer = await CoreService.Players.GetByIdAsync(playerId, DatabaseComponent.Repository);
+                    if (!getPlayer.Success)
                     {
-                        return Result<ScrimmageChallenge>.Failure("Team 1 player not found");
+                        return Result<ScrimmageChallenge>.Failure("Challenger team player not found");
                     }
                 }
-                foreach (var playerId in challenge.Team2Players.Select(p => p.Id))
+                if (challenge.OpponentTeamPlayers == null)
+                {
+                    return Result<ScrimmageChallenge>.Failure("Opponent team players not found");
+                }
+                foreach (var playerId in challenge.OpponentTeamPlayers.Select(p => p.Id))
                 {
                     var playerResult = await CoreService.Players.GetByIdAsync(playerId, DatabaseComponent.Repository);
                     if (!playerResult.Success)
@@ -397,10 +401,10 @@ namespace WabbitBot.Core.Scrimmages
                 }
 
                 // Attach loaded teams to challenge so callers can consume them
-                challenge.ChallengerTeam = team1;
-                challenge.OpponentTeam = team2;
-                challenge.IssuedByPlayer = issuedByPlayer;
-                challenge.AcceptedByPlayer = acceptedByPlayer;
+                challenge.ChallengerTeam = ChallengerTeam;
+                challenge.OpponentTeam = OpponentTeam;
+                challenge.IssuedByPlayer = IssuedByPlayer;
+                challenge.AcceptedByPlayer = AcceptedByPlayer;
 
                 return Result<ScrimmageChallenge>.CreateSuccess(challenge);
             }
@@ -411,157 +415,102 @@ namespace WabbitBot.Core.Scrimmages
         /// <summary>
         /// Creates a new scrimmage challenge
         /// </summary>
-        public async Task<Result<Scrimmage>> CreateScrimmageAsync(
+        public static async Task<Result<Scrimmage>> CreateScrimmageAsync(
             Guid ChallengeId,
+            ScrimmageChallenge ScrimmageChallenge,
             Team ChallengerTeam,
             Team OpponentTeam,
-            List<Player> Team1Players,
-            List<Player> Team2Players,
+            Player[] ChallengerTeamPlayers,
+            Player[] OpponentTeamPlayers,
             Player IssuedByPlayer,
             Player AcceptedByPlayer
         )
         {
             try
             {
-                var validateResult = await Validation.ValidateChallengeAsync(ChallengeId);
-                if (!validateResult.Success)
-                {
-                    return Result<Scrimmage>.Failure("Challenge not found");
-                }
-                var challenge = validateResult.Data!;
+                // var validateResult = await Validation.ValidateChallengeAsync(ChallengeId);
+                // if (!validateResult.Success)
+                // {
+                //     return Result<Scrimmage>.Failure("Challenge not found");
+                // }
+                // var challenge = validateResult.Data;
+                // var getChallenge = await CoreService.ScrimmageChallenges.GetByIdAsync(
+                //     ChallengeId,
+                //     DatabaseComponent.Repository
+                // );
+                // if (!getChallenge.Success)
+                // {
+                //     return Result<Scrimmage>.Failure("Challenge not found");
+                // }
+                // var Challenge = getChallenge.Data;
+                // if (Challenge == null)
+                // {
+                //     return Result<Scrimmage>.Failure("Challenge not found");
+                // }
 
-                var scrimmage = Factory.CreateScrimmage(
+                var Scrimmage = Factory.CreateScrimmage(
                     ChallengeId,
+                    ScrimmageChallenge,
                     ChallengerTeam,
                     OpponentTeam,
-                    Team1Players,
-                    Team2Players,
+                    ChallengerTeamPlayers,
+                    OpponentTeamPlayers,
                     IssuedByPlayer,
                     AcceptedByPlayer,
-                    challenge.TeamSize,
-                    challenge.BestOf
+                    ScrimmageChallenge.TeamSize,
+                    ScrimmageChallenge.BestOf
                 );
 
-                var challengerTeam = challenge.ChallengerTeam;
-                var opponentTeam = challenge.OpponentTeam;
-                if (challengerTeam == null)
-                {
-                    return Result<Scrimmage>.Failure("Challenger team not found");
-                }
-                if (opponentTeam == null)
-                {
-                    return Result<Scrimmage>.Failure("Opponent team not found");
-                }
-
-                var issuedByPlayer = challenge.IssuedByPlayer;
-                var acceptedByPlayer = challenge.AcceptedByPlayer;
-
                 // Nav properties
-                scrimmage.IssuedByPlayer = challenge.IssuedByPlayer;
-                scrimmage.AcceptedByPlayer = challenge.AcceptedByPlayer;
+                Scrimmage.ScrimmageChallenge = ScrimmageChallenge;
+                Scrimmage.IssuedByPlayer = IssuedByPlayer;
+                Scrimmage.AcceptedByPlayer = AcceptedByPlayer;
                 // Data properties
-                scrimmage.Team1Rating = challengerTeam.ScrimmageTeamStats[challenge.TeamSize].CurrentRating;
-                scrimmage.Team2Rating = opponentTeam.ScrimmageTeamStats[challenge.TeamSize].CurrentRating;
-                scrimmage.Team1Confidence = challengerTeam.ScrimmageTeamStats[challenge.TeamSize].Confidence;
-                scrimmage.Team2Confidence = opponentTeam.ScrimmageTeamStats[challenge.TeamSize].Confidence;
+                Scrimmage.ChallengerTeamRating = ChallengerTeam
+                    .ScrimmageTeamStats[ScrimmageChallenge.TeamSize]
+                    .CurrentRating;
+                Scrimmage.OpponentTeamRating = OpponentTeam
+                    .ScrimmageTeamStats[ScrimmageChallenge.TeamSize]
+                    .CurrentRating;
+                Scrimmage.ChallengerTeamConfidence = ChallengerTeam
+                    .ScrimmageTeamStats[ScrimmageChallenge.TeamSize]
+                    .Confidence;
+                Scrimmage.OpponentTeamConfidence = OpponentTeam
+                    .ScrimmageTeamStats[ScrimmageChallenge.TeamSize]
+                    .Confidence;
                 // Calculate higher rated team
-                if (scrimmage.Team1Rating > scrimmage.Team2Rating)
+                if (Scrimmage.ChallengerTeamRating > Scrimmage.OpponentTeamRating)
                 {
-                    scrimmage.HigherRatedTeamId = scrimmage.Team1Id;
+                    Scrimmage.HigherRatedTeamId = Scrimmage.ChallengerTeamId;
                 }
                 else
                 {
-                    scrimmage.HigherRatedTeamId = scrimmage.Team2Id;
+                    Scrimmage.HigherRatedTeamId = Scrimmage.OpponentTeamId;
                 }
 
-                var dbResult = await CoreService.Scrimmages.CreateAsync(scrimmage, DatabaseComponent.Repository);
+                var dbResult = await CoreService.Scrimmages.CreateAsync(Scrimmage, DatabaseComponent.Repository);
                 if (!dbResult.Success)
                 {
-                    return Result<Scrimmage>.Failure("Failed to create scrimmage challenge.");
+                    return Result<Scrimmage>.Failure("Failed to create new Scrimmage.");
                 }
 
-                // Commented out pending generator publishers
-                // var publishResult = await PublishScrimmageCreatedAsync(scrimmage.Id);
-                // if (!publishResult.Success)
-                // {
-                //     return Result<Scrimmage>.Failure("Failed to publish scrimmage created");
-                // }
+                var publishResult = await PublishScrimmageCreatedAsync(Scrimmage.Id);
+                if (!publishResult.Success)
+                {
+                    return Result<Scrimmage>.Failure("Failed to publish ScrimmageCreated event");
+                }
 
-                return Result<Scrimmage>.CreateSuccess(scrimmage);
+                return Result<Scrimmage>.CreateSuccess(Scrimmage);
             }
             catch (Exception ex)
             {
                 await CoreService.ErrorHandler.CaptureAsync(
                     ex,
-                    "Failed to create scrimmage",
+                    "Failed to create new Scrimmage.",
                     nameof(CreateScrimmageAsync)
                 );
                 return Result<Scrimmage>.Failure(
-                    $"An unexpected error occurred while creating the scrimmage: {ex.Message}"
-                );
-            }
-        }
-
-        /// <summary>
-        /// Publishes MatchProvisioningRequested to both Core (local) and Global (cross-boundary) buses.
-        /// Auto-generated publisher will dual-publish this event.
-        /// </summary>
-        // public ValueTask PublishMatchProvisioningRequestedAsync(Guid matchId, Guid scrimmageId)
-        // {
-        //     // TODO: Source generator will replace this with actual dual-publish logic
-        //     return ValueTask.CompletedTask;
-        // }
-
-        /// <summary>
-        /// Accepts a scrimmage challenge
-        /// </summary>
-        public async Task<Result> AcceptScrimmageAsync(Guid scrimmageId)
-        {
-            try
-            {
-                var scrimmageResult = await CoreService.Scrimmages.GetByIdAsync(
-                    scrimmageId,
-                    DatabaseComponent.Repository
-                );
-                if (!scrimmageResult.Success)
-                {
-                    return Result.Failure($"Failed to retrieve scrimmage: {scrimmageResult.ErrorMessage}");
-                }
-                var scrimmage = scrimmageResult.Data;
-
-                if (scrimmage == null)
-                    return Result.Failure("Scrimmage not found.");
-
-                if (!Accessors.IsTeamMatch(scrimmage))
-                    return Result.Failure("Scrimmage cannot be accepted.");
-
-                var currentState = scrimmage.StateHistory.Last();
-                if (!State.IsValidTransition(currentState.Status, ScrimmageStatus.Accepted))
-                    return Result.Failure("Failed to accept scrimmage.");
-
-                var updateResult = await CoreService.Scrimmages.UpdateAsync(scrimmage, DatabaseComponent.Repository);
-                if (!updateResult.Success)
-                {
-                    return Result.Failure($"Failed to update scrimmage: {updateResult.ErrorMessage}");
-                }
-
-                // Create match and publish provisioning request to both Core and Global
-                // TODO: Actually create the match entity here once match creation logic is ready
-                var matchId = Guid.NewGuid(); // Placeholder - should be actual match ID after creation
-                // Commented out pending generator publishers
-                // await PublishMatchProvisioningRequestedAsync(matchId, scrimmageId);
-
-                return Result.CreateSuccess();
-            }
-            catch (Exception ex)
-            {
-                await CoreService.ErrorHandler.CaptureAsync(
-                    ex,
-                    "Failed to accept scrimmage",
-                    nameof(AcceptScrimmageAsync)
-                );
-                return Result.Failure(
-                    $"An unexpected error occurred while accepting the scrimmage: " + $"{ex.Message}"
+                    $"An unexpected error occurred while creating the new Scrimmage: {ex.Message}"
                 );
             }
         }

@@ -18,11 +18,12 @@ namespace WabbitBot.Core.Common.Models.Scrimmage
     public partial class Scrimmage : Entity, IScrimmageEntity
     {
         // Navigation properties
-        public Guid ChallengeId { get; set; }
-        public Guid Team1Id { get; set; } // Challenger
-        public Guid Team2Id { get; set; } // Opponent
-        public List<Guid> Team1PlayerIds { get; set; } = new(); // Selected team members
-        public List<Guid> Team2PlayerIds { get; set; } = new(); // Selected team members
+        public Guid? ChallengeId { get; set; }
+        public ScrimmageChallenge? ScrimmageChallenge { get; set; }
+        public Guid ChallengerTeamId { get; set; } // Challenger
+        public Guid OpponentTeamId { get; set; } // Opponent
+        public List<Guid> ChallengerTeamPlayerIds { get; set; } = new(); // Selected team members
+        public List<Guid> OpponentTeamPlayerIds { get; set; } = new(); // Selected team members
         public Player? IssuedByPlayer { get; set; } // Player who issued the challenge
         public Player? AcceptedByPlayer { get; set; } // Player who accepted the challenge
         public Match? Match { get; set; }
@@ -33,40 +34,40 @@ namespace WabbitBot.Core.Common.Models.Scrimmage
         public DateTime? StartedAt { get; set; }
         public DateTime? CompletedAt { get; set; }
         public Guid WinnerId { get; set; }
-        public double Team1Rating { get; set; }
-        public double Team2Rating { get; set; }
-        public double Team1RatingChange { get; set; }
-        public double Team2RatingChange { get; set; }
-        public double Team1Confidence { get; set; } // Confidence at time of match
-        public double Team2Confidence { get; set; } // Confidence at time of match
-        public int Team1Score { get; set; } // Score at completion
-        public int Team2Score { get; set; } // Score at completion
+        public double ChallengerTeamRating { get; set; }
+        public double OpponentTeamRating { get; set; }
+        public double ChallengerTeamRatingChange { get; set; }
+        public double OpponentTeamRatingChange { get; set; }
+        public double ChallengerTeamConfidence { get; set; } // Confidence at time of match
+        public double OpponentTeamConfidence { get; set; } // Confidence at time of match
+        public int ChallengerTeamScore { get; set; } // Score at completion
+        public int OpponentTeamScore { get; set; } // Score at completion
         public int BestOf { get; set; } = 1;
 
         // Rating system
-        public double Team1VarietyBonusUsed { get; set; }
-        public double Team2VarietyBonusUsed { get; set; }
-        public double Team1MultiplierUsed { get; set; }
-        public double Team2MultiplierUsed { get; set; }
+        public double ChallengerTeamVarietyBonusUsed { get; set; }
+        public double OpponentTeamVarietyBonusUsed { get; set; }
+        public double ChallengerTeamMultiplierUsed { get; set; }
+        public double OpponentTeamMultiplierUsed { get; set; }
 
         // Gap scaling
         public Guid HigherRatedTeamId { get; set; }
-        public double Team1RatingRangeAtMatch { get; set; }
-        public double Team2RatingRangeAtMatch { get; set; }
-        public double Team1GapScalingAppliedValue { get; set; }
-        public double Team2GapScalingAppliedValue { get; set; }
+        public double ChallengerTeamRatingRangeAtMatch { get; set; }
+        public double OpponentTeamRatingRangeAtMatch { get; set; }
+        public double ChallengerTeamGapScalingAppliedValue { get; set; }
+        public double OpponentTeamGapScalingAppliedValue { get; set; }
 
         // Catch-up bonus
-        public double Team1CatchUpBonusUsed { get; set; }
-        public double Team2CatchUpBonusUsed { get; set; }
-        public double Team1AdjustedRatingChange { get; set; }
-        public double Team2AdjustedRatingChange { get; set; }
+        public double ChallengerTeamCatchUpBonusUsed { get; set; }
+        public double OpponentTeamCatchUpBonusUsed { get; set; }
+        public double ChallengerTeamAdjustedRatingChange { get; set; }
+        public double OpponentTeamAdjustedRatingChange { get; set; }
 
         // Proven Potential
-        public bool Team1ProvenPotentialApplied { get; set; } = false;
-        public bool Team2ProvenPotentialApplied { get; set; } = false;
-        public DateTime? Team1ProvenPotentialAppliedAt { get; set; }
-        public DateTime? Team2ProvenPotentialAppliedAt { get; set; }
+        public bool ChallengerTeamProvenPotentialApplied { get; set; } = false;
+        public bool OpponentTeamProvenPotentialApplied { get; set; } = false;
+        public DateTime? ChallengerTeamProvenPotentialAppliedAt { get; set; }
+        public DateTime? OpponentTeamProvenPotentialAppliedAt { get; set; }
 
         public override Domain Domain => Domain.Scrimmage;
     }
@@ -166,8 +167,8 @@ namespace WabbitBot.Core.Common.Models.Scrimmage
         public Guid IssuedByPlayerId { get; set; }
         public Player? AcceptedByPlayer { get; set; }
         public Guid? AcceptedByPlayerId { get; set; }
-        public List<Player> Team1Players { get; set; } = []; // Selected team members
-        public List<Player> Team2Players { get; set; } = []; // Selected team members
+        public Player[] ChallengerTeamPlayers { get; set; } = []; // Selected team members
+        public Player[]? OpponentTeamPlayers { get; set; } // Selected team members
         public ScrimmageChallengeStatus? ChallengeStatus { get; set; }
         public TeamSize TeamSize { get; set; }
         public int BestOf { get; set; }

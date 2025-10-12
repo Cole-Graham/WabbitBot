@@ -93,7 +93,7 @@ namespace WabbitBot.Core.Common.Models.Common
         public DateTime? Team2MapBansConfirmedAt { get; set; }
 
         // Discord Thread Management
-        public ulong? ChannelId { get; set; } // Discord channel ID where the match threads are created
+        public ulong? ChannelId { get; set; } // Discord channel ID where the match threads were created
         public ulong? Team1ThreadId { get; set; } // Discord thread ID for Team 1 (private thread)
         public ulong? Team2ThreadId { get; set; } // Discord thread ID for Team 2 (private thread)
 

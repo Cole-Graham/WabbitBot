@@ -357,7 +357,7 @@ namespace WabbitBot.SourceGenerators.Generators.Database
                         }
                         else if (IsCollectionType(p.Type) || IsDictionaryType(p.Type))
                         {
-                            initializer = " = new();";
+                            initializer = " = [];";
                         }
                         else
                         {

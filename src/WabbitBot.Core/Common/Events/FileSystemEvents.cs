@@ -54,3 +54,26 @@ public record DivisionIconDeletedEvent(string CanonicalFileName) : IEvent
     public DateTime Timestamp { get; init; } = DateTime.UtcNow;
     public EventBusType EventBusType { get; init; } = EventBusType.Core;
 }
+
+/// <summary>
+/// Published when a custom Discord component image is successfully uploaded.
+/// </summary>
+/// <param name="CanonicalFileName">The canonical filename (e.g., "challenge_banner.jpg")</param>
+/// <param name="FileSizeBytes">Size of the uploaded file in bytes</param>
+public record DiscordComponentImageUploadedEvent(string CanonicalFileName, long FileSizeBytes) : IEvent
+{
+    public Guid EventId { get; init; } = Guid.NewGuid();
+    public DateTime Timestamp { get; init; } = DateTime.UtcNow;
+    public EventBusType EventBusType { get; init; } = EventBusType.Core;
+}
+
+/// <summary>
+/// Published when a custom Discord component image is deleted (reverts to default).
+/// </summary>
+/// <param name="CanonicalFileName">The filename that was deleted</param>
+public record DiscordComponentImageDeletedEvent(string CanonicalFileName) : IEvent
+{
+    public Guid EventId { get; init; } = Guid.NewGuid();
+    public DateTime Timestamp { get; init; } = DateTime.UtcNow;
+    public EventBusType EventBusType { get; init; } = EventBusType.Core;
+}
