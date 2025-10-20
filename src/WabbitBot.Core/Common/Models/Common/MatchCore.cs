@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using WabbitBot.Common.Configuration;
 using WabbitBot.Common.Data.Interfaces;
 using WabbitBot.Common.Data.Service;
@@ -72,14 +73,14 @@ namespace WabbitBot.Core.Common.Models.Common
                     CurrentGameNumber = other.CurrentGameNumber,
                     CurrentMapId = other.CurrentMapId,
                     FinalScore = other.FinalScore,
-                    AvailableMaps = new List<string>(other.AvailableMaps),
-                    Team1MapBans = new List<string>(other.Team1MapBans),
-                    Team2MapBans = new List<string>(other.Team2MapBans),
+                    AvailableMaps = [.. other.AvailableMaps],
+                    Team1MapBans = [.. other.Team1MapBans],
+                    Team2MapBans = [.. other.Team2MapBans],
                     Team1BansSubmitted = other.Team1BansSubmitted,
                     Team2BansSubmitted = other.Team2BansSubmitted,
                     Team1BansConfirmed = other.Team1BansConfirmed,
                     Team2BansConfirmed = other.Team2BansConfirmed,
-                    FinalMapPool = new List<string>(other.FinalMapPool),
+                    FinalMapPool = [.. other.FinalMapPool],
                 };
             }
         }
@@ -151,66 +152,7 @@ namespace WabbitBot.Core.Common.Models.Common
         #endregion
 
         #region Validation
-        public static partial class Validation
-        {
-            public static Task<Result> ValidateMatch(Match? match)
-            {
-                if (match is null)
-                {
-                    return Task.FromResult(Result.Failure("Match is null"));
-                }
-
-                var missingFields = new List<string>();
-                if (match.StartedAt is null)
-                {
-                    missingFields.Add("StartedAt");
-                }
-                if (match.CompletedAt is null)
-                {
-                    missingFields.Add("CompletedAt");
-                }
-                if (match.WinnerId is null)
-                {
-                    missingFields.Add("WinnerId");
-                }
-                if (match.ParentId is null)
-                {
-                    missingFields.Add("ParentId");
-                }
-                if (match.ParentType is null)
-                {
-                    missingFields.Add("ParentType");
-                }
-                if (match.Team1MapBansConfirmedAt is null)
-                {
-                    missingFields.Add("Team1MapBansConfirmedAt");
-                }
-                if (match.Team2MapBansConfirmedAt is null)
-                {
-                    missingFields.Add("Team2MapBansConfirmedAt");
-                }
-                if (match.ChannelId is null)
-                {
-                    missingFields.Add("ChannelId");
-                }
-                if (match.Team1ThreadId is null)
-                {
-                    missingFields.Add("Team1ThreadId");
-                }
-                if (match.Team2ThreadId is null)
-                {
-                    missingFields.Add("Team2ThreadId");
-                }
-
-                if (missingFields.Count == 0)
-                {
-                    return Task.FromResult(Result.CreateSuccess("Match is valid"));
-                }
-
-                var missing = string.Join(", ", missingFields);
-                return Task.FromResult(Result.Failure($"Match is missing fields: {missing}"));
-            }
-        }
+        public static partial class Validation { }
         #endregion
 
         #region CoreLogic
@@ -218,7 +160,6 @@ namespace WabbitBot.Core.Common.Models.Common
         /// Creates a match from a scrimmage
         /// </summary>
         /// <param name="scrimmageId"></param>
-        /// <param name="scrimmageChannelId"></param>
         /// <returns></returns>
         public static async Task<Result<Match>> CreateScrimmageMatchAsync(Guid scrimmageId)
         {
@@ -278,30 +219,6 @@ namespace WabbitBot.Core.Common.Models.Common
                         return Result<Match>.Failure("Player not found");
                     Team2Players.Add(playerResult.Data);
                 }
-                NewMatch.Participants.Add(
-                    new MatchParticipant
-                    {
-                        MatchId = NewMatch.Id,
-                        Match = NewMatch,
-                        TeamId = ChallengerTeam.Id,
-                        Team = ChallengerTeam,
-                        PlayerIds = [.. Scrimmage.ChallengerTeamPlayerIds],
-                        Players = Team1Players,
-                        TeamNumber = 1,
-                    }
-                );
-                NewMatch.Participants.Add(
-                    new MatchParticipant
-                    {
-                        MatchId = NewMatch.Id,
-                        Match = NewMatch,
-                        TeamId = OpponentTeam.Id,
-                        Team = OpponentTeam,
-                        PlayerIds = [.. Scrimmage.OpponentTeamPlayerIds],
-                        Players = Team2Players,
-                        TeamNumber = 2,
-                    }
-                );
 
                 // 3) Persist
                 var createResult = await CoreService.Matches.CreateAsync(NewMatch, DatabaseComponent.Repository);
@@ -327,473 +244,159 @@ namespace WabbitBot.Core.Common.Models.Common
             }
         }
 
-        public async Task<Result<Match>> BuildOpponentEncountersAsync(Match match)
+        /// <summary>
+        /// Completes a match by updating its state with the winner.
+        /// </summary>
+        /// <param name="matchId">The match ID to complete</param>
+        /// <param name="winnerTeamId">The ID of the winning team</param>
+        /// <returns>Result indicating success or failure</returns>
+        public static async Task<Result> CompleteMatchAsync(Guid matchId, Guid winnerTeamId)
         {
             try
             {
-                return Result<Match>.CreateSuccess(match);
+                await CoreService.WithDbContext(async db =>
+                {
+                    var match = await db.Matches.Include(m => m.StateHistory).FirstOrDefaultAsync(m => m.Id == matchId);
+                    if (match is not null)
+                    {
+                        var currentSnapshot = Accessors.GetCurrentSnapshot(match);
+                        var newSnapshot = Factory.CreateMatchStateSnapshotFromOther(currentSnapshot);
+                        newSnapshot.CompletedAt = DateTime.UtcNow;
+                        newSnapshot.WinnerId = winnerTeamId;
+
+                        match.StateHistory.Add(newSnapshot);
+                        await db.SaveChangesAsync();
+                    }
+                });
+
+                return Result.CreateSuccess("Match completed successfully");
             }
             catch (Exception ex)
             {
                 await CoreService.ErrorHandler.CaptureAsync(
                     ex,
-                    "Failed to build opponent encounters",
-                    nameof(BuildOpponentEncountersAsync)
+                    $"Failed to complete match {matchId}",
+                    nameof(CompleteMatchAsync)
                 );
-                return Result<Match>.Failure(
-                    $"An unexpected error occurred while building the opponent encounters: {ex.Message}"
-                );
+                return Result.Failure($"Failed to complete match: {ex.Message}");
             }
         }
 
         /// <summary>
-        /// Starts a match with full business logic orchestration
+        /// Starts the next game in a match by selecting a map and creating the game entity.
         /// </summary>
-        public async Task<Result> StartMatchAsync(
-            Guid matchId,
-            Guid team1Id,
-            Guid team2Id,
-            List<Guid> team1PlayerIds,
-            List<Guid> team2PlayerIds
-        )
+        /// <param name="match">The match to start the next game for</param>
+        /// <returns>Result containing the created game or error</returns>
+        public static async Task<Result<Game>> StartNextGameAsync(Match match)
         {
             try
             {
-                var matchResult = await CoreService.Matches.GetByIdAsync(matchId, DatabaseComponent.Repository);
-                if (!matchResult.Success)
+                // Get current snapshot to access final map pool
+                var matchSnapshot = Accessors.GetCurrentSnapshot(match);
+
+                if (matchSnapshot.FinalMapPool.Count == 0)
                 {
-                    return Result.Failure($"Failed to retrieve match: {matchResult.ErrorMessage}");
-                }
-                var match = matchResult.Data;
-
-                if (match == null)
-                    return Result.Failure("Match not found.");
-
-                // Validate match can be started
-                if (Accessors.GetCurrentStatus(match) != MatchStatus.Created)
-                    return Result.Failure("Match can only be started when in Created state.");
-
-                // Set start time
-                match.StartedAt = DateTime.UtcNow;
-
-                // Create match participants
-                var team1Participant = new MatchParticipant
-                {
-                    MatchId = matchId,
-                    TeamId = team1Id,
-                    TeamNumber = 1,
-                    PlayerIds = team1PlayerIds,
-                    JoinedAt = DateTime.UtcNow,
-                };
-
-                var team2Participant = new MatchParticipant
-                {
-                    MatchId = matchId,
-                    TeamId = team2Id,
-                    TeamNumber = 2,
-                    PlayerIds = team2PlayerIds,
-                    JoinedAt = DateTime.UtcNow,
-                };
-
-                var participant1Result = await CoreService.MatchParticipants.CreateAsync(
-                    team1Participant,
-                    DatabaseComponent.Repository
-                );
-                var participant2Result = await CoreService.MatchParticipants.CreateAsync(
-                    team2Participant,
-                    DatabaseComponent.Repository
-                );
-
-                if (!participant1Result.Success || !participant2Result.Success)
-                    return Result.Failure("Failed to create match participants.");
-
-                // Create opponent encounters
-                var encounter1 = new TeamOpponentEncounter
-                {
-                    TeamId = team1Id,
-                    OpponentId = team2Id,
-                    MatchId = matchId,
-                    TeamSize = match.TeamSize,
-                    EncounteredAt = DateTime.UtcNow,
-                    Won = false, // Will be updated when match completes
-                };
-
-                var encounter2 = new TeamOpponentEncounter
-                {
-                    TeamId = team2Id,
-                    OpponentId = team1Id,
-                    MatchId = matchId,
-                    TeamSize = match.TeamSize,
-                    EncounteredAt = DateTime.UtcNow,
-                    Won = false, // Will be updated when match completes
-                };
-
-                var encounter1Result = await CoreService.TeamOpponentEncounters.CreateAsync(
-                    encounter1,
-                    DatabaseComponent.Repository
-                );
-                var encounter2Result = await CoreService.TeamOpponentEncounters.CreateAsync(
-                    encounter2,
-                    DatabaseComponent.Repository
-                );
-
-                if (!encounter1Result.Success || !encounter2Result.Success)
-                    return Result.Failure("Failed to create opponent encounters.");
-
-                // TODO: Re-implement map pool logic without MapService dependency
-                // match.AvailableMaps = GetDefaultMapPool();
-
-                // Create the first game
-                var game = new Game
-                {
-                    MatchId = match.Id,
-                    TeamSize = match.TeamSize,
-                    Team1PlayerIds = team1PlayerIds,
-                    Team2PlayerIds = team2PlayerIds,
-                    GameNumber = 1,
-                };
-
-                var createGameResult = await CoreService.Games.CreateAsync(game, DatabaseComponent.Repository);
-                if (!createGameResult.Success)
-                    return Result.Failure("Failed to create the first game for the match.");
-
-                match.Games.Add(createGameResult.Data!);
-
-                var updateMatchRepoResult = await CoreService.Matches.UpdateAsync(match, DatabaseComponent.Repository);
-                var updateMatchCacheResult = await CoreService.Matches.UpdateAsync(match, DatabaseComponent.Cache);
-
-                if (!updateMatchRepoResult.Success || !updateMatchCacheResult.Success)
-                {
-                    return Result.Failure("Failed to update match in repository or cache after game creation.");
+                    return Result<Game>.Failure("No maps available in final map pool");
                 }
 
-                // Publish Core-local event for match start
-                // await CoreService.PublishAsync(new ScrimmageMatchStartedEvent(match.Id));
+                // Determine next game number
+                var nextGameNumber = match.Games.Count + 1;
 
-                return Result.CreateSuccess();
-            }
-            catch (Exception ex)
-            {
-                await CoreService.ErrorHandler.CaptureAsync(ex, "Failed to start match", nameof(StartMatchAsync));
-                return Result.Failure($"An unexpected error occurred while starting the match: {ex.Message}");
-            }
-        }
+                // Select next map from the pool (cycling through maps)
+                var mapIndex = (nextGameNumber - 1) % matchSnapshot.FinalMapPool.Count;
+                var selectedMapName = matchSnapshot.FinalMapPool[mapIndex];
 
-        /// <summary>
-        /// Gets the participants for a given team in this match
-        /// </summary>
-        public static List<MatchParticipant> GetParticipantsForTeam(Match match, Guid teamId)
-        {
-            return match.Participants.Where(p => p.TeamId == teamId).ToList();
-        }
-
-        /// <summary>
-        /// Gets the opponent encounters for a given team in this match
-        /// </summary>
-        public static List<TeamOpponentEncounter> GetOpponentEncountersForTeam(Match match, Guid teamId)
-        {
-            var team1stats = match.Team1.ScrimmageTeamStats[match.TeamSize];
-            var team2stats = match.Team2.ScrimmageTeamStats[match.TeamSize];
-            return [.. team1stats.OpponentEncounters, .. team2stats.OpponentEncounters];
-        }
-
-        /// <summary>
-        /// Gets all teams participating in this match
-        /// </summary>
-        public static List<Guid> GetParticipatingTeamIds(Match match)
-        {
-            return match.Participants.Select(p => p.TeamId).Distinct().ToList();
-        }
-
-        /// <summary>
-        /// Gets all opponent encounters for this match
-        /// </summary>
-        public static List<(Guid TeamId, Guid OpponentId)> GetAllOpponentPairs(Match match)
-        {
-            var pairs = new List<(Guid, Guid)>();
-            foreach (var encounter in GetOpponentEncountersForTeam(match, match.Team1Id))
-            {
-                pairs.Add((encounter.TeamId, encounter.OpponentId));
-            }
-            return pairs.Distinct().ToList();
-        }
-
-        /// <summary>
-        /// Calculates variety entropy for a team's opponents in this match
-        /// </summary>
-        public static double CalculateVarietyEntropyForTeam(Match match, Guid teamId)
-        {
-            var encounters = GetOpponentEncountersForTeam(match, teamId);
-            if (!encounters.Any())
-                return 0.0;
-
-            var totalEncounters = encounters.Count;
-            var uniqueOpponents = encounters.Select(e => e.OpponentId).Distinct().Count();
-
-            // Shannon entropy calculation for opponent distribution
-            var entropy = 0.0;
-            var opponentGroups = encounters.GroupBy(e => e.OpponentId);
-
-            foreach (var group in opponentGroups)
-            {
-                var probability = (double)group.Count() / totalEncounters;
-                entropy -= probability * Math.Log(probability);
-            }
-
-            // Normalize by log of unique opponents to get value between 0 and 1
-            var maxEntropy = Math.Log(uniqueOpponents);
-            return maxEntropy == 0 ? 0 : entropy / maxEntropy;
-        }
-
-        /// <summary>
-        /// Calculates variety bonus based on opponent distribution
-        /// </summary>
-        public static double CalculateVarietyBonusForTeam(Match match, Guid teamId)
-        {
-            var encounters = GetOpponentEncountersForTeam(match, teamId);
-            var uniqueOpponents = encounters.Select(e => e.OpponentId).Distinct().Count();
-            var totalEncounters = encounters.Count;
-
-            // Bonus increases with more unique opponents, but decreases with repeated encounters
-            var uniqueBonus = Math.Min(uniqueOpponents * 0.1, 1.0); // Cap at 1.0 for 10+ opponents
-            var repeatPenalty = totalEncounters > uniqueOpponents ? (totalEncounters - uniqueOpponents) * 0.05 : 0.0;
-
-            return Math.Max(uniqueBonus - repeatPenalty, 0.0);
-        }
-
-        /// <summary>
-        /// Completes a match with winner determination and variety statistics updates
-        /// </summary>
-        public async Task<Result> CompleteMatchAsync(Guid matchId, Guid winnerId)
-        {
-            try
-            {
-                var matchResult = await CoreService.Matches.GetByIdAsync(matchId, DatabaseComponent.Repository);
-                if (!matchResult.Success)
+                // Get map ID from database
+                var mapResult = await CoreService.WithDbContext(async db =>
                 {
-                    return Result.Failure($"Failed to retrieve match: {matchResult.ErrorMessage}");
-                }
-                var match = matchResult.Data;
+                    return await db.Maps.Where(m => m.Name == selectedMapName).FirstOrDefaultAsync();
+                });
 
-                if (match == null)
-                    return Result.Failure("Match not found.");
-
-                // Validate match can be completed
-                if (Accessors.GetCurrentStatus(match) != MatchStatus.InProgress)
-                    return Result.Failure("Match can only be completed when in InProgress state.");
-
-                // Validate winner is a participant
-                var winnerParticipant = match.Participants.FirstOrDefault(p => p.TeamId == winnerId);
-                if (winnerParticipant == null)
-                    return Result.Failure("Winner team is not a participant in this match.");
-
-                // Set completion data
-                match.CompletedAt = DateTime.UtcNow;
-                match.WinnerId = winnerId;
-
-                // Update match participants with winner information
-                foreach (var participant in match.Participants)
+                if (mapResult is null)
                 {
-                    participant.IsWinner = participant.TeamId == winnerId;
-                    participant.UpdatedAt = DateTime.UtcNow;
-                    var updateParticipantResult = await CoreService.MatchParticipants.UpdateAsync(
-                        participant,
-                        DatabaseComponent.Repository
-                    );
-                    if (!updateParticipantResult.Success)
-                    {
-                        // Log and continue, don't fail entire operation
-                        await CoreService.ErrorHandler.CaptureAsync(
-                            new Exception(
-                                $"Failed to update participant {participant.Id}: "
-                                    + $"{updateParticipantResult.ErrorMessage}"
-                            ),
-                            "Match Completion Warning",
-                            nameof(CompleteMatchAsync)
-                        );
-                    }
+                    return Result<Game>.Failure($"Map '{selectedMapName}' not found in database");
                 }
 
-                // Update opponent encounters with winner information
-                foreach (var encounter in GetOpponentEncountersForTeam(match, match.Team1Id))
+                var mapId = mapResult.Id;
+
+                // Create the next game
+                var createGameResult = await CreateScrimmageGameAsync(match, mapId);
+                if (!createGameResult.Success || createGameResult.Data is null)
                 {
-                    encounter.Won = encounter.TeamId == winnerId;
-                    encounter.UpdatedAt = DateTime.UtcNow;
-                    var updateEncounterResult = await CoreService.TeamOpponentEncounters.UpdateAsync(
-                        encounter,
-                        DatabaseComponent.Repository
-                    );
-                    if (!updateEncounterResult.Success)
-                    {
-                        // Log and continue, don't fail entire operation
-                        await CoreService.ErrorHandler.CaptureAsync(
-                            new Exception(
-                                $"Failed to update opponent encounter {encounter.Id}: "
-                                    + $"{updateEncounterResult.ErrorMessage}"
-                            ),
-                            "Match Completion Warning",
-                            nameof(CompleteMatchAsync)
-                        );
-                    }
+                    return Result<Game>.Failure($"Failed to create game: {createGameResult.ErrorMessage}");
                 }
 
-                // Update match and save
-                var updateMatchRepoResult = await CoreService.Matches.UpdateAsync(match, DatabaseComponent.Repository);
-                var updateMatchCacheResult = await CoreService.Matches.UpdateAsync(match, DatabaseComponent.Cache);
-
-                if (!updateMatchRepoResult.Success || !updateMatchCacheResult.Success)
-                {
-                    return Result.Failure("Failed to update match in repository or cache after completion.");
-                }
-
-                // Trigger variety statistics updates for participating teams
-                await UpdateTeamVarietyStatsAsync(match);
-
-                // Publish Core-local event for match completion
-                // await CoreService.PublishAsync(new ScrimmageMatchCompletedEvent(match.Id, winnerId));
-
-                return Result.CreateSuccess();
-            }
-            catch (Exception ex)
-            {
-                await CoreService.ErrorHandler.CaptureAsync(ex, "Failed to complete match", nameof(CompleteMatchAsync));
-                return Result.Failure($"An unexpected error occurred while completing the match: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// Updates variety statistics for all teams that participated in a match
-        /// </summary>
-        private async Task UpdateTeamVarietyStatsAsync(Match match)
-        {
-            try
-            {
-                // var teamData = new DatabaseService<Team>(); // Replaced by CoreService.Teams field
-                // var varietyStatsData = new DatabaseService<TeamVarietyStats>(); // Replaced by _varietyStatsData field
-
-                foreach (var participant in match.Participants)
-                {
-                    var teamResult = await CoreService.Teams.GetByIdAsync(
-                        participant.TeamId,
-                        DatabaseComponent.Repository
-                    );
-                    if (!teamResult.Success)
-                    {
-                        await CoreService.ErrorHandler.CaptureAsync(
-                            new Exception(
-                                $"Failed to retrieve team {participant.TeamId}: " + $"{teamResult.ErrorMessage}"
-                            ),
-                            "Variety Stats Update Warning",
-                            nameof(UpdateTeamVarietyStatsAsync)
-                        );
-                        continue; // Skip this team and continue with others
-                    }
-                    var team = teamResult.Data;
-
-                    if (team == null)
-                    {
-                        continue; // Skip if team not found
-                    }
-
-                    // Get or create variety stats for this team and team size
-                    var varietyStats = team.VarietyStats.FirstOrDefault(vs => vs.TeamSize == match.TeamSize);
-                    if (varietyStats == null)
-                    {
-                        varietyStats = new TeamVarietyStats
-                        {
-                            TeamId = team.Id,
-                            TeamSize = match.TeamSize,
-                            VarietyEntropy = 0.0,
-                            VarietyBonus = 0.0,
-                            TotalOpponents = 0,
-                            UniqueOpponents = 0,
-                            LastCalculated = DateTime.UtcNow,
-                            LastUpdated = DateTime.UtcNow,
-                        };
-
-                        // Use _varietyStatsData from constructor
-                        var createResult = await CoreService.TeamVarietyStats.CreateAsync(
-                            varietyStats,
-                            DatabaseComponent.Repository
-                        );
-                        if (createResult.Success)
-                        {
-                            team.VarietyStats.Add(varietyStats);
-                        }
-                        else
-                        {
-                            await CoreService.ErrorHandler.CaptureAsync(
-                                new Exception(
-                                    $"Failed to create variety stats for team {team.Id}: "
-                                        + $"{createResult.ErrorMessage}"
-                                ),
-                                "Variety Stats Update Warning",
-                                nameof(UpdateTeamVarietyStatsAsync)
-                            );
-                            continue; // Skip this team if stats cannot be created
-                        }
-                    }
-
-                    // Update variety stats using recent encounters
-                    // Note: This still assumes team.RecentOpponents is available.
-                    // The relational-refactoring plan will address this data structure.
-                    var recentEncounters =
-                        GetOpponentEncountersForTeam(match, team.Id)
-                            .Where(oe => oe.TeamSize == match.TeamSize)
-                            .OrderByDescending(oe => oe.EncounteredAt)
-                            .Take(100) // Use last 100 encounters for stats calculation
-                            .ToList()
-                        ?? new List<TeamOpponentEncounter>();
-
-                    TeamCore.ScrimmageStats.UpdateVarietyStats(varietyStats, recentEncounters);
-                    varietyStats.LastUpdated = DateTime.UtcNow;
-
-                    // Use _varietyStatsData and CoreService.Teams from constructor
-                    var updateVarietyResult = await CoreService.TeamVarietyStats.UpdateAsync(
-                        varietyStats,
-                        DatabaseComponent.Repository
-                    );
-                    if (!updateVarietyResult.Success)
-                    {
-                        await CoreService.ErrorHandler.CaptureAsync(
-                            new Exception(
-                                $"Failed to update variety stats for team {team.Id}: "
-                                    + $"{updateVarietyResult.ErrorMessage}"
-                            ),
-                            "Variety Stats Update Warning",
-                            nameof(UpdateTeamVarietyStatsAsync)
-                        );
-                    }
-
-                    var updateTeamResult = await CoreService.Teams.UpdateAsync(team, DatabaseComponent.Repository);
-                    if (!updateTeamResult.Success)
-                    {
-                        await CoreService.ErrorHandler.CaptureAsync(
-                            new Exception(
-                                $"Failed to update team {team.Id} variety stats: " + $"{updateTeamResult.ErrorMessage}"
-                            ),
-                            "Variety Stats Update Warning",
-                            nameof(UpdateTeamVarietyStatsAsync)
-                        );
-                    }
-                }
+                return Result<Game>.CreateSuccess(createGameResult.Data, "Next game started successfully");
             }
             catch (Exception ex)
             {
                 await CoreService.ErrorHandler.CaptureAsync(
                     ex,
-                    "Failed to update team variety stats",
-                    nameof(UpdateTeamVarietyStatsAsync)
+                    $"Failed to start next game for match {match.Id}",
+                    nameof(StartNextGameAsync)
                 );
-                // Don't throw - variety stats update failure shouldn't fail match completion
+                return Result<Game>.Failure($"Failed to start next game: {ex.Message}");
             }
         }
 
-        // TODO: The rest of the business logic methods from MatchService.deprecated.cs need to be migrated here.
-        // - CancelMatchAsync
-        // - ForfeitMatchAsync
-        // - SubmitMapBansAsync
-        // - CheckMatchVictoryConditionsAsync
+        /// <summary>
+        /// Checks if a match has reached its victory condition.
+        /// </summary>
+        /// <param name="match">The match to check</param>
+        /// <returns>Result containing the winner team ID if match is won, or null if ongoing</returns>
+        public static Result<Guid?> CheckMatchVictoryCondition(Match match)
+        {
+            try
+            {
+                // Count wins for each team
+                var team1Wins = 0;
+                var team2Wins = 0;
+
+                foreach (var game in match.Games)
+                {
+                    var gameSnapshot = Accessors.GetCurrentSnapshot(game);
+                    if (gameSnapshot.CompletedAt.HasValue && gameSnapshot.WinnerId.HasValue)
+                    {
+                        if (gameSnapshot.WinnerId.Value == match.Team1Id)
+                        {
+                            team1Wins++;
+                        }
+                        else if (gameSnapshot.WinnerId.Value == match.Team2Id)
+                        {
+                            team2Wins++;
+                        }
+                    }
+                }
+
+                // Calculate games needed to win (best of N)
+                var gamesToWin = (match.BestOf + 1) / 2;
+
+                // Check if either team has won the match
+                if (team1Wins >= gamesToWin)
+                {
+                    return Result<Guid?>.CreateSuccess(match.Team1Id, "Team 1 won the match");
+                }
+                else if (team2Wins >= gamesToWin)
+                {
+                    return Result<Guid?>.CreateSuccess(match.Team2Id, "Team 2 won the match");
+                }
+
+                // Check if all games have been played with PlayToCompletion
+                if (match.PlayToCompletion && (team1Wins + team2Wins) >= match.BestOf)
+                {
+                    // All games played - determine winner by total wins
+                    var winnerId = team1Wins > team2Wins ? match.Team1Id : match.Team2Id;
+                    return Result<Guid?>.CreateSuccess(winnerId, "Match completed - all games played");
+                }
+
+                // Match is still ongoing
+                return Result<Guid?>.CreateSuccess(null, "Match is still ongoing");
+            }
+            catch (Exception ex)
+            {
+                return Result<Guid?>.Failure($"Failed to check match victory condition: {ex.Message}");
+            }
+        }
         #endregion
     }
 }

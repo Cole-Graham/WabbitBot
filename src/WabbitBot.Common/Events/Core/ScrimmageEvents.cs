@@ -15,15 +15,15 @@ namespace WabbitBot.Common.Events.Core
     }
 
     [EventGenerator(
-        pubTargetClass: "WabbitBot.DiscBot.App.Commands.ScrimmageCommands",
+        pubTargetClass: "WabbitBot.DiscBot.App.ScrimmageApp",
         subTargetClasses: ["WabbitBot.Core.Scrimmages.ScrimmageHandler"]
     )]
     public record ChallengeRequested(
         int TeamSize,
-        string ChallengerTeamName,
-        string OpponentTeamName,
-        string[] SelectedPlayerNames,
-        ulong IssuedByDiscordUserId,
+        Guid ChallengerTeamId,
+        Guid OpponentTeamId,
+        Guid[] SelectedPlayerIds,
+        Guid IssuedByPlayerId,
         int BestOf
     ) : IEvent
     {
@@ -31,17 +31,6 @@ namespace WabbitBot.Common.Events.Core
         public DateTime Timestamp { get; init; } = DateTime.UtcNow;
         public EventBusType EventBusType { get; init; } = EventBusType.Global;
     }
-
-    // [EventGenerator(
-    //     pubTargetClass: "WabbitBot.DiscBot.App.Handlers.ScrimmageHandler",
-    //     subTargetClasses: ["WabbitBot.DiscBot.App.Handlers.ScrimmageHandler"]
-    // )]
-    // public record ChallengeContainerCreated(Guid ChallengeId, ulong ChallengeChannelId) : IEvent
-    // {
-    //     public Guid EventId { get; init; } = Guid.NewGuid();
-    //     public DateTime Timestamp { get; init; } = DateTime.UtcNow;
-    //     public EventBusType EventBusType { get; init; } = EventBusType.Global;
-    // }
 
     [EventGenerator(
         pubTargetClass: "WabbitBot.DiscBot.App.ScrimmageApp",
@@ -61,48 +50,9 @@ namespace WabbitBot.Common.Events.Core
 
     [EventGenerator(
         pubTargetClass: "WabbitBot.DiscBot.App.Commands.ScrimmageCommands",
-        subTargetClasses: ["WabbitBot.DiscBot.App.Handlers.ScrimmageHandler"]
+        subTargetClasses: ["WabbitBot.DiscBot.App.Handlers"]
     )]
     public record ChallengeDeclined(Guid ChallengeId, Guid OpponentTeamId, Guid DeclinedByPlayerId) : IEvent
-    {
-        public Guid EventId { get; init; } = Guid.NewGuid();
-        public DateTime Timestamp { get; init; } = DateTime.UtcNow;
-        public EventBusType EventBusType { get; init; } = EventBusType.Global;
-    }
-
-    [EventGenerator(
-        pubTargetClass: "WabbitBot.DiscBot.App.Commands.ScrimmageCommands",
-        subTargetClasses: ["WabbitBot.DiscBot.App.Handlers.ScrimmageHandler"]
-    )]
-    public record ChallengeCancelled(Guid ChallengeId, Guid CancelledByPlayerId) : IEvent
-    {
-        public Guid EventId { get; init; } = Guid.NewGuid();
-        public DateTime Timestamp { get; init; } = DateTime.UtcNow;
-        public EventBusType EventBusType { get; init; } = EventBusType.Global;
-    }
-
-    [EventGenerator(
-        pubTargetClass: "WabbitBot.Core.Scrimmages.ScrimmageCore",
-        subTargetClasses: [
-            "WabbitBot.DiscBot.App.Handlers.ScrimmageHandler",
-            "WabbitBot.DiscBot.App.Handlers.MatchHandler",
-        ]
-    )]
-    public record ScrimmageCreated(Guid ScrimmageId) : IEvent
-    {
-        public Guid EventId { get; init; } = Guid.NewGuid();
-        public DateTime Timestamp { get; init; } = DateTime.UtcNow;
-        public EventBusType EventBusType { get; init; } = EventBusType.Global;
-    }
-
-    [EventGenerator(
-        pubTargetClass: "WabbitBot.Core.Scrimmages.ScrimmageCore",
-        subTargetClasses: [
-            "WabbitBot.DiscBot.App.Handlers.ScrimmageHandler",
-            "WabbitBot.DiscBot.App.Handlers.MatchHandler",
-        ]
-    )]
-    public record MatchProvisioningRequested(Guid ScrimmageId, ulong ScrimmageChannelId) : IEvent
     {
         public Guid EventId { get; init; } = Guid.NewGuid();
         public DateTime Timestamp { get; init; } = DateTime.UtcNow;

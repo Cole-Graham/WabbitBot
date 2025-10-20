@@ -238,9 +238,18 @@ namespace WabbitBot.SourceGenerators.Generators.Event
                     {
                         foreach (var targetClass in evt!.SubTargetClasses)
                         {
-                            // Only emit for classes that exist in this compilation (safety)
+                            // Only emit for classes that exist AND are defined in this compilation (not in references)
                             var targetSymbol = compilation.GetTypeByMetadataName(targetClass);
                             if (targetSymbol is null)
+                                continue;
+
+                            // Check that the target class is defined in THIS assembly, not a referenced assembly
+                            if (
+                                !SymbolEqualityComparer.Default.Equals(
+                                    targetSymbol.ContainingAssembly,
+                                    compilation.Assembly
+                                )
+                            )
                                 continue;
 
                             if (!byTargetClass.TryGetValue(targetClass, out var list))
@@ -330,6 +339,7 @@ namespace WabbitBot.SourceGenerators.Generators.Event
                 // Extract attribute parameters - they're all passed as named arguments
                 string? pubTargetClass = null;
                 var subTargetClasses = new List<string>();
+                var writeHandlers = new List<string>();
 
                 // Check named arguments first (this is how the attribute is typically used)
                 foreach (var namedArg in attribute.NamedArguments)
@@ -343,6 +353,16 @@ namespace WabbitBot.SourceGenerators.Generators.Event
                             if (namedArg.Value.Values.Length > 0)
                             {
                                 subTargetClasses = namedArg
+                                    .Value.Values.Select(v => v.Value as string)
+                                    .Where(s => !string.IsNullOrEmpty(s))
+                                    .Select(s => s!)
+                                    .ToList();
+                            }
+                            break;
+                        case "WriteHandlers":
+                            if (namedArg.Value.Values.Length > 0)
+                            {
+                                writeHandlers = namedArg
                                     .Value.Values.Select(v => v.Value as string)
                                     .Where(s => !string.IsNullOrEmpty(s))
                                     .Select(s => s!)
@@ -363,6 +383,18 @@ namespace WabbitBot.SourceGenerators.Generators.Event
                     if (!arrayArg.IsNull && arrayArg.Values.Length > 0)
                     {
                         subTargetClasses = arrayArg
+                            .Values.Select(v => v.Value as string)
+                            .Where(s => !string.IsNullOrEmpty(s))
+                            .Select(s => s!)
+                            .ToList();
+                    }
+                }
+                if (writeHandlers.Count == 0 && attribute.ConstructorArguments.Length > 2)
+                {
+                    var arrayArg = attribute.ConstructorArguments[2];
+                    if (!arrayArg.IsNull && arrayArg.Values.Length > 0)
+                    {
+                        writeHandlers = arrayArg
                             .Values.Select(v => v.Value as string)
                             .Where(s => !string.IsNullOrEmpty(s))
                             .Select(s => s!)
@@ -424,7 +456,8 @@ namespace WabbitBot.SourceGenerators.Generators.Event
                     pubTargetClass,
                     subTargetClasses,
                     parameters,
-                    typeSymbol
+                    typeSymbol,
+                    writeHandlers
                 );
             }
             catch
@@ -579,6 +612,7 @@ namespace WabbitBot.SourceGenerators.Generators.Event
             // Add using statements
             sb.AppendLine("using System.Threading.Tasks;");
             sb.AppendLine($"using {busNamespace};");
+            sb.AppendLine("using WabbitBot.Common.Events.Interfaces;");
 
             // Collect all event namespaces for using statements
             var eventNamespaces = events.Select(e => e.EventNamespace).Distinct().ToList();
@@ -606,9 +640,12 @@ namespace WabbitBot.SourceGenerators.Generators.Event
             {
                 var handlerName = $"Handle{evt.EventClassName}Async";
 
+                // Determine handler type based on WriteHandlers list or heuristic
+                var handlerType = DetermineHandlerType(targetClass, evt);
+
                 // Wire subscription to the handler method - build will fail if handler doesn't exist
                 sb.AppendLine(
-                    $"            {busAccessor}.Subscribe<{evt.EventClassName}>(async evt => await {targetClassName}.{handlerName}(evt));"
+                    $"            {busAccessor}.Subscribe<{evt.EventClassName}>(async evt => await {targetClassName}.{handlerName}(evt), HandlerType.{handlerType});"
                 );
             }
 
@@ -621,6 +658,38 @@ namespace WabbitBot.SourceGenerators.Generators.Event
             }
 
             return sb.ToString();
+        }
+
+        /// <summary>
+        /// Determines the handler type (Write or Read) for a given target class and event.
+        /// </summary>
+        private static string DetermineHandlerType(string targetClass, EventInfo evt)
+        {
+            // If WriteHandlers list is explicitly provided and contains this target, it's Write
+            if (evt.WriteHandlers.Any() && evt.WriteHandlers.Contains(targetClass))
+            {
+                return "Write";
+            }
+
+            // If WriteHandlers list is provided but doesn't contain this target, it's Read
+            if (evt.WriteHandlers.Any())
+            {
+                return "Read";
+            }
+
+            // Fallback to heuristic: Core handlers are Write, DiscBot handlers are Read
+            if (targetClass.Contains("WabbitBot.Core"))
+            {
+                return "Write";
+            }
+
+            if (targetClass.Contains("WabbitBot.DiscBot"))
+            {
+                return "Read";
+            }
+
+            // Default to Write for safety (mutations should happen first)
+            return "Write";
         }
 
         private static string SimplifyTypeName(string fullTypeName)
@@ -673,7 +742,8 @@ namespace WabbitBot.SourceGenerators.Generators.Event
         string? PubTargetClass,
         List<string> SubTargetClasses,
         List<EventParameter> Parameters,
-        INamedTypeSymbol EventClassSymbol
+        INamedTypeSymbol EventClassSymbol,
+        List<string> WriteHandlers
     )
     {
         public bool ShouldGeneratePublisher => !string.IsNullOrEmpty(PubTargetClass);

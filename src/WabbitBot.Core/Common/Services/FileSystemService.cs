@@ -33,7 +33,8 @@ public partial class FileSystemService
         "image/webp",
     };
 
-    private const long MaxThumbnailSize = 1 * 1024 * 1024; // 1MB
+    public const long MaxThumbnailSize = 5 * 1024 * 1024; // 5MB
+    public const long MaxReplayFileSize = 30 * 1024 * 1024; // 30MB
 
     protected readonly ICoreEventBus EventBus;
     private readonly IErrorService _errorHandler;
@@ -41,27 +42,40 @@ public partial class FileSystemService
     private readonly string _divisionIconsDirectory;
     private readonly string _discordComponentImagesDirectory;
     private readonly string _defaultDiscordImagesDirectory;
+    private readonly string _replaysDirectory;
     private readonly Dictionary<string, CdnMetadata> _cdnMetadataCache;
 
     /// <summary>
     /// Creates a new FileSystemService instance
     /// </summary>
+    /// <param name="storageOptions">Storage configuration options for directory paths</param>
     /// <param name="eventBus">Optional event bus instance, defaults to CoreEventBus.Instance</param>
     /// <param name="errorHandler">Optional error handler instance, defaults to new ErrorService()</param>
-    public FileSystemService(ICoreEventBus? eventBus = null, IErrorService? errorHandler = null)
+    public FileSystemService(
+        WabbitBot.Common.Configuration.StorageOptions? storageOptions = null,
+        ICoreEventBus? eventBus = null,
+        IErrorService? errorHandler = null
+    )
     {
         EventBus = eventBus ?? CoreEventBus.Instance;
-        _errorHandler = errorHandler ?? new WabbitBot.Common.ErrorService.ErrorService(); // TODO: Use a shared instance
-        _thumbnailsDirectory = Path.GetFullPath("data/maps/thumbnails");
-        _divisionIconsDirectory = Path.GetFullPath("data/divisions/icons");
-        _discordComponentImagesDirectory = Path.GetFullPath("data/images/discord");
-        _defaultDiscordImagesDirectory = Path.GetFullPath("data/images/default/discord");
+        _errorHandler = errorHandler ?? new WabbitBot.Common.ErrorService.ErrorService();
+
+        // Use provided storage options or create defaults
+        storageOptions ??= new WabbitBot.Common.Configuration.StorageOptions();
+
+        // Resolve paths (converts relative to absolute, leaves absolute as-is)
+        _thumbnailsDirectory = storageOptions.ResolvePath(storageOptions.MapsDirectory);
+        _divisionIconsDirectory = storageOptions.ResolvePath(storageOptions.DivisionIconsDirectory);
+        _discordComponentImagesDirectory = storageOptions.ResolvePath(storageOptions.DiscordComponentImagesDirectory);
+        _defaultDiscordImagesDirectory = storageOptions.ResolvePath(storageOptions.DefaultDiscordImagesDirectory);
+        _replaysDirectory = storageOptions.ResolvePath(storageOptions.ReplaysDirectory);
         _cdnMetadataCache = new Dictionary<string, CdnMetadata>();
 
-        // Ensure directories exist and are secure
+        // Ensure directories exist
         EnsureSecureDirectory();
         EnsureSecureDivisionIconsDirectory();
         EnsureSecureDiscordImagesDirectories();
+        EnsureSecureReplaysDirectory();
     }
 
     /// <summary>
@@ -168,53 +182,6 @@ public partial class FileSystemService
             return false;
         }
     }
-
-    /// <summary>
-    /// Gets the full path to a thumbnail file with security validation
-    /// </summary>
-    /// <param name="fileName">The filename</param>
-    /// <returns>Full path if file exists and is safe, null otherwise</returns>
-    public string? GetThumbnailPath(string fileName)
-    {
-        try
-        {
-            var fullPath = Path.Combine(_thumbnailsDirectory, fileName);
-
-            if (!IsPathSafe(fullPath) || !File.Exists(fullPath))
-            {
-                return null;
-            }
-
-            return fullPath;
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
-    /// <summary>
-    /// Checks if a thumbnail file exists
-    /// </summary>
-    /// <param name="fileName">The filename to check</param>
-    /// <returns>True if the file exists and is accessible</returns>
-    public bool ThumbnailExists(string fileName)
-    {
-        try
-        {
-            var fullPath = Path.Combine(_thumbnailsDirectory, fileName);
-            return IsPathSafe(fullPath) && File.Exists(fullPath);
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
-    /// <summary>
-    /// Gets the configured thumbnails directory
-    /// </summary>
-    public string ThumbnailsDirectory => _thumbnailsDirectory;
 
     #region Division Icon Management
 
@@ -327,53 +294,6 @@ public partial class FileSystemService
         }
     }
 
-    /// <summary>
-    /// Gets the full path to a division icon file with security validation
-    /// </summary>
-    /// <param name="fileName">The filename</param>
-    /// <returns>Full path if file exists and is safe, null otherwise</returns>
-    public string? GetDivisionIconPath(string fileName)
-    {
-        try
-        {
-            var fullPath = Path.Combine(_divisionIconsDirectory, fileName);
-
-            if (!IsPathSafe(fullPath) || !File.Exists(fullPath))
-            {
-                return null;
-            }
-
-            return fullPath;
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
-    /// <summary>
-    /// Checks if a division icon file exists
-    /// </summary>
-    /// <param name="fileName">The filename to check</param>
-    /// <returns>True if the file exists and is accessible</returns>
-    public bool DivisionIconExists(string fileName)
-    {
-        try
-        {
-            var fullPath = Path.Combine(_divisionIconsDirectory, fileName);
-            return IsPathSafe(fullPath) && File.Exists(fullPath);
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
-    /// <summary>
-    /// Gets the configured division icons directory
-    /// </summary>
-    public string DivisionIconsDirectory => _divisionIconsDirectory;
-
     #endregion
 
     #region Discord Component Images Management
@@ -386,64 +306,48 @@ public partial class FileSystemService
     /// <returns>CDN URL or file path, null if not found</returns>
     public string? GetDiscordComponentImage(string imageName)
     {
+        Console.WriteLine($"🔍 DEBUG: GetDiscordComponentImage called with: {imageName}");
+        Console.WriteLine($"🔍 DEBUG: _discordComponentImagesDirectory: {_discordComponentImagesDirectory}");
+        Console.WriteLine($"🔍 DEBUG: _defaultDiscordImagesDirectory: {_defaultDiscordImagesDirectory}");
+
         // Check for custom override first
         var customPath = Path.Combine(_discordComponentImagesDirectory, imageName);
+        Console.WriteLine($"🔍 DEBUG: Custom path: {customPath}");
+        Console.WriteLine($"🔍 DEBUG: Custom path exists: {File.Exists(customPath)}");
+
         if (File.Exists(customPath))
         {
             // Check if we have CDN metadata for the custom image
             var cdnMetadata = GetCdnMetadata(imageName);
             if (cdnMetadata is not null)
             {
+                Console.WriteLine($"🔍 DEBUG: Found CDN metadata for custom image: {cdnMetadata.CdnUrl}");
                 return cdnMetadata.CdnUrl;
             }
+            Console.WriteLine($"🔍 DEBUG: Returning custom path: {customPath}");
             return customPath; // Return local path for upload
         }
 
         // Fall back to default image
         var defaultPath = Path.Combine(_defaultDiscordImagesDirectory, imageName);
+        Console.WriteLine($"🔍 DEBUG: Default path: {defaultPath}");
+        Console.WriteLine($"🔍 DEBUG: Default path exists: {File.Exists(defaultPath)}");
+
         if (File.Exists(defaultPath))
         {
             // Check if we have CDN metadata for the default image
             var cdnMetadata = GetCdnMetadata($"default_{imageName}");
             if (cdnMetadata is not null)
             {
+                Console.WriteLine($"🔍 DEBUG: Found CDN metadata for default image: {cdnMetadata.CdnUrl}");
                 return cdnMetadata.CdnUrl;
             }
+            Console.WriteLine($"🔍 DEBUG: Returning default path: {defaultPath}");
             return defaultPath; // Return local path for upload
         }
 
+        Console.WriteLine($"🔍 DEBUG: Image not found, returning null");
         return null;
-    }
-
-    /// <summary>
-    /// Checks if a Discord component image is using the default or has been customized
-    /// </summary>
-    /// <param name="imageName">The image filename</param>
-    /// <returns>True if using default, false if customized</returns>
-    public bool IsUsingDefaultDiscordImage(string imageName)
-    {
-        var customPath = Path.Combine(_discordComponentImagesDirectory, imageName);
-        return !File.Exists(customPath);
-    }
-
-    /// <summary>
-    /// Gets all available default Discord component image names
-    /// </summary>
-    public List<string> GetDefaultDiscordImageNames()
-    {
-        if (!Directory.Exists(_defaultDiscordImagesDirectory))
-        {
-            return new List<string>();
-        }
-
-        return Directory
-            .GetFiles(_defaultDiscordImagesDirectory)
-            .Where(f => !f.EndsWith(".pdn", StringComparison.OrdinalIgnoreCase))
-            .Select(Path.GetFileName)
-            .Where(name => name is not null)
-            .Cast<string>()
-            .OrderBy(name => name)
-            .ToList();
     }
 
     /// <summary>
@@ -551,6 +455,128 @@ public partial class FileSystemService
 
     #endregion
 
+    #region Replay File Management
+
+    /// <summary>
+    /// Validates and saves a replay file (.rpl3 or .zip containing replay) with security checks
+    /// </summary>
+    /// <param name="fileData">The replay file data</param>
+    /// <param name="originalFileName">Original filename for validation</param>
+    /// <returns>Secure filename if successful, null if validation fails</returns>
+    public async Task<string?> SaveReplayFileAsync(byte[] fileData, string? originalFileName = null)
+    {
+        try
+        {
+            // 1. Validate file size
+            if (fileData.Length > MaxReplayFileSize)
+            {
+                throw new InvalidOperationException(
+                    $"Replay file size {fileData.Length} exceeds maximum allowed size {MaxReplayFileSize}"
+                );
+            }
+
+            // 2. Validate file extension if original filename provided
+            string extension = ".rpl3"; // Default extension
+            if (!string.IsNullOrEmpty(originalFileName))
+            {
+                extension = Path.GetExtension(originalFileName).ToLowerInvariant();
+                if (extension != ".rpl3" && extension != ".zip")
+                {
+                    throw new InvalidOperationException(
+                        $"File extension '{extension}' is not allowed. Only .rpl3 and .zip files are supported."
+                    );
+                }
+            }
+
+            // 3. Generate secure filename and save
+            var secureFileName = $"{Guid.NewGuid()}{extension}";
+            var fullPath = Path.Combine(_replaysDirectory, secureFileName);
+
+            await File.WriteAllBytesAsync(fullPath, fileData);
+
+            // Publish event for successful upload (infrastructure fact, not database CRUD)
+            await EventBus.PublishAsync(new ReplayFileUploadedEvent(secureFileName, originalFileName, fileData.Length));
+
+            return secureFileName;
+        }
+        catch (Exception ex)
+        {
+            await _errorHandler.CaptureAsync(
+                ex,
+                $"Replay file upload failed for {originalFileName}",
+                nameof(SaveReplayFileAsync)
+            );
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Deletes a replay file securely
+    /// </summary>
+    /// <param name="fileName">The filename to delete</param>
+    /// <returns>True if successful, false otherwise</returns>
+    public async Task<bool> DeleteReplayFileAsync(string fileName)
+    {
+        try
+        {
+            var fullPath = Path.Combine(_replaysDirectory, fileName);
+
+            // Ensure the path is safe (prevent path traversal)
+            if (!IsPathSafe(fullPath))
+            {
+                throw new InvalidOperationException("Invalid file path");
+            }
+
+            if (File.Exists(fullPath))
+            {
+                File.Delete(fullPath);
+
+                // Publish event for successful deletion (infrastructure fact, not database CRUD)
+                await EventBus.PublishAsync(new ReplayFileDeletedEvent(fileName));
+
+                return true;
+            }
+
+            return false;
+        }
+        catch (Exception ex)
+        {
+            await _errorHandler.CaptureAsync(
+                ex,
+                $"Failed to delete replay file {fileName}",
+                nameof(DeleteReplayFileAsync)
+            );
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Reads a replay file's contents
+    /// </summary>
+    /// <param name="fileName">The filename to read</param>
+    /// <returns>File contents if successful, null otherwise</returns>
+    public async Task<byte[]?> ReadReplayFileAsync(string fileName)
+    {
+        try
+        {
+            var fullPath = Path.Combine(_replaysDirectory, fileName);
+
+            if (!IsPathSafe(fullPath) || !File.Exists(fullPath))
+            {
+                return null;
+            }
+
+            return await File.ReadAllBytesAsync(fullPath);
+        }
+        catch (Exception ex)
+        {
+            await _errorHandler.CaptureAsync(ex, $"Failed to read replay file {fileName}", nameof(ReadReplayFileAsync));
+            return null;
+        }
+    }
+
+    #endregion
+
     #region Private Helper Methods
 
     /// <summary>
@@ -560,7 +586,7 @@ public partial class FileSystemService
     /// <param name="directory">The directory to search</param>
     /// <param name="filePattern">The file pattern (e.g., "mapId.*")</param>
     /// <returns>Full path to the first matching file, or null if not found</returns>
-    private static string? FindFileByPattern(string directory, string filePattern)
+    private string? FindFileByPattern(string directory, string filePattern)
     {
         try
         {
@@ -580,11 +606,11 @@ public partial class FileSystemService
             Directory.CreateDirectory(_thumbnailsDirectory);
         }
 
-        // Ensure the directory is within the application directory
-        var appDirectory = Path.GetFullPath(AppContext.BaseDirectory);
-        if (!_thumbnailsDirectory.StartsWith(appDirectory))
+        // Validate path is safe (no path traversal)
+        var normalizedPath = Path.GetFullPath(_thumbnailsDirectory);
+        if (!string.Equals(normalizedPath, _thumbnailsDirectory, StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException("Thumbnails directory must be within the application directory");
+            throw new InvalidOperationException($"Invalid thumbnails directory path: {_thumbnailsDirectory}");
         }
     }
 
@@ -595,11 +621,11 @@ public partial class FileSystemService
             Directory.CreateDirectory(_divisionIconsDirectory);
         }
 
-        // Ensure the directory is within the application directory
-        var appDirectory = Path.GetFullPath(AppContext.BaseDirectory);
-        if (!_divisionIconsDirectory.StartsWith(appDirectory))
+        // Validate path is safe (no path traversal)
+        var normalizedPath = Path.GetFullPath(_divisionIconsDirectory);
+        if (!string.Equals(normalizedPath, _divisionIconsDirectory, StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException("Division icons directory must be within the application directory");
+            throw new InvalidOperationException($"Invalid division icons directory path: {_divisionIconsDirectory}");
         }
     }
 
@@ -618,19 +644,42 @@ public partial class FileSystemService
             Directory.CreateDirectory(_defaultDiscordImagesDirectory);
         }
 
-        // Ensure directories are within the application directory
-        var appDirectory = Path.GetFullPath(AppContext.BaseDirectory);
-        if (!_discordComponentImagesDirectory.StartsWith(appDirectory))
+        // Validate paths are safe (no path traversal)
+        var normalizedComponentPath = Path.GetFullPath(_discordComponentImagesDirectory);
+        if (
+            !string.Equals(
+                normalizedComponentPath,
+                _discordComponentImagesDirectory,
+                StringComparison.OrdinalIgnoreCase
+            )
+        )
         {
             throw new InvalidOperationException(
-                "Discord component images directory must be within the application directory"
+                $"Invalid Discord component images directory path: {_discordComponentImagesDirectory}"
             );
         }
-        if (!_defaultDiscordImagesDirectory.StartsWith(appDirectory))
+
+        var normalizedDefaultPath = Path.GetFullPath(_defaultDiscordImagesDirectory);
+        if (!string.Equals(normalizedDefaultPath, _defaultDiscordImagesDirectory, StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException(
-                "Default Discord images directory must be within the application directory"
+                $"Invalid default Discord images directory path: {_defaultDiscordImagesDirectory}"
             );
+        }
+    }
+
+    private void EnsureSecureReplaysDirectory()
+    {
+        if (!Directory.Exists(_replaysDirectory))
+        {
+            Directory.CreateDirectory(_replaysDirectory);
+        }
+
+        // Validate path is safe (no path traversal)
+        var normalizedPath = Path.GetFullPath(_replaysDirectory);
+        if (!string.Equals(normalizedPath, _replaysDirectory, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException($"Invalid replays directory path: {_replaysDirectory}");
         }
     }
 
@@ -687,11 +736,41 @@ public partial class FileSystemService
         return $"{Guid.NewGuid()}{extension}";
     }
 
-    private static bool IsPathSafe(string filePath)
+    /// <summary>
+    /// Validates that a file path is safe and doesn't attempt path traversal.
+    /// Checks that the resolved path is within one of the configured storage directories.
+    /// </summary>
+    private bool IsPathSafe(string filePath)
     {
-        var fullPath = Path.GetFullPath(filePath);
-        var basePath = Path.GetFullPath(AppContext.BaseDirectory);
-        return fullPath.StartsWith(basePath);
+        try
+        {
+            var fullPath = Path.GetFullPath(filePath);
+
+            // Check if path is within any of our configured directories
+            var allowedDirectories = new[]
+            {
+                _thumbnailsDirectory,
+                _divisionIconsDirectory,
+                _discordComponentImagesDirectory,
+                _defaultDiscordImagesDirectory,
+                _replaysDirectory,
+            };
+
+            foreach (var allowedDir in allowedDirectories)
+            {
+                var normalizedAllowedDir = Path.GetFullPath(allowedDir);
+                if (fullPath.StartsWith(normalizedAllowedDir, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false; // Path is not within any allowed directory
+        }
+        catch
+        {
+            return false; // Any path resolution error = unsafe
+        }
     }
 
     #endregion

@@ -60,9 +60,8 @@ used to increase the player's variety score.
 - Use cosine scaling to decrease this weighting the lower the opponent's elo is, reaching 0 at a specified max gap.
   The formula is: `weight = (1 + cos(π * normalized_gap * 0.7)) / 2`
   where normalized_gap is the rating difference divided by the max gap.
-- The max rating gap should be equal to 40% of the total Elo range of the entire leaderboard population,
-divided by 2.
-- Formula: `variety_gap = (max_rating - min_rating) * 0.40 / 2`
+- The max rating gap should be equal to 20% of the total Elo range of the entire leaderboard population.
+- Formula: `variety_gap = (max_rating - min_rating) * 0.2`
 
 ## Variety Bonus Calculation Details
 
@@ -75,7 +74,7 @@ The bonus calculation takes into account several factors:
 1. **Entropy Difference**: 
    - Measures how much more diverse a player's opponent pool is compared to the average player
    - Uses Shannon entropy to measure the diversity of a player's opponent pool
-   - Calculates weighted entropy for each player based on their opponent distribution
+   - Calculates weighted entropy for each player based on their variety score
    - Higher entropy means more diverse opponent selection
    - Only opponents within MAX_GAP_PERCENT (20%) of the player's rating count towards the variety score
    - This ensures players are rewarded for maintaining variety within their skill range
@@ -122,16 +121,10 @@ The weighted entropy calculation uses Shannon entropy to measure how evenly dist
   normalized_gap = (player_rating - opponent_rating) / variety_gap
   weight = (1.0 + cos(π * normalized_gap * 0.7)) / 2.0
   ```
-- Example scaling values:
-  - 0% of max gap: 1.0 (full weight)
-  - 25%: 0.9
-  - 50%: 0.75
-  - 75%: 0.5
-  - 100%: 0.0 (no weight)
 
 Example calculation:
 - Leaderboard range: 2047 - 1371 = 676 ELO
-- Variety gap: 676 * 0.4 / 2 = 135 ELO
+- Variety gap: 676 * 0.2 = 135 ELO
 - For a 1800 ELO player vs 1700 ELO opponent:
   - gap = 100 ELO
   - normalized_gap = 100/135 ≈ 0.74

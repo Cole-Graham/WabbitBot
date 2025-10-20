@@ -20,6 +20,8 @@ namespace WabbitBot.Common.Models
 
     public interface IDivisionEntity { }
 
+    public interface IReplayEntity { }
+
     // Domain definition for entities, if you add a new domain, you must add it to the
     // WabbitBot.SourceGenerators.Attributes definition as well.
     public enum Domain

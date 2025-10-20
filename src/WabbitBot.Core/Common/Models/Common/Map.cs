@@ -31,6 +31,12 @@ public class Map : Entity, IMapEntity
     public string Name { get; set; } = string.Empty;
 
     /// <summary>
+    /// The scenario name of the map.
+    /// This is the name in the replay files and MapPack.ndf
+    /// </summary>
+    public string ScenarioName { get; set; } = string.Empty;
+
+    /// <summary>
     /// Optional description of the map.
     /// </summary>
     public string? Description { get; set; }

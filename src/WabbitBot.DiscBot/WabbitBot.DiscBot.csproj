@@ -8,9 +8,9 @@
         <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
     </PropertyGroup>
     <ItemGroup>
-        <PackageReference Include="DSharpPlus" Version="5.0.0-nightly-02551" />
-        <PackageReference Include="DSharpPlus.Commands" Version="5.0.0-nightly-02551" />
-        <PackageReference Include="DSharpPlus.Interactivity" Version="5.0.0-nightly-02551" />
+        <PackageReference Include="DSharpPlus" Version="5.0.0-nightly-02553" />
+        <PackageReference Include="DSharpPlus.Commands" Version="5.0.0-nightly-02553" />
+        <PackageReference Include="DSharpPlus.Interactivity" Version="5.0.0-nightly-02553" />
     </ItemGroup>
     <ItemGroup>
         <ProjectReference Include="..\WabbitBot.Common\WabbitBot.Common.csproj" />

@@ -35,7 +35,6 @@ namespace WabbitBot.Core.Common.Models.Common
                     TeamType = teamType,
                     LastActive = lastActive,
                     CreatedAt = createdAt,
-                    Rosters = new List<TeamRoster>(),
                 };
             }
 
@@ -58,7 +57,6 @@ namespace WabbitBot.Core.Common.Models.Common
                     RosterCaptainId = rosterCaptainId,
                     LastActive = DateTime.UtcNow,
                     CreatedAt = DateTime.UtcNow,
-                    RosterMembers = new List<TeamMember>(),
                 };
             }
 

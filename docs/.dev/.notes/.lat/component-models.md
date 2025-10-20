@@ -17,12 +17,15 @@ new requirements:
     - store default component images in data/images/default/discord
     - use default `challenge_banner.jpg` from server files as attachment (cache cdn for future use)
         - override with configured challenge_banner image if it has been configured
-2. TextDisplayBuilderComponent() for body with Discord markdown formatting
-    - Get the Challenger and Opponent's `User.DiscordIds` and Discord mention string.
+2. DiscordSeparatorComponent()
+3. DiscordSectionComponent
+    -TextDisplayComponent for body with Discord markdown formatting
+    - Get the Challenger and Opponent team's captain `Player.Name` and Discord mention string.
     - Get the Challenger and Opponent's `Team.Name`
-    - `## {challenger_mention} {challenger_team_name} ({ScrimmageTeamStats.CurrentRating})\n\n`
-      `{opponent_mention} {opponent_team_name} has been challenged to a Scrimmage Match.`
-3. DiscordActionRowComponent() with Accept and Decline buttons.
+    - `## {challenger_discord_mention} {challenger_team_name} ({ScrimmageTeamStats.CurrentRating})\n\n`
+      `{opponent_captain_mention} {opponent_team_name} {opponent_team_rating} has been challenged to a Scrimmage Match.`
+4. DiscordSeparatorComponent()
+5. DiscordActionRowComponent() with Accept and Decline and Cancel buttons.
 
 # Match thread initial container for overview of match and results of map ban proceedings.
 1. MediaGalleryBuilderComponent() for top banner
@@ -121,22 +124,81 @@ new requirements:
         - override with configured game_banner images if they have been configured
 2. DiscordSeparatorComponent()
 3. DiscordMediaGalleryBuilderComponent() for the map thumbnail (randomly chosen from the remaining pool of maps)
-4. DiscordSeparatorComponent()
-5. TextDisplayBuilderComponent() for body with Discord markdown formatting
-    - Get the Challenger and Opponent's `Team.Name`
-    - `After match completion, reply to this message with all replay file's from your team.\n`
-      `Contact an admin if no replay files are available.`
+4. DiscordSectionComponent()
+    -TextDisplyComponent:
+        `[{ChallengerTeam.CurrentRating}] **{ChallengerTeam.Name}** vs. [{OpponentTeam.CurrentRating}] **{OpponentTeam.Name}** - Game {game_n} - **{Map.Name}**`
+5. DiscordSeparatorComponent()
+6. DiscordSectionComponent()
+    - One of these section components for each Player on the `Team`, containing TextDisplayComponent and a ThumbnailComponent accessory.
+    - TextDisplayComponent:
+        Before deck code submitted:
+        `**{Player.Name}** {Player.MashinaUser.DiscordMention} *__???__*\n`
+        `*Waiting for deck code...*`
+        After deck code submitted:
+        `**{Player.Name}** {Player.MashinaUser.DiscordMention} **__{Division_Name}__**\n`
+        ``{player_deck_code}``
+        - Make sure to include single backticks ` around {player_deck_code} to format it as a code block
+    - ThumbnailComponent (as accessory):
+        - get via FileSystemService using `Division.IconFilename`, fallback to default `division_icon.jpg`
+            `data\images\default\discord\division_icon.jpg`
+        - use notsubbmited until player submits their deck
+            `data\images\default\discord\division_notsubmitted.jpg`
+7. DiscordFileComponent()
+    - One of these components for each replay file uploaded by players (not included initially)
+    - Each file component should be inserted directly after the player's section component
+8. DiscordSeparatorComponent()
+9. DiscordSectionComponent()
+    -TextDisplayComponent
+        Before deck code submitted:
+        `Opponent Team: [{opponent_team_rating}] **{opponent_team_name}** - *{game_size} Roster*`
+        `**{Player.Name}** {Player.MashinaUser.DiscordMention} *Waiting...*`
+        `etc...`
+        After deck code submitted:
+        `Opponent Team: [{opponent_team_rating}] **{opponent_team_name}** - *{game_size} Roster*`
+        `**{Player.Name}** {Player.MashinaUser.DiscordMention} **__{Division.Name}__**`
+        `etc...`
+10. DiscordSeparatorComponent()
+11. DiscordActionRowComponent():
+    - All states should include a "Refresh Opponent Status" button
+    On initial creation of game embed:
+      - Button to submit deck code into a popup modal
+      - deck code parsed with `DeckParser.cs` and player SectionComponents updated with {Division_Name} and `Division.IconFilename`
+      - Deck submission button replaced with confirm and revise buttons on initial deck submission
+      - If player clicks revise button then the submit deck button comes back.
+    After all players on both teams have confirmed their deck codes:
+      - Submit Replay button using newly supported file uploads for pop-up modals
+        `https://github.com/DSharpPlus/DSharpPlus/commit/7f73502fe335d01081a63ca5c5c470b58ef0495d`
+      - Command should have security measures such as only accepting .rpl3 file types 
+      - Call C# version of `dev\tools\ReplayParser\replay_parser.py`
+      - Generate new `Replay` and `ReplayPlayer` entity classes (`src\WabbitBot.Core\Common\Models\Common\Replay.cs`)
+      - Add ICollection property to `Game` entity class for replays
+      - Incorporate saving the replay files using the `FileSystemService` and/or `FileData` property on `Replay` entity
+      - Submit Replay button should disappear after submitting replay (if the replay was valid)
 
 # Match complete embed
 1. MediaGalleryBuilderComponent() for top banner
     - store default component images in data/images/default/discord
     - use default `match_complete_banner.jpg` from deployment server files as attachment (cache cdn for future use)
-        - override with configured match_complete_banner image if they have been configured
+        - override with configured match_complete_banner image it has been configured
 2. DiscordSeparatorComponent()
-5. TextDisplayBuilderComponent() for body with Discord markdown formatting
-    - Get the Challenger and Opponent's `Team.Name`
-    - `## Winner: {winner_team_name} {winner_elo_gain} {winner_new_rating}`
-      `{loser_team_name} {loser_elo_loss} {loser_new_rating}`
+3. DiscordSectionComponent()
+    - TextDisplayComponent:
+        `# Winner: {winner_team_name} {winner_games_won} - {loser_games_won}`
+      If any games were a draw:
+        `# Winner: {winner_team_name} {winner_games_won} - {loser_games_won} - {draws}`
+4. DiscordSeparatorComponent()
+5. DiscordSectionComponent()
+    - TextDisplayComponent:
+      `**{winner_team_name}** [{winner_current_rating}] {winner_elo_gain} 🌲\n`
+      `{winner_player_name_list}\n\n`
+      
+      `**{loser_team_name}** [{loser_current_rating}] {loser_elo_loss} 🔻`
+      ``{loser_player_names_list}`
+6. DiscordSeparatorComponent()
+7. DiscordFileComponent()
+    - compressed zip file of all replays from the match, including opponent replays
+    - zip file name should have the game size, team names, and timestamp e.g. `3v3-GOATFOAR-vs-Wolverines-2025-10-18_12-10-11.zip`
+    - replay file names should have the player name, game number, division name, map name, and timestamp
 
 # Leaderboard container
 1. MediaGalleryBuilderComponent() for top banner

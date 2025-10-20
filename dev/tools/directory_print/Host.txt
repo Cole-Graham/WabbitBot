@@ -12,5 +12,5 @@
             ├── 📄 Program.cs
             ├── 📄 WabbitBot.Host.csproj
             ├── 📄 appsettings.Development.json
-            ├── 📄 appsettings.Production.json
+            ├── 📄 appsettings.Development.json.template
             └── 📄 appsettings.json

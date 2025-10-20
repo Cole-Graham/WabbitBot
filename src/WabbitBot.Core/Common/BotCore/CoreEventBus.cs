@@ -28,7 +28,7 @@ public class CoreEventBus(IGlobalEventBus globalEventBus) : ICoreEventBus
         }
     }
 
-    private readonly Dictionary<Type, List<Delegate>> _handlers = [];
+    private readonly Dictionary<Type, List<EventHandlerMetadata>> _handlers = [];
     private readonly Dictionary<Type, List<Delegate>> _requestHandlers = [];
     private readonly ConcurrentDictionary<Guid, TaskCompletionSource<object?>> _pendingRequests = new();
     private readonly Lock _lock = new();
@@ -59,7 +59,7 @@ public class CoreEventBus(IGlobalEventBus globalEventBus) : ICoreEventBus
         }
 
         var eventType = @event.GetType();
-        List<Delegate>? handlers;
+        List<EventHandlerMetadata>? handlers;
 
         lock (_lock)
         {
@@ -71,45 +71,47 @@ public class CoreEventBus(IGlobalEventBus globalEventBus) : ICoreEventBus
             else
             {
                 // Make a copy to avoid holding the lock during invocation
-                handlers = new List<Delegate>(handlers);
+                handlers = new List<EventHandlerMetadata>(handlers);
             }
         }
 
-        var tasks = new List<Task>();
-
-        // Execute all local handlers
-        foreach (var handler in handlers)
+        // Phase 1: Execute all local Write handlers
+        var writeHandlers = handlers.Where(h => h.Type == HandlerType.Write).ToList();
+        if (writeHandlers.Count > 0)
         {
-            tasks.Add((Task)handler.DynamicInvoke(@event)!);
+            var writeTasks = writeHandlers.Select(h => (Task)h.Handler.DynamicInvoke(@event)!);
+            await Task.WhenAll(writeTasks);
         }
 
-        // Only forward to global bus if the event is meant for global routing
+        // Phase 2: Execute all local Read handlers
+        var readHandlers = handlers.Where(h => h.Type == HandlerType.Read).ToList();
+        if (readHandlers.Count > 0)
+        {
+            var readTasks = readHandlers.Select(h => (Task)h.Handler.DynamicInvoke(@event)!);
+            await Task.WhenAll(readTasks);
+        }
+
+        // Forward to global bus if the event is meant for global routing
+        // This happens after local handlers to maintain Write/Read ordering across boundaries
         if (@event.EventBusType == EventBusType.Global)
         {
-            tasks.Add(
-                Task.Run(async () =>
-                {
-                    try
-                    {
-                        var evtType2 = @event.GetType();
-                        var method = typeof(IGlobalEventBus).GetMethod("PublishAsync")!;
-                        var generic = method.MakeGenericMethod(evtType2);
-                        var task = (Task)generic.Invoke(_globalEventBus, new object[] { @event })!;
-                        await task;
-                    }
-                    catch (Exception ex)
-                    {
-                        var errorEvent = new BoundaryErrorEvent(ex, "Core-to-Global", EventBusType.Global);
-                    }
-                })
-            );
+            try
+            {
+                var evtType2 = @event.GetType();
+                var method = typeof(IGlobalEventBus).GetMethod("PublishAsync")!;
+                var generic = method.MakeGenericMethod(evtType2);
+                var task = (Task)generic.Invoke(_globalEventBus, new object[] { @event })!;
+                await task;
+            }
+            catch (Exception ex)
+            {
+                var errorEvent = new BoundaryErrorEvent(ex, "Core-to-Global", EventBusType.Global);
+            }
         }
-
-        await Task.WhenAll(tasks);
     }
 
     /// <inheritdoc />
-    public void Subscribe<TEvent>(Func<TEvent, Task> handler)
+    public void Subscribe<TEvent>(Func<TEvent, Task> handler, HandlerType type = HandlerType.Write)
         where TEvent : class, IEvent
     {
         if (!_isInitialized)
@@ -123,13 +125,13 @@ public class CoreEventBus(IGlobalEventBus globalEventBus) : ICoreEventBus
 
         lock (_lock)
         {
-            if (!_handlers.TryGetValue(eventType, out List<Delegate>? handlers))
+            if (!_handlers.TryGetValue(eventType, out List<EventHandlerMetadata>? handlers))
             {
-                handlers = new List<Delegate>();
+                handlers = new List<EventHandlerMetadata>();
                 _handlers[eventType] = handlers;
             }
 
-            handlers.Add(handler);
+            handlers.Add(new EventHandlerMetadata { Handler = handler, Type = type });
         }
     }
 
@@ -147,9 +149,13 @@ public class CoreEventBus(IGlobalEventBus globalEventBus) : ICoreEventBus
         var eventType = typeof(TEvent);
         lock (_lock)
         {
-            if (_handlers.TryGetValue(eventType, out List<Delegate>? handlers))
+            if (_handlers.TryGetValue(eventType, out List<EventHandlerMetadata>? handlers))
             {
-                handlers.Remove(handler);
+                var toRemove = handlers.FirstOrDefault(m => m.Handler.Equals(handler));
+                if (toRemove is not null)
+                {
+                    handlers.Remove(toRemove);
+                }
 
                 // Remove the event type if no handlers remain
                 if (handlers.Count == 0)

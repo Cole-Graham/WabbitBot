@@ -11,7 +11,7 @@ namespace WabbitBot.Common.Configuration
     public interface IBotConfigurationService
     {
         string GetToken();
-        string GetDatabasePath();
+        ulong? GetDebugGuildId();
         T GetSection<T>(string sectionName)
             where T : class, new();
         void ValidateConfiguration();
@@ -30,8 +30,16 @@ namespace WabbitBot.Common.Configuration
 
         public string GetToken() => Environment.GetEnvironmentVariable("WABBITBOT_TOKEN") ?? _botOptions.Token;
 
-        public string GetDatabasePath() =>
-            Environment.GetEnvironmentVariable("WABBITBOT_DATABASE_PATH") ?? _botOptions.Database.Path;
+        public ulong? GetDebugGuildId()
+        {
+            var debugGuildIdStr =
+                Environment.GetEnvironmentVariable("WABBITBOT_DEBUG_GUILD_ID") ?? _configuration["Bot:DebugGuildId"];
+
+            if (string.IsNullOrEmpty(debugGuildIdStr))
+                return null;
+
+            return ulong.TryParse(debugGuildIdStr, out var guildId) ? guildId : null;
+        }
 
         public T GetSection<T>(string sectionName)
             where T : class, new()
@@ -48,8 +56,8 @@ namespace WabbitBot.Common.Configuration
             if (string.IsNullOrEmpty(_botOptions.Token))
                 throw new InvalidOperationException("Bot token is required");
 
-            if (string.IsNullOrEmpty(_botOptions.Database.Path))
-                throw new InvalidOperationException("Database path is required");
+            if (string.IsNullOrEmpty(_botOptions.Database.ConnectionString))
+                throw new InvalidOperationException("Database connection string is required");
 
             // Validate scrimmage configuration
             if (_botOptions.Scrimmage.InitialRating < 0)
@@ -184,13 +192,25 @@ namespace WabbitBot.Common.Configuration
         public MatchOptions Match { get; set; } = new();
         public LeaderboardOptions Leaderboard { get; set; } = new();
         public MapsOptions Maps { get; set; } = new();
+        public MapBansOptions MapBans { get; set; } = new();
         public DivisionsOptions Divisions { get; set; } = new();
         public RetentionOptions Retention { get; set; } = new();
+        public StorageOptions Storage { get; set; } = new();
     }
 
     public class DatabaseOptions
     {
-        public string Path { get; set; } = "data/wabbitbot.db";
+        public const string SectionName = "Bot:Database";
+
+        /// <summary>
+        /// PostgreSQL connection string. Format: Host=localhost;Database=wabbitbot;Username=user;Password=pass
+        /// </summary>
+        public string ConnectionString { get; set; } =
+            "Host=localhost;Database=wabbitbot;Username=wabbitbot;Password=wabbitbot";
+
+        /// <summary>
+        /// Maximum number of connections in the connection pool
+        /// </summary>
         public int MaxPoolSize { get; set; } = 10;
     }
 
@@ -290,8 +310,6 @@ namespace WabbitBot.Common.Configuration
 
     public class RatingDecayOptions
     {
-        public const string SectionName = "Bot:Leaderboard:RatingDecay";
-
         public bool Enabled { get; set; } = true;
         public double DecayRatePerWeek { get; set; } = 25;
         public double MinimumRating { get; set; } = 1000;
@@ -300,7 +318,6 @@ namespace WabbitBot.Common.Configuration
     public class MapsOptions
     {
         public const string SectionName = "Bot:Maps";
-
         public List<MapConfiguration> Maps { get; set; } = new();
     }
 
@@ -318,11 +335,65 @@ namespace WabbitBot.Common.Configuration
         public int JobIntervalHours { get; set; } = 24;
     }
 
+    public class StorageOptions
+    {
+        public const string SectionName = "Bot:Storage";
+
+        /// <summary>
+        /// Base directory for all data storage. Defaults to "data" (relative to app directory).
+        /// For production, use absolute paths like "/var/lib/wabbitbot"
+        /// </summary>
+        public string BaseDataDirectory { get; set; } = "data";
+
+        /// <summary>
+        /// Directory for replay file storage (.rpl3 and .zip files)
+        /// </summary>
+        public string ReplaysDirectory { get; set; } = "data/replays";
+
+        /// <summary>
+        /// Base directory for all images
+        /// </summary>
+        public string ImagesDirectory { get; set; } = "data/images";
+
+        /// <summary>
+        /// Directory for map thumbnail images shown in Discord embeds
+        /// </summary>
+        public string MapsDirectory { get; set; } = "data/images/maps/discord";
+
+        /// <summary>
+        /// Directory for division icon images
+        /// </summary>
+        public string DivisionIconsDirectory { get; set; } = "data/divisions/icons";
+
+        /// <summary>
+        /// Directory for custom Discord component images (user-uploaded)
+        /// </summary>
+        public string DiscordComponentImagesDirectory { get; set; } = "data/images/discord";
+
+        /// <summary>
+        /// Directory for default Discord images shipped with the application.
+        /// This directory should be read-only in production.
+        /// </summary>
+        public string DefaultDiscordImagesDirectory { get; set; } = "data/images/default/discord";
+
+        /// <summary>
+        /// Resolves a path, making it absolute if it's relative.
+        /// Relative paths are resolved against the application base directory.
+        /// </summary>
+        public string ResolvePath(string path)
+        {
+            if (Path.IsPathRooted(path))
+            {
+                return Path.GetFullPath(path);
+            }
+            return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, path));
+        }
+    }
+
     public class MapConfiguration
     {
-        public const string SectionName = "Bot:Maps";
-
-        public string Name { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty; // Display name
+        public string ScenarioName { get; set; } = string.Empty; // This is the name in the replay files and MapPack.ndf
         public string Size { get; set; } = string.Empty;
         public string Density { get; set; } = "Medium"; // "Low", "Medium", or "High"
         public string? ThumbnailFilename { get; set; }
@@ -332,7 +403,6 @@ namespace WabbitBot.Common.Configuration
 
     public class RosterSizeRanges
     {
-        public const string SectionName = "Bot:Scrimmage:RosterSizeRanges";
         public RosterSizeRange Solo { get; set; } = new(1, 1);
         public RosterSizeRange Duo { get; set; } = new(4, 5);
         public RosterSizeRange Squad { get; set; } = new(8, 10);
@@ -342,12 +412,53 @@ namespace WabbitBot.Common.Configuration
 
     public class DivisionConfiguration
     {
-        public const string SectionName = "Bot:Divisions";
-
         public string Name { get; set; } = string.Empty;
         public string Faction { get; set; } = string.Empty; // "BLUFOR" or "REDFOR"
         public string? Description { get; set; }
         public string? IconFilename { get; set; }
         public bool IsActive { get; set; } = true;
+    }
+
+    public class MapBansOptions
+    {
+        public const string SectionName = "Bot:MapBans";
+
+        public Dictionary<string, BanConfiguration> BestOf1 { get; set; } = new();
+        public Dictionary<string, BanConfiguration> BestOf3 { get; set; } = new();
+        public Dictionary<string, BanConfiguration> BestOf5 { get; set; } = new();
+        public Dictionary<string, BanConfiguration> BestOf7 { get; set; } = new();
+
+        /// <summary>
+        /// Gets the ban configuration for a specific match length and pool size.
+        /// </summary>
+        /// <param name="bestOf">Match length (1, 3, 5, or 7)</param>
+        /// <param name="poolSize">Size of the map pool</param>
+        /// <returns>BanConfiguration if found, otherwise returns a default configuration with 0 bans</returns>
+        public BanConfiguration GetBanConfig(int bestOf, int poolSize)
+        {
+            var poolKey = $"poolsize_{poolSize}";
+            Dictionary<string, BanConfiguration>? matchDict = bestOf switch
+            {
+                1 => BestOf1,
+                3 => BestOf3,
+                5 => BestOf5,
+                7 => BestOf7,
+                _ => null,
+            };
+
+            if (matchDict is not null && matchDict.TryGetValue(poolKey, out var banConfig))
+            {
+                return banConfig;
+            }
+
+            // Return default configuration if not found
+            return new BanConfiguration { GuaranteedBans = 0, CoinflipBans = 0 };
+        }
+    }
+
+    public class BanConfiguration
+    {
+        public int GuaranteedBans { get; set; }
+        public int CoinflipBans { get; set; }
     }
 }

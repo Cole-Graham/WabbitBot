@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Security.Cryptography.X509Certificates;
 using FluentValidation.Validators;
 using WabbitBot.Common.Attributes;
@@ -18,16 +19,22 @@ namespace WabbitBot.Core.Common.Models.Scrimmage
     public partial class Scrimmage : Entity, IScrimmageEntity
     {
         // Navigation properties
-        public Guid? ChallengeId { get; set; }
-        public ScrimmageChallenge? ScrimmageChallenge { get; set; }
+        public Guid? ScrimmageChallengeId { get; set; }
+        public virtual ScrimmageChallenge? ScrimmageChallenge { get; set; } = null;
         public Guid ChallengerTeamId { get; set; } // Challenger
         public Guid OpponentTeamId { get; set; } // Opponent
         public List<Guid> ChallengerTeamPlayerIds { get; set; } = new(); // Selected team members
         public List<Guid> OpponentTeamPlayerIds { get; set; } = new(); // Selected team members
-        public Player? IssuedByPlayer { get; set; } // Player who issued the challenge
-        public Player? AcceptedByPlayer { get; set; } // Player who accepted the challenge
-        public Match? Match { get; set; }
-        public List<ScrimmageStateSnapshot> StateHistory { get; set; } = new();
+
+        // Navigation properties for selected team members
+        public virtual ICollection<Player> ChallengerTeamPlayers { get; set; } = [];
+        public virtual ICollection<Player> OpponentTeamPlayers { get; set; } = [];
+        public Guid IssuedByPlayerId { get; set; } // Player who issued the challenge
+        public Guid? AcceptedByPlayerId { get; set; } // Player who accepted the challenge
+        public virtual Player? IssuedByPlayer { get; set; } = null; // Player who issued the challenge
+        public virtual Player? AcceptedByPlayer { get; set; } = null; // Player who accepted the challenge
+        public virtual Match? Match { get; set; } = null;
+        public virtual ICollection<ScrimmageStateSnapshot> StateHistory { get; set; } = [];
 
         // Data properties
         public TeamSize TeamSize { get; set; }
@@ -93,13 +100,14 @@ namespace WabbitBot.Core.Common.Models.Scrimmage
         public Guid NewPlayerId { get; set; }
         public Guid EstablishedPlayerId { get; set; }
         public Guid TriggerMatchId { get; set; }
-        public Guid AppliedAtMatchId { get; set; }
-        public Guid TrackingEndMatchId { get; set; }
+        public Guid AppliedAtMatchId { get; set; } // The match when the new player reached 1.0 confidence and PP batch was applied
+        public Guid TrackingEndMatchId { get; set; } // The match when 16-match tracking window closed for the new player
+        public int NewPlayerMatchCountAtCreation { get; set; } // New player's total matches when PP record was created
         public int CrossedThresholds { get; set; }
         public double ClosureFraction { get; set; }
-        public double ScalingApplied { get; set; }
-        public double AdjustedNewChange { get; set; }
-        public double AdjustedEstablishedChange { get; set; }
+        public double ScalingApplied { get; set; } // The threshold scaling applied to both players' rating changes
+        public double AdjustedNewChange { get; set; } // The adjusted rating change for the new player after PP application
+        public double AdjustedEstablishedChange { get; set; } // The adjusted rating change for the established player after PP application
 
         // Data properties
         public double ChallengerRating { get; set; }
@@ -130,7 +138,7 @@ namespace WabbitBot.Core.Common.Models.Scrimmage
     {
         // TODO: Implement/Design ScrimmageStateSnapshot
         public Guid ScrimmageId { get; set; } // Navigational property
-        public Scrimmage? Scrimmage { get; set; } // Navigational property
+        public virtual Scrimmage? Scrimmage { get; set; } = null; // Navigational property
         public ScrimmageStatus Status { get; set; }
         public override Domain Domain => Domain.Scrimmage;
     }
@@ -157,22 +165,31 @@ namespace WabbitBot.Core.Common.Models.Scrimmage
     public class ScrimmageChallenge : Entity
     {
         // Navigation properties
-        public Team? ChallengerTeam { get; set; }
-        public Team? OpponentTeam { get; set; }
+        public virtual Team? ChallengerTeam { get; set; } = null;
+        public virtual Team? OpponentTeam { get; set; } = null;
         public Guid ChallengerTeamId { get; set; }
         public Guid OpponentTeamId { get; set; }
 
         // Data properties
-        public Player? IssuedByPlayer { get; set; }
+        public virtual Player? IssuedByPlayer { get; set; } = null;
         public Guid IssuedByPlayerId { get; set; }
-        public Player? AcceptedByPlayer { get; set; }
+        public virtual Player? AcceptedByPlayer { get; set; } = null;
         public Guid? AcceptedByPlayerId { get; set; }
-        public Player[] ChallengerTeamPlayers { get; set; } = []; // Selected team members
-        public Player[]? OpponentTeamPlayers { get; set; } // Selected team members
+
+        // Foreign key collections for selected team members
+        public ICollection<Guid> ChallengerTeamPlayerIds { get; set; } = [];
+        public ICollection<Guid>? OpponentTeamPlayerIds { get; set; }
+
+        // Navigation properties for selected team members (EF Core compatible collections)
+        public virtual ICollection<Player> ChallengerTeamPlayers { get; set; } = [];
+        public virtual ICollection<Player>? OpponentTeamPlayers { get; set; }
+
         public ScrimmageChallengeStatus? ChallengeStatus { get; set; }
         public TeamSize TeamSize { get; set; }
         public int BestOf { get; set; }
         public DateTime ChallengeExpiresAt { get; set; }
+        public ulong? ChallengeMessageId { get; set; } // Discord message ID for the challenge container
+        public ulong? ChallengeChannelId { get; set; } // Discord channel ID where challenge was posted
         public override Domain Domain => Domain.Scrimmage;
     }
 
@@ -181,5 +198,6 @@ namespace WabbitBot.Core.Common.Models.Scrimmage
         Pending,
         Accepted,
         Declined,
+        Cancelled,
     }
 }

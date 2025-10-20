@@ -54,7 +54,11 @@ namespace WabbitBot.Common.Attributes
     /// Applied to event record/class definitions to generate supporting infrastructure.
     /// </summary>
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
-    public class EventGeneratorAttribute(string? pubTargetClass = null, string[]? subTargetClasses = null) : Attribute
+    public class EventGeneratorAttribute(
+        string? pubTargetClass = null,
+        string[]? subTargetClasses = null,
+        string[]? writeHandlers = null
+    ) : Attribute
     {
         /// <summary>
         /// The fully qualified class name where the publisher method should be generated.
@@ -67,6 +71,13 @@ namespace WabbitBot.Common.Attributes
         /// Example: ["WabbitBot.DiscBot.App.Handlers.ScrimmageHandler", "WabbitBot.Core.Leaderboards.LeaderboardCore"]
         /// </summary>
         public string[]? SubTargetClasses { get; } = subTargetClasses;
+
+        /// <summary>
+        /// Array of fully qualified class names that should be treated as Write handlers (mutate state).
+        /// Handlers not in this list will be treated as Read handlers (read state).
+        /// Example: ["WabbitBot.Core.Common.Models.Common.GameHandler"]
+        /// </summary>
+        public string[]? WriteHandlers { get; } = writeHandlers;
     }
     #endregion
 

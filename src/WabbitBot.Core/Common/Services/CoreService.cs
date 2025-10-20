@@ -35,13 +35,42 @@ namespace WabbitBot.Core.Common.Services
         // IDbContextFactory compatibility where needed (e.g., EfRepositoryAdapter).
 
         /// <summary>
-        /// Initializes the FileSystemService with explicit dependencies.
-        /// Should be called once during application startup.
+        /// Initializes the CoreService with the event bus and error handler.
+        /// Must be called once during application startup before any other CoreService methods are used.
         /// </summary>
         /// <param name="eventBus">The Core event bus instance</param>
         /// <param name="errorHandler">The error service instance</param>
-        public static void InitializeFileSystemService(ICoreEventBus eventBus, IErrorService errorHandler)
+        public static void Initialize(ICoreEventBus eventBus, IErrorService errorHandler)
         {
+            ArgumentNullException.ThrowIfNull(eventBus);
+            ArgumentNullException.ThrowIfNull(errorHandler);
+
+            if (_lazyEventBus is not null || _lazyErrorHandler is not null)
+            {
+                throw new InvalidOperationException("CoreService has already been initialized");
+            }
+
+            _lazyEventBus = new Lazy<ICoreEventBus>(() => eventBus, LazyThreadSafetyMode.ExecutionAndPublication);
+            _lazyErrorHandler = new Lazy<IErrorService>(
+                () => errorHandler,
+                LazyThreadSafetyMode.ExecutionAndPublication
+            );
+        }
+
+        /// <summary>
+        /// Initializes the FileSystemService with explicit dependencies.
+        /// Should be called once during application startup.
+        /// </summary>
+        /// <param name="storageOptions">Storage configuration for file system paths</param>
+        /// <param name="eventBus">The Core event bus instance</param>
+        /// <param name="errorHandler">The error service instance</param>
+        public static void InitializeFileSystemService(
+            WabbitBot.Common.Configuration.StorageOptions storageOptions,
+            ICoreEventBus eventBus,
+            IErrorService errorHandler
+        )
+        {
+            ArgumentNullException.ThrowIfNull(storageOptions);
             ArgumentNullException.ThrowIfNull(eventBus);
             ArgumentNullException.ThrowIfNull(errorHandler);
 
@@ -50,7 +79,7 @@ namespace WabbitBot.Core.Common.Services
                 throw new InvalidOperationException("FileSystemService has already been initialized");
             }
 
-            _fileSystemService = new FileSystemService(eventBus, errorHandler);
+            _fileSystemService = new FileSystemService(storageOptions, eventBus, errorHandler);
         }
 
         // Testability Hooks

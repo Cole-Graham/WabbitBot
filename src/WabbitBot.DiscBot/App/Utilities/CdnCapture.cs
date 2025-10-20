@@ -6,7 +6,7 @@ namespace WabbitBot.DiscBot.App.Utilities
     /// <summary>
     /// Utility for capturing Discord CDN URLs from sent messages and reporting them to Core.
     /// </summary>
-    public static class CdnCapture
+    public static partial class CdnCapture
     {
         /// <summary>
         /// Extracts CDN URLs from a Discord message and reports them to Core via GlobalEventBus.
@@ -31,6 +31,12 @@ namespace WabbitBot.DiscBot.App.Utilities
                         // Use provided canonical filename or extract from attachment filename
                         var fileName = canonicalFileName ?? attachment.FileName;
 
+                        // Skip if filename or URL is null/empty
+                        if (string.IsNullOrEmpty(fileName) || string.IsNullOrEmpty(attachment.Url))
+                        {
+                            continue;
+                        }
+
                         // Publish CDN link reported event
                         await globalBus.PublishAsync(
                             new FileCdnLinkReported(
@@ -49,47 +55,31 @@ namespace WabbitBot.DiscBot.App.Utilities
                     foreach (var embed in message.Embeds)
                     {
                         // Thumbnail
-                        if (!string.IsNullOrEmpty(embed.Thumbnail?.Url?.ToString()))
+                        var thumbnailUrl = embed.Thumbnail?.Url?.ToString();
+                        if (!string.IsNullOrEmpty(thumbnailUrl))
                         {
-                            await ReportCdnUrlAsync(
-                                globalBus,
-                                embed.Thumbnail.Url.ToString(),
-                                message.Id,
-                                message.ChannelId
-                            );
+                            await ReportCdnUrlAsync(globalBus, thumbnailUrl, message.Id, message.ChannelId);
                         }
 
                         // Image
-                        if (!string.IsNullOrEmpty(embed.Image?.Url?.ToString()))
+                        var imageUrl = embed.Image?.Url?.ToString();
+                        if (!string.IsNullOrEmpty(imageUrl))
                         {
-                            await ReportCdnUrlAsync(
-                                globalBus,
-                                embed.Image.Url.ToString(),
-                                message.Id,
-                                message.ChannelId
-                            );
+                            await ReportCdnUrlAsync(globalBus, imageUrl, message.Id, message.ChannelId);
                         }
 
                         // Author icon
-                        if (!string.IsNullOrEmpty(embed.Author?.IconUrl?.ToString()))
+                        var authorIconUrl = embed.Author?.IconUrl?.ToString();
+                        if (!string.IsNullOrEmpty(authorIconUrl))
                         {
-                            await ReportCdnUrlAsync(
-                                globalBus,
-                                embed.Author.IconUrl.ToString(),
-                                message.Id,
-                                message.ChannelId
-                            );
+                            await ReportCdnUrlAsync(globalBus, authorIconUrl, message.Id, message.ChannelId);
                         }
 
                         // Footer icon
-                        if (!string.IsNullOrEmpty(embed.Footer?.IconUrl?.ToString()))
+                        var footerIconUrl = embed.Footer?.IconUrl?.ToString();
+                        if (!string.IsNullOrEmpty(footerIconUrl))
                         {
-                            await ReportCdnUrlAsync(
-                                globalBus,
-                                embed.Footer.IconUrl.ToString(),
-                                message.Id,
-                                message.ChannelId
-                            );
+                            await ReportCdnUrlAsync(globalBus, footerIconUrl, message.Id, message.ChannelId);
                         }
                     }
                 }

@@ -24,6 +24,13 @@ namespace WabbitBot.Core.Common.Models.Common
         // Navigation properties
         public Dictionary<TeamSize, ScrimmageTeamStats> ScrimmageTeamStats { get; set; } = [];
         public Dictionary<TeamSize, TournamentTeamStats> TournamentTeamStats { get; set; } = [];
+
+        // Foreign key collections
+        public ICollection<Guid> MatchIds { get; set; } = [];
+        public ICollection<Guid> RosterIds { get; set; } = [];
+        public ICollection<Guid> VarietyStatsIds { get; set; } = [];
+
+        // Navigation properties
         public virtual ICollection<Match> Matches { get; set; } = [];
 
         // Core team data (no roster-specific properties here)
@@ -83,6 +90,9 @@ namespace WabbitBot.Core.Common.Models.Common
         public DateTime LastActive { get; set; }
         public Guid? RosterCaptainId { get; set; } // Roster-specific captain (optional)
 
+        // Foreign key collection for members
+        public ICollection<Guid> RosterMemberIds { get; set; } = [];
+
         // Navigation to members
         public virtual ICollection<TeamMember> RosterMembers { get; set; } = [];
 
@@ -104,9 +114,9 @@ namespace WabbitBot.Core.Common.Models.Common
     {
         // Navigation properties
         public Guid TeamRosterId { get; set; }
-        public virtual TeamRoster TeamRoster { get; set; } = null!;
+        public virtual TeamRoster? TeamRoster { get; set; } = null;
         public Guid MashinaUserId { get; set; }
-        public MashinaUser? MashinaUser { get; set; }
+        public virtual MashinaUser? MashinaUser { get; set; }
         public Guid PlayerId { get; set; }
         public string DiscordUserId { get; set; } = string.Empty;
 
@@ -137,11 +147,17 @@ namespace WabbitBot.Core.Common.Models.Common
         // Team identification (for team stats)
         public Guid TeamId { get; set; }
         public TeamSize TeamSize { get; set; }
+
+        // Foreign key collection for opponent encounters
+        public ICollection<Guid> OpponentEncounterIds { get; set; } = [];
+
+        // Navigation property for opponent encounters
         public virtual ICollection<TeamOpponentEncounter> OpponentEncounters { get; set; } = [];
 
         // Basic stats
         public int Wins { get; set; }
         public int Losses { get; set; }
+        public int Draws { get; set; }
 
         // Rating system (using double for precision as per user preference)
         public double InitialRating { get; set; }
@@ -157,9 +173,6 @@ namespace WabbitBot.Core.Common.Models.Common
         // Timing
         public DateTime LastMatchAt { get; set; }
         public DateTime LastUpdated { get; set; }
-
-        // Navigation property
-        public Team Team { get; set; } = null!;
 
         public override Domain Domain => Domain.Common;
     }
@@ -179,9 +192,11 @@ namespace WabbitBot.Core.Common.Models.Common
     {
         // Navigation properties
         public Guid TeamId { get; set; }
-        public Team Team { get; set; } = null!;
+        public virtual Team? Team { get; set; } = null;
         public List<Guid> TournamentIds { get; set; } = [];
-        public ICollection<Tournament.Tournament> Tournaments { get; set; } = [];
+
+        // Navigation property for tournaments
+        public virtual ICollection<Tournament.Tournament> Tournaments { get; set; } = [];
 
         // Data properties
         public TeamSize TeamSize { get; set; }
@@ -217,7 +232,7 @@ namespace WabbitBot.Core.Common.Models.Common
     public class TeamVarietyStats : Entity, ITeamEntity
     {
         // Navigation
-        public Team Team { get; set; } = null!;
+        public virtual Team? Team { get; set; } = null;
         public Guid TeamId { get; set; }
 
         // Data

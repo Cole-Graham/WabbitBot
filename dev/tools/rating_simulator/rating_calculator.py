@@ -111,7 +111,7 @@ class RatingCalculator:
         - Uses Shannon entropy to measure opponent diversity across ALL opponents equally
         - No distance-based weighting to avoid bias toward middle-rated players
         - Applies continuous scaling based on opponent availability:
-          - Counts potential opponents within neighbor range (40% of total range / 2)
+          - Counts potential opponents within neighbor range (20% of total range)
           - Compares to player with maximum neighbors in their range
           - Scales bonuses/penalties based on neighbor ratio (1.0 to 1.5x)
         - Applies quadratic scaling based on games played relative to median
@@ -167,14 +167,14 @@ class RatingCalculator:
         base_bonus = scaled_diff * self.max_variety_bonus
 
         # Apply continuous scaling based on opponent availability
-        # Use the same rating range calculation as gap scaling (40% of total range / 2)
+        # Use the same rating range calculation as gap scaling (20% of total range)
         rating_range = (
             max(o.rating for o in opponents) - min(o.rating for o in opponents)
             if opponents
             else 0
         )
         neighbor_range = (
-            rating_range * 0.4 / 2
+            rating_range * 0.2
         )  # Same formula as max_gap in gap scaling
 
         # Find this player's opponent count within neighbor range
@@ -228,7 +228,7 @@ class RatingCalculator:
         - Calculate base rating change as K * (actual - expected)
         - Apply multiplier to final change
         - Use cosine scaling to decrease adjustments for large rating gaps to prevent shadow-boxing
-        - Max gap is 20% of total leaderboard range (40% / 2) on either side of player's rating
+        - Max gap is 20% of total leaderboard range (20%) on either side of player's rating
         - Only apply gap scaling to higher-rated player if lower-rated player has 1.0 confidence
         - Cosine scaling values:
           - 0% gap: 1.0 (full weight)
@@ -349,8 +349,8 @@ class RatingCalculator:
         loser_confidence_multiplier = 2.0 - loser_confidence
 
         # Calculate rating gap scaling to prevent shadow-boxing
-        # rating_range is total leaderboard range, calculate 20% of it (40% / 2)
-        max_gap = rating_range * 0.4 / 2 if rating_range > 0 else 0
+        # rating_range is total leaderboard range, calculate 20% of it
+        max_gap = rating_range * 0.2 if rating_range > 0 else 0
         rating_gap = abs(winner_rating - loser_rating)
 
         # Initialize gap scaling (no effect by default)

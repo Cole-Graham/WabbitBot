@@ -400,6 +400,7 @@ FodyWeavers.xsd
 *.sln.iml
 
 # Misc
+KrakusReplayAnalyzer/
 Scrimmage_backup.txt
 rating_simulator.py
 rating_simulator_backup.py
@@ -421,6 +422,9 @@ src/output/bin/
 src/output/config.json
 !src/output/config.template.json
 
+# Published output (dotnet publish)
+out/
+
 # Ignore all environment configs
 appsettings.*.json
 # Allow the safe defaults and template
@@ -432,6 +436,6 @@ dev/tools/local_backup/logs/
 *config.ini
 !*.template.ini
 
-# Custom map configurations
-src/WabbitBot.Core/Config/maps.json
-!src/WabbitBot.Core/Config/maps.default.json
+data/maps
+data/replays
+data/developmentmaps

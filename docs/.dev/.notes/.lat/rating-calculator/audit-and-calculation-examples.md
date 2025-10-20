@@ -43,8 +43,8 @@ public static class RatingApplication
         if (team1CatchUpBonus > 0.0) team1Multiplier += team1CatchUpBonus;
         if (team2CatchUpBonus > 0.0) team2Multiplier += team2CatchUpBonus;
 
-        // Gap scaling (cosine within 40% of leaderboard range / 2)
-        var maxGap = ratingRange > 0.0 ? ratingRange * 0.4 / 2.0 : 0.0;
+        // Gap scaling (cosine within 20% of leaderboard range)
+        var maxGap = ratingRange > 0.0 ? ratingRange * 0.2 : 0.0;
         var gap = Math.Abs(scrimmage.Team1Rating - scrimmage.Team2Rating);
         var gapScale = 1.0;
         Guid? higherRatedTeamId = null;

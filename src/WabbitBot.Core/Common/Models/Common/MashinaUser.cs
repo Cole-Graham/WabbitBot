@@ -19,10 +19,11 @@ namespace WabbitBot.Core.Common.Models.Common
     {
         // Navigation properties
         public Guid? PlayerId { get; set; } // Reference to associated Player entity
-        public Player? Player { get; set; } // Reference to associated Player entity
+        public virtual Player? Player { get; set; } // Reference to associated Player entity
 
         // Discord properties
         public ulong DiscordUserId { get; set; }
+        public List<ulong> PreviousDiscordUserIds { get; set; } = [];
         public string? DiscordUsername { get; set; }
         public List<string> PreviousDiscordUsernames { get; set; } = [];
         public string? DiscordGlobalname { get; set; }

@@ -163,7 +163,7 @@ public partial class DatabaseService<TEntity> : IDatabaseService<TEntity>
         return result;
     }
 
-    public async Task<Result<bool>> ExistsAsync(object id, DatabaseComponent component)
+    public async Task<Result<bool>> ExistsAsync(Guid id, DatabaseComponent component)
     {
         switch (component)
         {
@@ -180,7 +180,7 @@ public partial class DatabaseService<TEntity> : IDatabaseService<TEntity>
         }
     }
 
-    public async Task<Result<TEntity?>> GetByIdAsync(object id, DatabaseComponent component)
+    public async Task<Result<TEntity?>> GetByIdAsync(Guid id, DatabaseComponent component)
     {
         TEntity? entity;
         switch (component)

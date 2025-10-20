@@ -77,3 +77,27 @@ public record DiscordComponentImageDeletedEvent(string CanonicalFileName) : IEve
     public DateTime Timestamp { get; init; } = DateTime.UtcNow;
     public EventBusType EventBusType { get; init; } = EventBusType.Core;
 }
+
+/// <summary>
+/// Published when a replay file is successfully uploaded.
+/// </summary>
+/// <param name="CanonicalFileName">The secure filename assigned to the replay</param>
+/// <param name="OriginalFileName">The original filename from the upload</param>
+/// <param name="FileSizeBytes">Size of the uploaded file in bytes</param>
+public record ReplayFileUploadedEvent(string CanonicalFileName, string? OriginalFileName, long FileSizeBytes) : IEvent
+{
+    public Guid EventId { get; init; } = Guid.NewGuid();
+    public DateTime Timestamp { get; init; } = DateTime.UtcNow;
+    public EventBusType EventBusType { get; init; } = EventBusType.Core;
+}
+
+/// <summary>
+/// Published when a replay file is successfully deleted.
+/// </summary>
+/// <param name="CanonicalFileName">The filename that was deleted</param>
+public record ReplayFileDeletedEvent(string CanonicalFileName) : IEvent
+{
+    public Guid EventId { get; init; } = Guid.NewGuid();
+    public DateTime Timestamp { get; init; } = DateTime.UtcNow;
+    public EventBusType EventBusType { get; init; } = EventBusType.Core;
+}

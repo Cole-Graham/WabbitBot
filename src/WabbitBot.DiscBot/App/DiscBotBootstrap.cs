@@ -1,9 +1,11 @@
 using DSharpPlus;
 using DSharpPlus.Commands;
 using DSharpPlus.Commands.Processors.SlashCommands;
+using DSharpPlus.Entities;
 using WabbitBot.Common.Configuration;
 using WabbitBot.Common.ErrorService;
 using WabbitBot.Common.Events.Interfaces;
+using WabbitBot.Common.Models;
 using WabbitBot.DiscBot.App.Commands;
 using WabbitBot.DiscBot.App.Services.DiscBot;
 
@@ -33,8 +35,11 @@ namespace WabbitBot.DiscBot.App
             DiscBotService.Initialize(discBotEventBus, errorService);
 
             // Initialize handlers (subscribe to events)
-            // Handlers.MatchHandler.Initialize();
-            // Handlers.GameHandler.Initialize();
+            Handlers.GameHandler.Initialize();
+            Handlers.ScrimmageHandler.Initialize();
+
+            // Start background batch processor for game container updates
+            Handlers.GameHandler.StartBatchProcessor();
 
             // Initialize temp storage for attachment downloads
             DiscBotService.TempStorage.Initialize();
@@ -54,7 +59,8 @@ namespace WabbitBot.DiscBot.App
         /// Registers commands and sets up interaction handlers.
         /// </summary>
         /// <param name="config">The bot configuration service</param>
-        public static async Task StartDiscordClientAsync(IBotConfigurationService config)
+        /// <param name="environment">The current environment (Development, Production, etc.)</param>
+        public static async Task StartDiscordClientAsync(IBotConfigurationService config, string environment)
         {
             ArgumentNullException.ThrowIfNull(config);
 
@@ -83,7 +89,42 @@ namespace WabbitBot.DiscBot.App
                             commands.AddProcessor<SlashCommandProcessor>();
 
                             // Register command classes
-                            commands.AddCommands<ScrimmageCommands>();
+                            // For development: Register to specific guild for instant updates
+                            // For production: Register globally (takes ~1 hour to update)
+                            var debugGuildId = config.GetDebugGuildId();
+                            var isDevelopment = string.Equals(
+                                environment,
+                                "Development",
+                                StringComparison.OrdinalIgnoreCase
+                            );
+
+                            if (debugGuildId.HasValue)
+                            {
+                                // Guild-specific registration for development (instant updates)
+                                commands.AddCommands<ScrimmageCommands>(debugGuildId.Value);
+                                Console.WriteLine(
+                                    $"🔧 [{environment.ToUpperInvariant()}] Commands registered to guild {debugGuildId.Value} for instant updates"
+                                );
+                            }
+                            else
+                            {
+                                // Global registration for production (takes up to 1 hour to update)
+                                commands.AddCommands<ScrimmageCommands>();
+                                if (isDevelopment)
+                                {
+                                    Console.WriteLine(
+                                        "⚠️  [DEVELOPMENT] Commands registered globally - updates may take up to 1 hour. "
+                                            + "Set Bot:DebugGuildId for instant updates."
+                                    );
+                                }
+                                else
+                                {
+                                    Console.WriteLine(
+                                        $"🌍 [{environment.ToUpperInvariant()}] Commands registered globally"
+                                    );
+                                }
+                            }
+
                             // TODO: Add other command classes as they are implemented
                         }
                     )
@@ -172,12 +213,29 @@ namespace WabbitBot.DiscBot.App
                 // Handlers return Result for immediate feedback
                 Common.Models.Result? result = null;
 
+                // Check if it's a select menu or button based on component type
+                var isSelectMenu = args.Interaction.Data.ComponentType == DiscordComponentType.StringSelect;
+
+                // Route scrimmage-related interactions
                 if (
                     customId.StartsWith("accept_challenge_", StringComparison.Ordinal)
                     || customId.StartsWith("decline_challenge_", StringComparison.Ordinal)
+                    || customId.StartsWith("cancel_challenge_", StringComparison.Ordinal)
+                    || customId.StartsWith("challenge_issue_", StringComparison.Ordinal)
+                    || customId.StartsWith("challenge_cancel_", StringComparison.Ordinal)
                 )
                 {
                     result = await ScrimmageApp.ProcessButtonInteractionAsync(client, args);
+                }
+                else if (
+                    isSelectMenu
+                    && (
+                        customId.StartsWith("challenge_", StringComparison.Ordinal)
+                        || customId.StartsWith("select_teammates_", StringComparison.Ordinal)
+                    )
+                )
+                {
+                    result = await Handlers.ScrimmageHandler.HandleSelectMenuInteractionAsync(client, args);
                 }
                 else if (customId.StartsWith("match_", StringComparison.Ordinal))
                 {
@@ -185,7 +243,7 @@ namespace WabbitBot.DiscBot.App
                 }
                 else if (customId.StartsWith("game_", StringComparison.Ordinal))
                 {
-                    result = await Handlers.GameHandler.ProcessButtonInteractionAsync(client, args);
+                    result = await GameApp.ProcessButtonInteractionAsync(client, args);
                 }
                 // Add more handlers as needed
 
@@ -221,9 +279,26 @@ namespace WabbitBot.DiscBot.App
             {
                 var customId = args.Interaction.Data.CustomId;
 
+                Result? result = null;
+
                 // Delegate to appropriate handler based on custom ID pattern
-                // TODO: Implement modal handlers as needed
-                await Task.CompletedTask;
+                if (
+                    customId.StartsWith("submit_deck_", StringComparison.Ordinal)
+                    || customId.StartsWith("submit_replay_", StringComparison.Ordinal)
+                )
+                {
+                    result = await GameApp.ProcessModalSubmitAsync(client, args);
+                }
+
+                // Log failures (success is typically logged by the handler itself)
+                if (result is not null && !result.Success)
+                {
+                    await DiscBotService.ErrorHandler.CaptureAsync(
+                        new InvalidOperationException(result.ErrorMessage ?? "Unknown error"),
+                        $"Modal submission failed: {customId}",
+                        nameof(HandleModalSubmitAsync)
+                    );
+                }
             }
             catch (Exception ex)
             {
@@ -240,6 +315,9 @@ namespace WabbitBot.DiscBot.App
         /// </summary>
         public static async Task StopAsync()
         {
+            // Stop the batch processor first to ensure no pending updates
+            Handlers.GameHandler.StopBatchProcessor();
+
             if (_client is not null)
             {
                 try

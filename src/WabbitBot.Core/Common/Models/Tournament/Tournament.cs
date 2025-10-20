@@ -25,6 +25,9 @@ namespace WabbitBot.Core.Common.Models.Tournament
         public int MaxParticipants { get; set; }
         public int BestOf { get; set; } = 1; // Number of games to win each match
 
+        // Foreign key collection for state history
+        public ICollection<Guid> StateHistoryIds { get; set; } = [];
+
         // State Management Properties - StateHistory stored as JSONB
         public virtual ICollection<TournamentStateSnapshot> StateHistory { get; set; } =
             new List<TournamentStateSnapshot>();
@@ -60,9 +63,9 @@ namespace WabbitBot.Core.Common.Models.Tournament
         // Tournament state properties
         public Guid TournamentId { get; set; }
         public DateTime Timestamp { get; set; }
-        public Guid TriggeredByUserId { get; set; } = Guid.Empty; // User who triggered this state change
-        public string TriggeredByUserName { get; set; } = string.Empty; // Username (denormalized for historical completeness)
-        public Dictionary<string, object> AdditionalData { get; set; } = new();
+        public Guid TriggeredByMashinaUserId { get; set; } = Guid.Empty; // User who triggered this state change
+        public virtual MashinaUser? TriggeredByMashinaUser { get; set; } = null;
+        public Dictionary<string, object> AdditionalData { get; set; } = [];
 
         // Tournament lifecycle properties
         public DateTime? RegistrationOpenedAt { get; set; }
@@ -78,21 +81,22 @@ namespace WabbitBot.Core.Common.Models.Tournament
 
         // Tournament status properties
         public Guid? WinnerTeamId { get; set; }
-        public Guid? CancelledByUserId { get; set; }
+        public Guid? CancelledByMashinaUserId { get; set; }
+        public virtual MashinaUser? CancelledByMashinaUser { get; set; } = null;
         public string? CancellationReason { get; set; }
 
         // Tournament progression properties
-        public List<Guid> RegisteredTeamIds { get; set; } = new();
-        public List<Guid> ParticipantTeamIds { get; set; } = new();
-        public List<Guid> ActiveMatchIds { get; set; } = new();
-        public List<Guid> CompletedMatchIds { get; set; } = new();
-        public List<Guid> AllMatchIds { get; set; } = new();
-        public List<string> FinalRankings { get; set; } = new(); // Team IDs in order of placement
+        public List<Guid> RegisteredTeamIds { get; set; } = [];
+        public List<Guid> ParticipantTeamIds { get; set; } = [];
+        public List<Guid> ActiveMatchIds { get; set; } = [];
+        public List<Guid> CompletedMatchIds { get; set; } = [];
+        public List<Guid> AllMatchIds { get; set; } = [];
+        public List<Guid> FinalRankings { get; set; } = []; // Team IDs in order of placement
         public int CurrentParticipantCount { get; set; }
         public int CurrentRound { get; set; } = 1;
 
         // Parent navigation
-        public virtual Tournament Tournament { get; set; } = null!;
+        public virtual Tournament? Tournament { get; set; } = null;
 
         public override Domain Domain => Domain.Tournament;
     }

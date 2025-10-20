@@ -5,8 +5,6 @@ using Microsoft.Extensions.Options;
 using WabbitBot.Common.Configuration;
 using WabbitBot.Common.ErrorService;
 using WabbitBot.Common.Events;
-using WabbitBot.Common.Events.Interfaces;
-using WabbitBot.Common.Utilities;
 using WabbitBot.Core.Common.BotCore;
 using WabbitBot.Core.Common.Database;
 using WabbitBot.Core.Common.Services;
@@ -17,11 +15,11 @@ namespace WabbitBot.Host;
 public static class Program
 {
     // Static instances for global access
-    private static readonly IGlobalEventBus GlobalEventBus;
-    private static readonly ICoreEventBus CoreEventBus;
-    private static readonly IErrorService ErrorService;
-    private static readonly IGlobalErrorHandler GlobalErrorHandler;
-    private static IBotConfigurationService? ConfigurationService;
+    private static readonly GlobalEventBus GlobalEventBus;
+    private static readonly CoreEventBus CoreEventBus;
+    private static readonly ErrorService ErrorService;
+    private static readonly GlobalErrorHandler GlobalErrorHandler;
+    private static BotConfigurationService? ConfigurationService;
 
     // Static constructor for initialization of dependencies
     static Program()
@@ -33,8 +31,8 @@ public static class Program
         GlobalEventBusProvider.Initialize(GlobalEventBus);
 
         CoreEventBus = new CoreEventBus(GlobalEventBus);
-        ErrorService = new WabbitBot.Common.ErrorService.ErrorService();
-        GlobalErrorHandler = new WabbitBot.Common.Events.GlobalErrorHandler(GlobalEventBus);
+        ErrorService = new ErrorService();
+        GlobalErrorHandler = new GlobalErrorHandler(GlobalEventBus);
     }
 
     public static async Task Main()
@@ -59,7 +57,7 @@ public static class Program
             var token = configuration["Bot:Token"];
             if (string.IsNullOrWhiteSpace(token))
                 throw new InvalidOperationException(
-                    "Missing Bot:Token. Provide it via user-secrets (Dev) or .env (Cybrancee)."
+                    "Missing Bot:Token. Provide it via user-secrets (Dev), .env file, or environment variables (Production)."
                 );
 
             var botOptions =
@@ -73,9 +71,6 @@ public static class Program
             // Initialize static configuration provider
             WabbitBot.Common.Configuration.ConfigurationProvider.Initialize(ConfigurationService);
 
-            // Initialize thumbnail utility
-            ThumbnailUtility.Initialize(configuration);
-
             // Validate configuration
             ConfigurationService.ValidateConfiguration();
 
@@ -83,7 +78,7 @@ public static class Program
             await InitializeCoreAsync(configuration);
 
             // Initialize DiscBot (Discord client bootstrap)
-            await InitializeDiscBotAsync(ConfigurationService);
+            await InitializeDiscBotAsync(ConfigurationService, currentEnv);
 
             // Publish startup event (allow startup events to carry configuration references)
             await GlobalEventBus.PublishAsync(new StartupInitiatedEvent(botOptions, ConfigurationService));
@@ -108,8 +103,17 @@ public static class Program
     private static IConfiguration BuildConfiguration()
     {
         // 1) Load .env first so its values are present as environment variables
-        //    (Cybrancee places secrets in a .env file alongside your app)
-        Env.Load();
+        //    On VPS: .env file in app directory OR systemd EnvironmentFile directive
+        //    The .env file is optional; environment variables can be provided directly
+        try
+        {
+            Env.Load();
+        }
+        catch (FileNotFoundException)
+        {
+            // .env is optional - environment variables may be set via systemd or shell
+            Console.WriteLine("⚠️  No .env file found; using system environment variables only.");
+        }
 
         var environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Development";
 
@@ -145,13 +149,33 @@ public static class Program
             // Initialize the DbContext provider
             WabbitBotDbContextProvider.Initialize(configuration);
 
-            // Create DbContext, run migrations, and validate schema version
+            // Determine environment
+            var environment =
+                configuration["ASPNETCORE_ENVIRONMENT"]
+                ?? Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")
+                ?? "Production";
+
+            // Create DbContext and initialize database
             using (var dbContext = WabbitBotDbContextProvider.CreateDbContext())
             {
-                await dbContext.Database.MigrateAsync();
+                if (string.Equals(environment, "Development", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Development: Use EnsureCreated for rapid prototyping
+                    // This creates the database from scratch without migrations
+                    await dbContext.Database.EnsureCreatedAsync();
 
-                var versionTracker = new SchemaVersionTracker(dbContext);
-                await versionTracker.ValidateCompatibilityAsync();
+                    // Seed development data
+                    await DevelopmentDataSeeder.SeedAsync(dbContext);
+                }
+                else
+                {
+                    // Production/Staging: Use migrations for proper schema versioning
+                    await dbContext.Database.MigrateAsync();
+
+                    // Validate schema version compatibility
+                    var versionTracker = new SchemaVersionTracker(dbContext);
+                    await versionTracker.ValidateCompatibilityAsync();
+                }
 
                 await GlobalEventBus.PublishAsync(new DatabaseInitializedEvent());
             }
@@ -214,13 +238,27 @@ public static class Program
     {
         try
         {
+            // Initialize CoreService with event bus and error handler (must be done first)
+            CoreService.Initialize(CoreEventBus, ErrorService);
+
             // Database services setup
             CoreService.RegisterRepositoryAdapters();
             CoreService.RegisterCacheProviders();
             CoreService.RegisterArchiveProviders();
 
+            // Get storage configuration
+            var storageOptions =
+                WabbitBot.Common.Configuration.ConfigurationProvider.GetSection<WabbitBot.Common.Configuration.StorageOptions>(
+                    WabbitBot.Common.Configuration.StorageOptions.SectionName
+                );
+
             // Initialize FileSystemService with explicit dependencies
-            CoreService.InitializeFileSystemService(CoreEventBus, ErrorService);
+            CoreService.InitializeFileSystemService(storageOptions, CoreEventBus, ErrorService);
+
+            // Initialize Core event handlers (subscribe to CoreEventBus)
+            WabbitBot.Core.Scrimmages.ScrimmageHandler.Initialize();
+            WabbitBot.Core.Common.Models.Common.GameHandler.Initialize();
+            WabbitBot.Core.Common.Models.Common.MatchHandler.Initialize();
 
             await Task.CompletedTask;
         }
@@ -235,7 +273,7 @@ public static class Program
     /// Initializes DiscBot by calling the bootstrap entry point in WabbitBot.DiscBot.DSharpPlus.
     /// This keeps all DSharpPlus code out of Core.
     /// </summary>
-    private static async Task InitializeDiscBotAsync(IBotConfigurationService config)
+    private static async Task InitializeDiscBotAsync(IBotConfigurationService config, string environment)
     {
         try
         {
@@ -246,7 +284,7 @@ public static class Program
             await WabbitBot.DiscBot.App.DiscBotBootstrap.InitializeServicesAsync(discBotEventBus, ErrorService);
 
             // Start the Discord client
-            await WabbitBot.DiscBot.App.DiscBotBootstrap.StartDiscordClientAsync(config);
+            await WabbitBot.DiscBot.App.DiscBotBootstrap.StartDiscordClientAsync(config, environment);
         }
         catch (Exception ex)
         {

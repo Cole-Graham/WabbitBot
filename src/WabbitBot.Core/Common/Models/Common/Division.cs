@@ -162,6 +162,13 @@ public class Division : Entity, IDivisionEntity
     public string? IconFilename { get; set; }
 
     /// <summary>
+    /// Foreign key collections for navigation properties.
+    /// </summary>
+    public ICollection<Guid> StatsIds { get; set; } = [];
+    public ICollection<Guid> MapStatsIds { get; set; } = [];
+    public ICollection<Guid> LearningCurveIds { get; set; } = [];
+
+    /// <summary>
     /// Navigation property to division statistics.
     /// </summary>
     public virtual ICollection<DivisionStats> Stats { get; set; } = new List<DivisionStats>();

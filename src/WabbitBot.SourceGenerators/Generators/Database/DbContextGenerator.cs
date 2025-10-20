@@ -182,6 +182,19 @@ namespace WabbitBot.SourceGenerators.Generators.Database
                 sourceBuilder.AppendLine("");
             }
 
+            // Generate partial void declarations for custom relationship configurations
+            sourceBuilder.AppendLine("        // Partial methods for custom relationship configuration");
+            sourceBuilder.AppendLine(
+                "        // Implement these in WabbitBotDbContext.Manual.cs for entities with complex relationships"
+            );
+            foreach (var metadata in entityMetadata)
+            {
+                sourceBuilder.AppendLine(
+                    $"        partial void Configure{metadata.ClassName}Relationships(ModelBuilder modelBuilder);"
+                );
+            }
+            sourceBuilder.AppendLine();
+
             // Generate OnModelCreating to invoke Configure methods
             sourceBuilder.AppendLine("        protected override void OnModelCreating(ModelBuilder modelBuilder)");
             sourceBuilder.AppendLine("        {");
@@ -201,6 +214,14 @@ namespace WabbitBot.SourceGenerators.Generators.Database
             {
                 var methodName = $"Configure{metadata.ClassName}Archive";
                 sourceBuilder.AppendLine($"            {methodName}(modelBuilder);");
+            }
+            sourceBuilder.AppendLine();
+            sourceBuilder.AppendLine(
+                "            // Call custom relationship configuration methods (optional partial methods)"
+            );
+            foreach (var metadata in entityMetadata)
+            {
+                sourceBuilder.AppendLine($"            Configure{metadata.ClassName}Relationships(modelBuilder);");
             }
             sourceBuilder.AppendLine("        }");
             sourceBuilder.AppendLine();

@@ -24,6 +24,8 @@
             │   │   ├── 📄 IGameApp.cs
             │   │   ├── 📄 IMatchApp.cs
             │   │   └── 📄 IScrimmageApp.cs
+            │   ├── 📁 Providers
+            │   │   └── 📄 Autocomplete.cs
             │   ├── 📁 Renderers
             │   │   ├── 📄 GameRenderer.cs
             │   │   ├── 📄 MatchRenderer.cs
@@ -36,7 +38,9 @@
             │   ├── 📁 Utilities
             │   │   ├── 📄 AssetUrlValidator.cs
             │   │   ├── 📄 AttachmentHint.cs
-            │   │   └── 📄 CdnCapture.cs
+            │   │   ├── 📄 CdnCapture.cs
+            │   │   └── 📄 EmbedStyling.cs
+            │   ├── 📄 App.cs
             │   ├── 📄 DiscBotBootstrap.cs
             │   ├── 📄 DiscordClientProvider.cs
             │   ├── 📄 GameApp.cs

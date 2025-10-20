@@ -70,6 +70,7 @@
             │   └── 📄 IErrorService.cs
             ├── 📁 Events
             │   ├── 📁 Core
+            │   │   ├── 📄 MatchEvents.cs
             │   │   └── 📄 ScrimmageEvents.cs
             │   ├── 📁 DiscBot
             │   ├── 📁 Interfaces
@@ -84,6 +85,7 @@
             ├── 📁 Models
             │   ├── 📄 Entity.cs
             │   └── 📄 Result.cs
+            ├── 📁 Services
             ├── 📁 Utilities
             │   └── 📄 ThumbnailUtility.cs
             └── 📄 WabbitBot.Common.csproj

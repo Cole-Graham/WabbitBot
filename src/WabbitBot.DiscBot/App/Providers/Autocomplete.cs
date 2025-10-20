@@ -20,25 +20,44 @@ namespace WabbitBot.DiscBot.App.Providers
         public async ValueTask<IEnumerable<DiscordAutoCompleteChoice>> AutoCompleteAsync(AutoCompleteContext context)
         {
             var term = context.UserInput ?? string.Empty;
-            var teamSize = context.Options.FirstOrDefault(o => o.Name == "teamSize")?.Value?.ToString();
-            var teamSizeEnum = teamSize != null ? Enum.Parse<TeamSize>(teamSize, true) : TeamSize.ThreeVThree;
 
+            // Discord slash commands lowercase parameter names
+            var teamSize = context
+                .Options.FirstOrDefault(o => o.Name.Equals("team_size", StringComparison.OrdinalIgnoreCase))
+                ?.Value?.ToString();
+
+            // Debug logging
+            Console.WriteLine(
+                $"[UserTeamAutoComplete] User ID: {context.User.Id}, TeamSize: '{teamSize}', Search: '{term}'"
+            );
+            Console.WriteLine(
+                $"[UserTeamAutoComplete] Options: {string.Join(", ", context.Options.Select(o => $"{o.Name}={o.Value}"))}"
+            );
+
+            var teamSizeEnum = !string.IsNullOrEmpty(teamSize)
+                ? Enum.Parse<TeamSize>(teamSize, true)
+                : TeamSize.TwoVTwo;
             var rosterGroup = TeamCore.TeamSizeRosterGrouping.GetRosterGroup(teamSizeEnum);
 
+            Console.WriteLine($"[UserTeamAutoComplete] Parsed TeamSize: {teamSizeEnum}, RosterGroup: {rosterGroup}");
+
+            var userIdString = context.User.Id.ToString();
             var teams = await CoreService.WithDbContext(async db =>
             {
-                return await db
+                var result = await db
                     .Teams.Where(t =>
                         t.Rosters.Any(r =>
-                            r.RosterGroup == rosterGroup
-                            && r.RosterMembers.Any(m => m.DiscordUserId == context.User.Id.ToString())
+                            r.RosterGroup == rosterGroup && r.RosterMembers.Any(m => m.DiscordUserId == userIdString)
                         )
                     )
-                    .Where(t => t.Name.Contains(term, StringComparison.OrdinalIgnoreCase))
+                    .Where(t => EF.Functions.ILike(t.Name, $"%{term}%"))
                     .OrderBy(t => t.Name)
                     .Select(t => new { t.Name, t.Id })
                     .Take(25)
                     .ToListAsync();
+
+                Console.WriteLine($"[UserTeamAutoComplete] Found {result.Count} teams");
+                return result;
             });
 
             return teams.Select(t => new DiscordAutoCompleteChoice(t.Name, t.Name));
@@ -57,9 +76,15 @@ namespace WabbitBot.DiscBot.App.Providers
         public async ValueTask<IEnumerable<DiscordAutoCompleteChoice>> AutoCompleteAsync(AutoCompleteContext context)
         {
             var term = context.UserInput ?? string.Empty;
-            var teamSize = context.Options.FirstOrDefault(o => o.Name == "teamSize")?.Value?.ToString();
 
-            var teamSizeEnum = teamSize != null ? Enum.Parse<TeamSize>(teamSize, true) : TeamSize.ThreeVThree;
+            // Discord slash commands convert PascalCase to snake_case
+            var teamSize = context
+                .Options.FirstOrDefault(o => o.Name.Equals("team_size", StringComparison.OrdinalIgnoreCase))
+                ?.Value?.ToString();
+
+            var teamSizeEnum = !string.IsNullOrEmpty(teamSize)
+                ? Enum.Parse<TeamSize>(teamSize, true)
+                : TeamSize.TwoVTwo;
 
             var rosterGroup = TeamCore.TeamSizeRosterGrouping.GetRosterGroup(teamSizeEnum);
 
@@ -76,7 +101,7 @@ namespace WabbitBot.DiscBot.App.Providers
 
                 return await db
                     .Teams.Where(t => t.Rosters.Any(r => r.RosterGroup == rosterGroup)) // Must have roster for this game size
-                    .Where(t => t.Name.Contains(term, StringComparison.OrdinalIgnoreCase))
+                    .Where(t => EF.Functions.ILike(t.Name, $"%{term}%"))
                     .Where(t => !userTeamIds.Contains(t.Id)) // Exclude all user's teams
                     .Where(t => !t.Matches.Any(m => m.CompletedAt == null)) // Exclude teams in active matches
                     .OrderBy(t => t.Name)
@@ -101,10 +126,14 @@ namespace WabbitBot.DiscBot.App.Providers
         public async ValueTask<IEnumerable<DiscordAutoCompleteChoice>> AutoCompleteAsync(AutoCompleteContext context)
         {
             var term = context.UserInput ?? string.Empty;
+
+            // Discord slash commands convert PascalCase to snake_case
             var challengerTeamName = context
-                .Options.FirstOrDefault(o => o.Name == "challengerTeamName")
+                .Options.FirstOrDefault(o => o.Name.Equals("challenger_team_name", StringComparison.OrdinalIgnoreCase))
                 ?.Value?.ToString();
-            var teamSize = context.Options.FirstOrDefault(o => o.Name == "teamSize")?.Value?.ToString();
+            var teamSize = context
+                .Options.FirstOrDefault(o => o.Name.Equals("team_size", StringComparison.OrdinalIgnoreCase))
+                ?.Value?.ToString();
 
             if (string.IsNullOrEmpty(challengerTeamName))
             {
@@ -112,13 +141,15 @@ namespace WabbitBot.DiscBot.App.Providers
             }
 
             // Get the roster group for the selected team size
-            var teamSizeEnum = teamSize != null ? Enum.Parse<TeamSize>(teamSize, true) : TeamSize.ThreeVThree;
+            var teamSizeEnum = !string.IsNullOrEmpty(teamSize)
+                ? Enum.Parse<TeamSize>(teamSize, true)
+                : TeamSize.TwoVTwo;
             var rosterGroup = TeamCore.TeamSizeRosterGrouping.GetRosterGroup(teamSizeEnum);
 
             var players = await CoreService.WithDbContext(async db =>
             {
                 return await db
-                    .Teams.Where(t => t.Name.Equals(challengerTeamName, StringComparison.OrdinalIgnoreCase))
+                    .Teams.Where(t => EF.Functions.ILike(t.Name, challengerTeamName))
                     .SelectMany(t => t.Rosters)
                     .Where(r => r.RosterGroup == rosterGroup) // Filter to the right roster group
                     .SelectMany(r => r.RosterMembers) // Get members from that roster
@@ -127,15 +158,15 @@ namespace WabbitBot.DiscBot.App.Providers
                     .Where(tm =>
                         tm.MashinaUser != null
                         && (
-                            tm.MashinaUser.DiscordUsername.Contains(term, StringComparison.OrdinalIgnoreCase)
-                            || tm.MashinaUser.DiscordGlobalname.Contains(term, StringComparison.OrdinalIgnoreCase)
+                            EF.Functions.ILike(tm.MashinaUser.DiscordUsername ?? string.Empty, $"%{term}%")
+                            || EF.Functions.ILike(tm.MashinaUser.DiscordGlobalname ?? string.Empty, $"%{term}%")
                         )
                     )
-                    .OrderBy(tm => tm.MashinaUser!.DiscordUsername)
+                    .OrderBy(tm => tm.MashinaUser!.DiscordUsername ?? string.Empty)
                     .Select(tm => new
                     {
                         DisplayName = string.IsNullOrEmpty(tm.MashinaUser!.DiscordGlobalname)
-                            ? tm.MashinaUser.DiscordUsername
+                            ? tm.MashinaUser.DiscordUsername ?? "Unknown"
                             : tm.MashinaUser.DiscordGlobalname,
                         PlayerId = tm.PlayerId,
                     })
@@ -143,7 +174,10 @@ namespace WabbitBot.DiscBot.App.Providers
                     .ToListAsync();
             });
 
-            return players.Select(p => new DiscordAutoCompleteChoice(p.DisplayName, p.PlayerId.ToString()));
+            return players.Select(p => new DiscordAutoCompleteChoice(
+                p.DisplayName ?? "Unknown",
+                p.PlayerId.ToString()
+            ));
         }
     }
 
@@ -168,8 +202,8 @@ namespace WabbitBot.DiscBot.App.Providers
                     .Include(c => c.OpponentTeam)
                     .Where(c => c.ChallengerTeam != null && c.OpponentTeam != null)
                     .Where(c =>
-                        c.ChallengerTeam!.Name.Contains(term, StringComparison.OrdinalIgnoreCase)
-                        || c.OpponentTeam!.Name.Contains(term, StringComparison.OrdinalIgnoreCase)
+                        EF.Functions.ILike(c.ChallengerTeam!.Name, $"%{term}%")
+                        || EF.Functions.ILike(c.OpponentTeam!.Name, $"%{term}%")
                     )
                     .OrderByDescending(c => c.CreatedAt)
                     .Select(c => new { DisplayName = $"{c.ChallengerTeam!.Name} vs {c.OpponentTeam!.Name}", c.Id })
@@ -178,6 +212,352 @@ namespace WabbitBot.DiscBot.App.Providers
             });
 
             return challenges.Select(c => new DiscordAutoCompleteChoice(c.DisplayName, c.Id.ToString()));
+        }
+    }
+
+    /// <summary>
+    /// Autocomplete provider for cancellable scrimmage challenges
+    /// </summary>
+    /// <remarks>
+    /// This provider only shows pending challenges where the user is authorized to cancel them:
+    /// - User is the player who issued the challenge, OR
+    /// - User is the captain of the challenger team
+    /// </remarks>
+    public sealed class CancellableChallengeAutoComplete : IAutoCompleteProvider
+    {
+        public async ValueTask<IEnumerable<DiscordAutoCompleteChoice>> AutoCompleteAsync(AutoCompleteContext context)
+        {
+            var term = context.UserInput ?? string.Empty;
+
+            var challenges = await CoreService.WithDbContext(async db =>
+            {
+                // Get the player associated with the Discord user
+                var player = await db
+                    .Players.Where(p => p.MashinaUser.DiscordUserId == context.User.Id)
+                    .Select(p => new { p.Id })
+                    .FirstOrDefaultAsync();
+
+                if (player is null)
+                {
+                    return [];
+                }
+
+                // Find challenges where:
+                // 1. Status is Pending
+                // 2. User is the issuer OR user is the team captain
+                return await db
+                    .ScrimmageChallenges.Where(c => c.ChallengeStatus == ScrimmageChallengeStatus.Pending)
+                    .Include(c => c.ChallengerTeam)
+                    .Include(c => c.OpponentTeam)
+                    .Where(c =>
+                        c.ChallengerTeam != null
+                        && c.OpponentTeam != null
+                        && (c.IssuedByPlayerId == player.Id || c.ChallengerTeam.TeamCaptainId == player.Id)
+                    )
+                    .Where(c =>
+                        EF.Functions.ILike(c.ChallengerTeam!.Name, $"%{term}%")
+                        || EF.Functions.ILike(c.OpponentTeam!.Name, $"%{term}%")
+                    )
+                    .OrderByDescending(c => c.CreatedAt)
+                    .Select(c => new { DisplayName = $"{c.ChallengerTeam!.Name} vs {c.OpponentTeam!.Name}", c.Id })
+                    .Take(25)
+                    .ToListAsync();
+            });
+
+            return challenges.Select(c => new DiscordAutoCompleteChoice(c.DisplayName, c.Id.ToString()));
+        }
+    }
+
+    /// <summary>
+    /// Autocomplete provider for active games where the user is a participant
+    /// </summary>
+    /// <remarks>
+    /// This provider shows games where the user is on one of the teams and the game hasn't been completed yet.
+    /// Shows in format: "Team1 vs Team2 - Game 1 (Map Name)"
+    /// </remarks>
+    public sealed class UserActiveGameAutoComplete : IAutoCompleteProvider
+    {
+        public async ValueTask<IEnumerable<DiscordAutoCompleteChoice>> AutoCompleteAsync(AutoCompleteContext context)
+        {
+            var term = context.UserInput ?? string.Empty;
+
+            var games = await CoreService.WithDbContext(async db =>
+            {
+                // Get the player associated with the Discord user
+                var player = await db
+                    .Players.Where(p => p.MashinaUser.DiscordUserId == context.User.Id)
+                    .Select(p => new { p.Id })
+                    .FirstOrDefaultAsync();
+
+                if (player is null)
+                {
+                    return [];
+                }
+
+                // Find games where:
+                // 1. Match is not completed
+                // 2. User is in one of the teams (check Match.Team1PlayerIds or Team2PlayerIds)
+                // 3. Required navigation properties are loaded (null checks)
+                return await db
+                    .Games.Include(g => g.Match)
+                    .ThenInclude(m => m.Team1)
+                    .Include(g => g.Match)
+                    .ThenInclude(m => m.Team2)
+                    .Include(g => g.Map)
+                    .Where(g =>
+                        g.Match.CompletedAt == null
+                        && g.Match.Team1 != null
+                        && g.Match.Team2 != null
+                        && g.Map != null
+                        && (g.Match.Team1PlayerIds.Contains(player.Id) || g.Match.Team2PlayerIds.Contains(player.Id))
+                    )
+                    .Where(g =>
+                        EF.Functions.ILike(g.Match.Team1!.Name, $"%{term}%")
+                        || EF.Functions.ILike(g.Match.Team2!.Name, $"%{term}%")
+                        || EF.Functions.ILike(g.Map!.Name, $"%{term}%")
+                    )
+                    .OrderByDescending(g => g.CreatedAt)
+                    .Select(g => new
+                    {
+                        DisplayName = $"{g.Match.Team1!.Name} vs {g.Match.Team2!.Name} - Game {g.GameNumber} ({g.Map!.Name})",
+                        g.Id,
+                    })
+                    .Take(25)
+                    .ToListAsync();
+            });
+
+            return games.Select(g => new DiscordAutoCompleteChoice(g.DisplayName, g.Id.ToString()));
+        }
+    }
+
+    /// <summary>
+    /// Autocomplete provider for active scrimmages where the user is a participant
+    /// </summary>
+    /// <remarks>
+    /// This provider shows scrimmages where the user is on one of the teams and the scrimmage is in progress.
+    /// Shows in format: "Team1 vs Team2"
+    /// </remarks>
+    public sealed class UserActiveScrimmageAutoComplete : IAutoCompleteProvider
+    {
+        public async ValueTask<IEnumerable<DiscordAutoCompleteChoice>> AutoCompleteAsync(AutoCompleteContext context)
+        {
+            var term = context.UserInput ?? string.Empty;
+
+            var scrimmages = await CoreService.WithDbContext(async db =>
+            {
+                // Get the player associated with the Discord user
+                var player = await db
+                    .Players.Where(p => p.MashinaUser.DiscordUserId == context.User.Id)
+                    .Select(p => new { p.Id })
+                    .FirstOrDefaultAsync();
+
+                if (player is null)
+                {
+                    return [];
+                }
+
+                // Find scrimmages where:
+                // 1. Scrimmage is in progress (CompletedAt is null)
+                // 2. User is in one of the teams (check ChallengerTeamPlayerIds or OpponentTeamPlayerIds)
+                return await db
+                    .Scrimmages.Include(s => s.Match)
+                    .ThenInclude(m => m!.Team1)
+                    .Include(s => s.Match)
+                    .ThenInclude(m => m!.Team2)
+                    .Where(s =>
+                        s.CompletedAt == null
+                        && s.Match != null
+                        && s.Match.Team1 != null
+                        && s.Match.Team2 != null
+                        && (
+                            s.ChallengerTeamPlayerIds.Contains(player.Id) || s.OpponentTeamPlayerIds.Contains(player.Id)
+                        )
+                    )
+                    .Where(s =>
+                        EF.Functions.ILike(s.Match!.Team1!.Name, $"%{term}%")
+                        || EF.Functions.ILike(s.Match!.Team2!.Name, $"%{term}%")
+                    )
+                    .OrderByDescending(s => s.StartedAt)
+                    .Select(s => new { DisplayName = $"{s.Match!.Team1!.Name} vs {s.Match!.Team2!.Name}", s.Id })
+                    .Take(25)
+                    .ToListAsync();
+            });
+
+            return scrimmages.Select(s => new DiscordAutoCompleteChoice(s.DisplayName, s.Id.ToString()));
+        }
+    }
+
+    /// <summary>
+    /// Autocomplete provider for players currently in a scrimmage
+    /// </summary>
+    /// <remarks>
+    /// This provider shows players from the user's team in the selected scrimmage.
+    /// </remarks>
+    public sealed class ScrimmagePlayerAutoComplete : IAutoCompleteProvider
+    {
+        public async ValueTask<IEnumerable<DiscordAutoCompleteChoice>> AutoCompleteAsync(AutoCompleteContext context)
+        {
+            var term = context.UserInput ?? string.Empty;
+            var scrimmageIdStr = context.Options.FirstOrDefault(o => o.Name == "scrimmageId")?.Value?.ToString();
+
+            if (string.IsNullOrEmpty(scrimmageIdStr) || !Guid.TryParse(scrimmageIdStr, out var scrimmageId))
+            {
+                return [];
+            }
+
+            var players = await CoreService.WithDbContext(async db =>
+            {
+                // Get the player associated with the Discord user
+                var currentUser = await db
+                    .Players.Where(p => p.MashinaUser.DiscordUserId == context.User.Id)
+                    .Select(p => new { p.Id })
+                    .FirstOrDefaultAsync();
+
+                if (currentUser is null)
+                {
+                    return [];
+                }
+
+                // Find the scrimmage
+                var scrimmage = await db.Scrimmages.FirstOrDefaultAsync(s => s.Id == scrimmageId);
+                if (scrimmage is null)
+                {
+                    return [];
+                }
+
+                // Determine which team the user is on
+                var userTeamPlayerIds =
+                    scrimmage.ChallengerTeamPlayerIds.Contains(currentUser.Id) ? scrimmage.ChallengerTeamPlayerIds
+                    : scrimmage.OpponentTeamPlayerIds.Contains(currentUser.Id) ? scrimmage.OpponentTeamPlayerIds
+                    : new List<Guid>();
+
+                if (userTeamPlayerIds.Count == 0)
+                {
+                    return [];
+                }
+
+                // Get players from user's team (excluding the user themselves)
+                return await db
+                    .Players.Where(p => userTeamPlayerIds.Contains(p.Id) && p.Id != currentUser.Id)
+                    .Where(p =>
+                        p.MashinaUser != null
+                        && (
+                            EF.Functions.ILike(p.MashinaUser.DiscordUsername ?? string.Empty, $"%{term}%")
+                            || EF.Functions.ILike(p.MashinaUser.DiscordGlobalname ?? string.Empty, $"%{term}%")
+                        )
+                    )
+                    .OrderBy(p => p.MashinaUser!.DiscordUsername ?? string.Empty)
+                    .Select(p => new
+                    {
+                        DisplayName = string.IsNullOrEmpty(p.MashinaUser!.DiscordGlobalname)
+                            ? p.MashinaUser.DiscordUsername ?? "Unknown"
+                            : p.MashinaUser.DiscordGlobalname,
+                        p.Id,
+                    })
+                    .Take(25)
+                    .ToListAsync();
+            });
+
+            return players.Select(p => new DiscordAutoCompleteChoice(p.DisplayName ?? "Unknown", p.Id.ToString()));
+        }
+    }
+
+    /// <summary>
+    /// Autocomplete provider for eligible substitute players from the roster
+    /// </summary>
+    /// <remarks>
+    /// This provider shows active roster members from the user's team who are NOT currently in the scrimmage.
+    /// </remarks>
+    public sealed class SubstitutePlayerAutoComplete : IAutoCompleteProvider
+    {
+        public async ValueTask<IEnumerable<DiscordAutoCompleteChoice>> AutoCompleteAsync(AutoCompleteContext context)
+        {
+            var term = context.UserInput ?? string.Empty;
+            var scrimmageIdStr = context.Options.FirstOrDefault(o => o.Name == "scrimmageId")?.Value?.ToString();
+
+            if (string.IsNullOrEmpty(scrimmageIdStr) || !Guid.TryParse(scrimmageIdStr, out var scrimmageId))
+            {
+                return [];
+            }
+
+            var players = await CoreService.WithDbContext(async db =>
+            {
+                // Get the player associated with the Discord user
+                var currentUser = await db
+                    .Players.Where(p => p.MashinaUser.DiscordUserId == context.User.Id)
+                    .Select(p => new { p.Id })
+                    .FirstOrDefaultAsync();
+
+                if (currentUser is null)
+                {
+                    return [];
+                }
+
+                // Find the scrimmage
+                var scrimmage = await db
+                    .Scrimmages.Include(s => s.Match)
+                    .ThenInclude(m => m!.Team1)
+                    .Include(s => s.Match)
+                    .ThenInclude(m => m!.Team2)
+                    .FirstOrDefaultAsync(s => s.Id == scrimmageId);
+
+                if (scrimmage is null || scrimmage.Match is null)
+                {
+                    return [];
+                }
+
+                // Determine which team the user is on
+                Guid userTeamId;
+                List<Guid> currentPlayerIds;
+                if (scrimmage.ChallengerTeamPlayerIds.Contains(currentUser.Id))
+                {
+                    userTeamId = scrimmage.ChallengerTeamId;
+                    currentPlayerIds = scrimmage.ChallengerTeamPlayerIds;
+                }
+                else if (scrimmage.OpponentTeamPlayerIds.Contains(currentUser.Id))
+                {
+                    userTeamId = scrimmage.OpponentTeamId;
+                    currentPlayerIds = scrimmage.OpponentTeamPlayerIds;
+                }
+                else
+                {
+                    return [];
+                }
+
+                // Get the roster group for the scrimmage team size
+                var rosterGroup = TeamCore.TeamSizeRosterGrouping.GetRosterGroup(scrimmage.TeamSize);
+
+                // Get roster members who are NOT currently in the scrimmage
+                return await db
+                    .Teams.Where(t => t.Id == userTeamId)
+                    .SelectMany(t => t.Rosters)
+                    .Where(r => r.RosterGroup == rosterGroup)
+                    .SelectMany(r => r.RosterMembers)
+                    .Where(tm => tm.IsActive && !currentPlayerIds.Contains(tm.PlayerId))
+                    .Include(tm => tm.MashinaUser)
+                    .Where(tm =>
+                        tm.MashinaUser != null
+                        && (
+                            EF.Functions.ILike(tm.MashinaUser.DiscordUsername ?? string.Empty, $"%{term}%")
+                            || EF.Functions.ILike(tm.MashinaUser.DiscordGlobalname ?? string.Empty, $"%{term}%")
+                        )
+                    )
+                    .OrderBy(tm => tm.MashinaUser!.DiscordUsername ?? string.Empty)
+                    .Select(tm => new
+                    {
+                        DisplayName = string.IsNullOrEmpty(tm.MashinaUser!.DiscordGlobalname)
+                            ? tm.MashinaUser.DiscordUsername ?? "Unknown"
+                            : tm.MashinaUser.DiscordGlobalname,
+                        tm.PlayerId,
+                    })
+                    .Take(25)
+                    .ToListAsync();
+            });
+
+            return players.Select(p => new DiscordAutoCompleteChoice(
+                p.DisplayName ?? "Unknown",
+                p.PlayerId.ToString()
+            ));
         }
     }
 }

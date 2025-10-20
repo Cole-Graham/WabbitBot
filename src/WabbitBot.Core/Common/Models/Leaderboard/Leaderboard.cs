@@ -19,7 +19,12 @@ namespace WabbitBot.Core.Common.Models.Leaderboard
     {
         // Navigation properties
         public Guid SeasonId { get; set; }
-        public Season Season { get; set; } = new();
+        public virtual Season? Season { get; set; } = null;
+
+        // Foreign key collection for leaderboard items
+        public ICollection<Guid> LeaderboardItemIds { get; set; } = [];
+
+        // Navigation property for leaderboard items
         public virtual ICollection<ScrimmageLeaderboardItem> LeaderboardItems { get; set; } =
             new List<ScrimmageLeaderboardItem>();
 
@@ -42,8 +47,13 @@ namespace WabbitBot.Core.Common.Models.Leaderboard
     {
         // Navigation properties
         public Guid SeasonId { get; set; }
-        public Season Season { get; set; } = new();
+        public virtual Season? Season { get; set; } = null;
         public TeamSize TeamSize { get; set; }
+
+        // Foreign key collection for leaderboard items
+        public ICollection<Guid> LeaderboardItemIds { get; set; } = [];
+
+        // Navigation property for leaderboard items
         public virtual ICollection<TournamentLeaderboardItem> LeaderboardItems { get; set; } =
             new List<TournamentLeaderboardItem>();
         public override Domain Domain => Domain.Leaderboard;
@@ -62,11 +72,13 @@ namespace WabbitBot.Core.Common.Models.Leaderboard
     {
         // Navigation properties
         public Guid TeamId { get; set; }
-        public Team Team { get; set; } = new();
+        public virtual Team? Team { get; set; } = null;
         public List<Guid> PlayerIds { get; set; } = new();
-        public ICollection<Player> Players { get; set; } = new List<Player>();
+
+        // Navigation property for players
+        public virtual ICollection<Player> Players { get; set; } = new List<Player>();
         public Guid ScrimmageLeaderboardId { get; set; }
-        public ScrimmageLeaderboard ScrimmageLeaderboard { get; set; } = new();
+        public virtual ScrimmageLeaderboard? ScrimmageLeaderboard { get; set; } = null;
 
         // Data properties
         public string Name { get; set; } = string.Empty;
@@ -94,11 +106,13 @@ namespace WabbitBot.Core.Common.Models.Leaderboard
     {
         // Navigation properties
         public Guid TeamId { get; set; }
-        public Team Team { get; set; } = new();
+        public virtual Team? Team { get; set; } = null;
         public List<Guid> PlayerIds { get; set; } = new();
-        public ICollection<Player> Players { get; set; } = new List<Player>();
+
+        // Navigation property for players
+        public virtual ICollection<Player> Players { get; set; } = new List<Player>();
         public Guid TournamentLeaderboardId { get; set; }
-        public TournamentLeaderboard TournamentLeaderboard { get; set; } = new();
+        public virtual TournamentLeaderboard? TournamentLeaderboard { get; set; } = null;
 
         // Navigation to tournaments this Team has played in
 
@@ -134,9 +148,16 @@ namespace WabbitBot.Core.Common.Models.Leaderboard
     {
         // Navigation properties
         public Guid SeasonConfigId { get; set; }
-        public SeasonConfig Config { get; set; } = new();
-        public ICollection<ScrimmageLeaderboard> ScrimmageLeaderboards { get; set; } = new List<ScrimmageLeaderboard>();
-        public ICollection<TournamentLeaderboard> TournamentLeaderboards { get; set; } =
+        public virtual SeasonConfig? Config { get; set; } = null;
+
+        // Foreign key collections
+        public ICollection<Guid> ScrimmageLeaderboardIds { get; set; } = [];
+        public ICollection<Guid> TournamentLeaderboardIds { get; set; } = [];
+
+        // Navigation properties
+        public virtual ICollection<ScrimmageLeaderboard> ScrimmageLeaderboards { get; set; } =
+            new List<ScrimmageLeaderboard>();
+        public virtual ICollection<TournamentLeaderboard> TournamentLeaderboards { get; set; } =
             new List<TournamentLeaderboard>();
 
         // Data properties

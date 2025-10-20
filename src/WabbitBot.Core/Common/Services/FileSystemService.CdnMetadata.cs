@@ -3,13 +3,22 @@ using WabbitBot.Common.Events;
 namespace WabbitBot.Core.Common.Services;
 
 /// <summary>
-/// CDN metadata management for FileSystemService
+/// CDN metadata management for FileSystemService.
+///
+/// NOTE: CDN metadata is stored in-memory only and will be lost on bot restart.
+/// This is acceptable because:
+/// - The cache repopulates naturally as files are uploaded
+/// - Discord CDN URLs may expire anyway (requiring re-upload)
+/// - Persistence would add complexity for marginal benefit
+///
+/// If persistence becomes necessary, consider adding a database table or JSON file storage.
 /// </summary>
 public partial class FileSystemService
 {
     /// <summary>
     /// Records a CDN URL for a canonical filename.
     /// Used when DiscBot uploads a file and reports the CDN URL.
+    /// This cache is in-memory only and will be lost on restart.
     /// </summary>
     /// <param name="canonicalFileName">The canonical filename</param>
     /// <param name="cdnUrl">The Discord CDN URL</param>
@@ -51,7 +60,7 @@ public partial class FileSystemService
 
     /// <summary>
     /// Resolves an asset to a usable URL or file path.
-    /// Prefers CDN URL when available, otherwise returns relative path for local upload.
+    /// Prefers CDN URL when available, otherwise returns full path for local upload.
     /// </summary>
     /// <param name="assetType">Type of asset (e.g., "MapThumbnail", "DivisionIcon")</param>
     /// <param name="assetId">Asset identifier (e.g., map ID, division name)</param>
@@ -63,19 +72,16 @@ public partial class FileSystemService
 
         string? fullPath = null;
         string? directory = null;
-        string? relativePathPrefix = null;
 
         // Determine the directory based on asset type
         switch (assetType.ToLowerInvariant())
         {
             case "mapthumbnail":
                 directory = _thumbnailsDirectory;
-                relativePathPrefix = "data/maps/thumbnails";
                 break;
 
             case "divisionicon":
                 directory = _divisionIconsDirectory;
-                relativePathPrefix = "data/divisions/icons";
                 break;
 
             default:
@@ -90,8 +96,8 @@ public partial class FileSystemService
         {
             return null; // No file found for this asset ID
         }
+
         var canonicalFileName = Path.GetFileName(fullPath);
-        var relativePathUnderAppBase = $"{relativePathPrefix}/{canonicalFileName}";
 
         // Check for CDN metadata
         var cdnMetadata = GetCdnMetadata(canonicalFileName);
@@ -101,7 +107,7 @@ public partial class FileSystemService
             assetId,
             canonicalFileName,
             cdnMetadata?.CdnUrl, // Prefer CDN URL when available
-            cdnMetadata is null ? relativePathUnderAppBase : null, // Only provide path if no CDN
+            cdnMetadata is null ? fullPath : null, // Only provide full path if no CDN
             Guid.Empty
         ); // Correlation ID set by caller
     }

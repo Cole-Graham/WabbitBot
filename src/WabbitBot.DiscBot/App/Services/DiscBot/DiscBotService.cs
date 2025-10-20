@@ -16,12 +16,12 @@ namespace WabbitBot.DiscBot.App.Services.DiscBot
     {
         private static Lazy<IDiscBotEventBus>? _lazyEventBus;
         private static Lazy<IErrorService>? _lazyErrorHandler;
-        private static Lazy<WabbitBot.Core.Common.Services.FileSystemService>? _lazyFileSystemService;
 
         // Static service instances accessible across all projects
         public static IDiscBotEventBus EventBus => _lazyEventBus!.Value;
         public static IErrorService ErrorHandler => _lazyErrorHandler!.Value;
-        public static WabbitBot.Core.Common.Services.FileSystemService FileSystem => _lazyFileSystemService!.Value;
+        public static WabbitBot.Core.Common.Services.FileSystemService FileSystem =>
+            WabbitBot.Core.Common.Services.CoreService.FileSystem;
 
         /// <summary>
         /// Gets the Discord client instance
@@ -124,10 +124,6 @@ namespace WabbitBot.DiscBot.App.Services.DiscBot
             _lazyEventBus = new Lazy<IDiscBotEventBus>(() => eventBus, LazyThreadSafetyMode.ExecutionAndPublication);
             _lazyErrorHandler = new Lazy<IErrorService>(
                 () => errorHandler,
-                LazyThreadSafetyMode.ExecutionAndPublication
-            );
-            _lazyFileSystemService = new Lazy<WabbitBot.Core.Common.Services.FileSystemService>(
-                () => new WabbitBot.Core.Common.Services.FileSystemService(),
                 LazyThreadSafetyMode.ExecutionAndPublication
             );
 

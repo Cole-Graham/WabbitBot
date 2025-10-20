@@ -102,14 +102,25 @@ public partial class DatabaseService<TEntity>
     {
         if (_repositoryAdapter is null)
         {
+            Console.WriteLine($"🔍 DEBUG: Repository adapter is null for {typeof(TEntity).Name}");
             return default;
         }
         try
         {
-            return await _repositoryAdapter.GetByIdAsync(id);
+            Console.WriteLine(
+                $"🔍 DEBUG: Calling repository adapter GetByIdAsync for {typeof(TEntity).Name} with ID: {id}"
+            );
+            var result = await _repositoryAdapter.GetByIdAsync(id);
+            Console.WriteLine($"🔍 DEBUG: Repository adapter returned: {result?.ToString() ?? "null"}");
+            return result;
         }
-        catch
+        catch (Exception ex)
         {
+            Console.WriteLine(
+                $"🔍 DEBUG: Exception in GetByIdFromRepositoryAsync for {typeof(TEntity).Name}: {ex.Message}"
+            );
+            Console.WriteLine($"🔍 DEBUG: Exception type: {ex.GetType().Name}");
+            Console.WriteLine($"🔍 DEBUG: Stack trace: {ex.StackTrace}");
             return default;
         }
     }

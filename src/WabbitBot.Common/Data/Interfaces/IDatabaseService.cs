@@ -16,10 +16,10 @@ namespace WabbitBot.Common.Data.Interfaces
         Task<Result<TEntity>> CreateAsync(TEntity entity, DatabaseComponent component);
         Task<Result<TEntity>> UpdateAsync(TEntity entity, DatabaseComponent component);
         Task<Result<TEntity>> DeleteAsync(object id, DatabaseComponent component);
-        Task<Result<bool>> ExistsAsync(object id, DatabaseComponent component);
+        Task<Result<bool>> ExistsAsync(Guid id, DatabaseComponent component);
 
         // Query operations
-        Task<Result<TEntity?>> GetByIdAsync(object id, DatabaseComponent component);
+        Task<Result<TEntity?>> GetByIdAsync(Guid id, DatabaseComponent component);
         Task<Result<TEntity?>> GetByStringIdAsync(string id, DatabaseComponent component);
         Task<Result<TEntity?>> GetByNameAsync(string name, DatabaseComponent component);
         Task<Result<IEnumerable<TEntity>>> GetAllAsync(DatabaseComponent component);

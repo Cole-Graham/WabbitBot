@@ -1,6 +1,7 @@
 using DSharpPlus;
 using DSharpPlus.Entities;
 using DSharpPlus.EventArgs;
+using Microsoft.EntityFrameworkCore;
 using WabbitBot.Common.Attributes;
 using WabbitBot.Common.Configuration;
 using WabbitBot.Common.Data.Interfaces;
@@ -11,6 +12,7 @@ using WabbitBot.Core.Common.Services;
 using WabbitBot.Core.Scrimmages;
 using WabbitBot.DiscBot.App;
 using WabbitBot.DiscBot.App.Events;
+using WabbitBot.DiscBot.App.Renderers;
 using WabbitBot.DiscBot.App.Services.DiscBot;
 
 /// <summary>
@@ -27,12 +29,30 @@ namespace WabbitBot.DiscBot.App.Handlers
     {
         public static async Task HandleChallengeCreatedAsync(ChallengeCreated evt)
         {
+            Console.WriteLine($"🎯 DEBUG: HandleChallengeCreatedAsync called!");
+            Console.WriteLine($"   Event ChallengeId: {evt.ChallengeId}");
+
+            // Add a small delay to ensure the challenge is committed to the database
+            await Task.Delay(100);
+
+            // Load challenge - lazy loading will handle navigation properties
             var challenge = await CoreService.ScrimmageChallenges.GetByIdAsync(
                 evt.ChallengeId,
                 DatabaseComponent.Repository
             );
+            Console.WriteLine($"🔍 DEBUG: GetByIdAsync result: Success={challenge.Success}");
             if (!challenge.Success)
             {
+                Console.WriteLine($"   Error: {challenge.ErrorMessage}");
+
+                // Debug: Check if challenge exists at all in the database
+                var debugCheck = await CoreService.WithDbContext(async db =>
+                {
+                    var exists = await db.ScrimmageChallenges.AnyAsync(c => c.Id == evt.ChallengeId);
+                    return exists;
+                });
+                Console.WriteLine($"🔍 DEBUG: Challenge exists in database: {debugCheck}");
+
                 await DiscBotService.ErrorHandler.CaptureAsync(
                     new InvalidOperationException("Failed to get challenge"),
                     "Failed to get challenge",
@@ -41,6 +61,7 @@ namespace WabbitBot.DiscBot.App.Handlers
                 return;
             }
             var challengeData = challenge.Data;
+            Console.WriteLine($"🔍 DEBUG: Challenge data: {(challengeData != null ? "Found" : "Null")}");
             if (challengeData == null)
             {
                 await DiscBotService.ErrorHandler.CaptureAsync(
@@ -50,7 +71,21 @@ namespace WabbitBot.DiscBot.App.Handlers
                 );
                 return;
             }
-            if (challengeData.ChallengerTeam == null)
+            Console.WriteLine($"🔍 DEBUG: Challenge details:");
+            Console.WriteLine($"   ID: {challengeData.Id}");
+            Console.WriteLine($"   ChallengerTeamId: {challengeData.ChallengerTeamId}");
+            Console.WriteLine($"   OpponentTeamId: {challengeData.OpponentTeamId}");
+
+            // Load the teams since navigation properties aren't loaded
+            Console.WriteLine($"🔍 DEBUG: Looking up challenger team with ID: {challengeData.ChallengerTeamId}");
+            var challengerTeamResult = await CoreService.Teams.GetByIdAsync(
+                challengeData.ChallengerTeamId,
+                DatabaseComponent.Repository
+            );
+            Console.WriteLine(
+                $"🔍 DEBUG: Challenger team lookup result: Success={challengerTeamResult.Success}, Data={challengerTeamResult.Data?.Name ?? "null"}"
+            );
+            if (!challengerTeamResult.Success || challengerTeamResult.Data is null)
             {
                 await DiscBotService.ErrorHandler.CaptureAsync(
                     new InvalidOperationException("Challenger team not found"),
@@ -59,7 +94,12 @@ namespace WabbitBot.DiscBot.App.Handlers
                 );
                 return;
             }
-            if (challengeData.OpponentTeam == null)
+
+            var opponentTeamResult = await CoreService.Teams.GetByIdAsync(
+                challengeData.OpponentTeamId,
+                DatabaseComponent.Repository
+            );
+            if (!opponentTeamResult.Success || opponentTeamResult.Data is null)
             {
                 await DiscBotService.ErrorHandler.CaptureAsync(
                     new InvalidOperationException("Opponent team not found"),
@@ -68,13 +108,18 @@ namespace WabbitBot.DiscBot.App.Handlers
                 );
                 return;
             }
-            var containerResult = await ScrimmageApp.CreateChallengeContainerAsync(
+
+            var challengerTeam = challengerTeamResult.Data;
+            var opponentTeam = opponentTeamResult.Data;
+
+            var containerResult = await ScrimmageRenderer.RenderChallengeContainerAsync(
                 challengeData.Id,
                 challengeData.TeamSize,
-                challengeData.ChallengerTeam.Name,
-                challengeData.OpponentTeam.Name
+                challengerTeam.Name,
+                opponentTeam.Name,
+                opponentTeam
             );
-            if (!containerResult.Success)
+            if (!containerResult.Success || containerResult.Data is null)
             {
                 await DiscBotService.ErrorHandler.CaptureAsync(
                     new InvalidOperationException("Failed to create challenge container"),
@@ -83,19 +128,26 @@ namespace WabbitBot.DiscBot.App.Handlers
                 );
                 return;
             }
-            // var pubResult = await PublishChallengeContainerCreatedAsync(
-            //     challengeData.Id,
-            //     containerResult.Data!.ChallengeChannel.Id
-            // );
-            // if (!pubResult.Success)
-            // {
-            //     await DiscBotService.ErrorHandler.CaptureAsync(
-            //         new InvalidOperationException("Failed to publish challenge container created"),
-            //         "Failed to publish challenge container created",
-            //         nameof(HandleChallengeCreatedAsync)
-            //     );
-            //     return;
-            // }
+
+            // Store the message ID and channel ID in the challenge
+            challengeData.ChallengeMessageId = containerResult.Data.ChallengeMessage.Id;
+            challengeData.ChallengeChannelId = containerResult.Data.ChallengeChannel.Id;
+            var updateResult = await CoreService.ScrimmageChallenges.UpdateAsync(
+                challengeData,
+                DatabaseComponent.Repository
+            );
+
+            if (!updateResult.Success)
+            {
+                await DiscBotService.ErrorHandler.CaptureAsync(
+                    new InvalidOperationException(
+                        $"Failed to update challenge with message ID: {updateResult.ErrorMessage}"
+                    ),
+                    "Failed to update challenge with message ID",
+                    nameof(HandleChallengeCreatedAsync)
+                );
+            }
+
             return;
         }
 
@@ -105,26 +157,8 @@ namespace WabbitBot.DiscBot.App.Handlers
             await Task.CompletedTask;
         }
 
-        public static async Task HandleChallengeCancelledAsync(ChallengeCancelled evt)
-        {
-            // TODO: Implement challenge cancelled notification
-            await Task.CompletedTask;
-        }
-
-        public static async Task HandleScrimmageCreatedAsync(ScrimmageCreated evt)
-        {
-            // TODO: Implement scrimmage created notification
-            await Task.CompletedTask;
-        }
-
-        public static async Task HandleMatchProvisioningRequestedAsync(MatchProvisioningRequested evt)
-        {
-            // TODO: Implement match provisioning
-            await Task.CompletedTask;
-        }
-
         /// <summary>
-        /// Handles string select dropdown interactions (map ban selections).
+        /// Handles string select dropdown interactions (challenge configuration selections).
         /// Returns Result indicating success/failure for immediate feedback.
         /// </summary>
         public static async Task<Result> HandleSelectMenuInteractionAsync(
@@ -137,8 +171,18 @@ namespace WabbitBot.DiscBot.App.Handlers
 
             try
             {
-                // Placeholder, add select menu interactions here
-                return Result.CreateSuccess("No select menu handlers registered");
+                // Route to ScrimmageApp for challenge configuration and teammate selection
+                if (
+                    customId.StartsWith("challenge_opponent_", StringComparison.Ordinal)
+                    || customId.StartsWith("challenge_players_", StringComparison.Ordinal)
+                    || customId.StartsWith("challenge_bestof_", StringComparison.Ordinal)
+                    || customId.StartsWith("select_teammates_", StringComparison.Ordinal)
+                )
+                {
+                    return await ScrimmageApp.ProcessSelectMenuInteractionAsync(client, args);
+                }
+
+                return Result.CreateSuccess("No select menu handlers registered for this interaction");
             }
             catch (Exception ex)
             {
@@ -249,7 +293,7 @@ namespace WabbitBot.DiscBot.App.Handlers
 
         private static async Task HandleScrimmageThreadsCreatedAsync(ScrimmageThreadsCreated evt)
         {
-            // TODO: Implement scrimmage threads created notification
+            // Placeholder if we need to handle this event
             await Task.CompletedTask;
         }
     }

@@ -122,12 +122,11 @@ internal class MockBotConfigurationService : IBotConfigurationService
 {
     public string GetToken() => "mock-token";
 
-    public string GetDatabasePath() => "mock-db-path";
+    public ulong? GetDebugGuildId() => null;
 
     public T GetSection<T>(string sectionName)
         where T : class, new() => new T();
 
-    public void ValidateConfiguration()
-    { /* No-op for testing */
+    public void ValidateConfiguration() { /* No-op for testing */
     }
 }

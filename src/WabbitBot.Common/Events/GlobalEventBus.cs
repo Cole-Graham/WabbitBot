@@ -1,10 +1,12 @@
+using WabbitBot.Common.Events.Interfaces;
+
 namespace WabbitBot.Common.Events;
 
 public interface IGlobalEventBus
 {
     Task PublishAsync<TEvent>(TEvent @event)
         where TEvent : class;
-    void Subscribe<TEvent>(Func<TEvent, Task> handler)
+    void Subscribe<TEvent>(Func<TEvent, Task> handler, HandlerType type = HandlerType.Write)
         where TEvent : class;
     void Unsubscribe<TEvent>(Func<TEvent, Task> handler)
         where TEvent : class;
@@ -25,30 +27,43 @@ public interface IGlobalEventBus
 
 public class GlobalEventBus : IGlobalEventBus
 {
-    private readonly Dictionary<Type, List<Delegate>> _handlers = new();
+    private readonly Dictionary<Type, List<EventHandlerMetadata>> _handlers = new();
     private readonly Dictionary<Guid, TaskCompletionSource<object>> _pendingRequests = new();
     private readonly object _lock = new();
 
-    public Task PublishAsync<TEvent>(TEvent @event)
+    public async Task PublishAsync<TEvent>(TEvent @event)
         where TEvent : class
     {
         if (@event == null)
             throw new ArgumentNullException(nameof(@event));
 
         var eventType = typeof(TEvent);
-        List<Delegate>? handlers;
+        List<EventHandlerMetadata>? handlers;
 
         lock (_lock)
         {
             if (!_handlers.TryGetValue(eventType, out handlers))
-                return Task.CompletedTask;
+                return;
         }
 
-        var tasks = handlers.Select(h => (Task)h.DynamicInvoke(@event)!);
-        return Task.WhenAll(tasks);
+        // Phase 1: Execute all Write handlers and await completion
+        var writeHandlers = handlers.Where(h => h.Type == HandlerType.Write).ToList();
+        if (writeHandlers.Count > 0)
+        {
+            var writeTasks = writeHandlers.Select(h => (Task)h.Handler.DynamicInvoke(@event)!);
+            await Task.WhenAll(writeTasks);
+        }
+
+        // Phase 2: Execute all Read handlers after Write handlers complete
+        var readHandlers = handlers.Where(h => h.Type == HandlerType.Read).ToList();
+        if (readHandlers.Count > 0)
+        {
+            var readTasks = readHandlers.Select(h => (Task)h.Handler.DynamicInvoke(@event)!);
+            await Task.WhenAll(readTasks);
+        }
     }
 
-    public void Subscribe<TEvent>(Func<TEvent, Task> handler)
+    public void Subscribe<TEvent>(Func<TEvent, Task> handler, HandlerType type = HandlerType.Write)
         where TEvent : class
     {
         if (handler == null)
@@ -58,9 +73,9 @@ public class GlobalEventBus : IGlobalEventBus
         lock (_lock)
         {
             if (!_handlers.ContainsKey(eventType))
-                _handlers[eventType] = new List<Delegate>();
+                _handlers[eventType] = new List<EventHandlerMetadata>();
 
-            _handlers[eventType].Add(handler);
+            _handlers[eventType].Add(new EventHandlerMetadata { Handler = handler, Type = type });
         }
     }
 
@@ -74,7 +89,13 @@ public class GlobalEventBus : IGlobalEventBus
         lock (_lock)
         {
             if (_handlers.ContainsKey(eventType))
-                _handlers[eventType].Remove(handler);
+            {
+                var toRemove = _handlers[eventType].FirstOrDefault(m => m.Handler.Equals(handler));
+                if (toRemove is not null)
+                {
+                    _handlers[eventType].Remove(toRemove);
+                }
+            }
         }
     }
 

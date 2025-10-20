@@ -22,7 +22,7 @@ namespace WabbitBot.Core.Common.Models.Common
     public class Player : Entity, IPlayerEntity
     {
         public Guid MashinaUserId { get; set; }
-        public MashinaUser MashinaUser { get; set; } = null!;
+        public virtual MashinaUser MashinaUser { get; set; } = null!;
         public string Name { get; set; } = string.Empty;
         public DateTime LastActive { get; set; }
 
@@ -31,7 +31,7 @@ namespace WabbitBot.Core.Common.Models.Common
         public List<Guid> TeamIds { get; set; } = [];
 
         /// <summary>
-        /// Key: Platform name (e.g., "Discord", "Steam"), Value: List of user IDs from that platform.
+        /// Key: Platform name (e.g., "EugenSystems", "Discord", "Steam", "EpicGames"), Value: List of user IDs from that platform.
         /// </summary>
         public Dictionary<string, List<string>> PreviousPlatformIds { get; set; } = [];
 

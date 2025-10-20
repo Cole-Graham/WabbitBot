@@ -19,7 +19,8 @@ namespace WabbitBot.Common.Events.Interfaces
         /// </summary>
         /// <typeparam name="TEvent">The type of event to subscribe to</typeparam>
         /// <param name="handler">The handler function to be called when the event occurs</param>
-        void Subscribe<TEvent>(Func<TEvent, Task> handler)
+        /// <param name="type">The handler type (Write or Read) for execution phase ordering</param>
+        void Subscribe<TEvent>(Func<TEvent, Task> handler, HandlerType type = HandlerType.Write)
             where TEvent : class, IEvent;
 
         /// <summary>

@@ -43,20 +43,20 @@
 
     """
     Applies continuous scaling based on opponent availability:
-    - Uses same rating range calculation as gap scaling (40% of total range / 2)
+    - Uses same rating range calculation as gap scaling (20% of total range)
     - Counts potential opponents within neighbor range
     - Compares to player with maximum neighbors in their range
     - Scales bonuses/penalties based on neighbor ratio (1.0 to 1.5x)
     """
     # Apply continuous scaling based on opponent availability
-    # Use the same rating range calculation as gap scaling (40% of total range / 2)
+    # Use the same rating range calculation as gap scaling (20% of total range)
     rating_range = (
         max(o.rating for o in opponents) - min(o.rating for o in opponents)
         if opponents
         else 0
     )
     neighbor_range = (
-        rating_range * 0.4 / 2
+        rating_range * 0.2
     )  # Same formula as max_gap in gap scaling
     # Find this player's opponent count within neighbor range
     player_neighbors = sum(

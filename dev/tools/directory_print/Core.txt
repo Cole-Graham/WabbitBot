@@ -52,6 +52,8 @@
             │   │   │   ├── 📄 DivisionCore.cs
             │   │   │   ├── 📄 Map.cs
             │   │   │   ├── 📄 MapCore.cs
+            │   │   │   ├── 📄 MashinaUser.cs
+            │   │   │   ├── 📄 MashinaUserCore.cs
             │   │   │   ├── 📄 Match.cs
             │   │   │   ├── 📄 MatchCore.Game.cs
             │   │   │   ├── 📄 MatchCore.State.cs
@@ -61,9 +63,7 @@
             │   │   │   ├── 📄 PlayerCore.cs
             │   │   │   ├── 📄 Team.cs
             │   │   │   ├── 📄 TeamCore.Stats.cs
-            │   │   │   ├── 📄 TeamCore.cs
-            │   │   │   ├── 📄 User.cs
-            │   │   │   └── 📄 UserCore.cs
+            │   │   │   └── 📄 TeamCore.cs
             │   │   ├── 📁 Leaderboard
             │   │   │   └── 📄 Leaderboard.cs
             │   │   ├── 📁 Scrimmage

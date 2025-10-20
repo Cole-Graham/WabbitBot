@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using WabbitBot.Common.Events;
+using WabbitBot.Common.Events.Core;
 using WabbitBot.Common.Events.Interfaces;
 
 namespace WabbitBot.DiscBot;
@@ -28,7 +29,7 @@ public class DiscBotEventBus(IGlobalEventBus globalEventBus) : IDiscBotEventBus
         }
     }
 
-    private readonly Dictionary<Type, List<Delegate>> _handlers = [];
+    private readonly Dictionary<Type, List<EventHandlerMetadata>> _handlers = [];
     private readonly Dictionary<Type, List<Delegate>> _requestHandlers = [];
     private readonly ConcurrentDictionary<Guid, TaskCompletionSource<object?>> _pendingRequests = new();
     private readonly Lock _lock = new();
@@ -76,7 +77,7 @@ public class DiscBotEventBus(IGlobalEventBus globalEventBus) : IDiscBotEventBus
     }
 
     /// <inheritdoc />
-    public void Subscribe<TEvent>(Func<TEvent, Task> handler)
+    public void Subscribe<TEvent>(Func<TEvent, Task> handler, HandlerType type = HandlerType.Write)
         where TEvent : class, IEvent
     {
         ArgumentNullException.ThrowIfNull(handler);
@@ -89,7 +90,7 @@ public class DiscBotEventBus(IGlobalEventBus globalEventBus) : IDiscBotEventBus
                 handlers = [];
                 _handlers[eventType] = handlers;
             }
-            handlers.Add(handler);
+            handlers.Add(new EventHandlerMetadata { Handler = handler, Type = type });
         }
     }
 
@@ -104,7 +105,11 @@ public class DiscBotEventBus(IGlobalEventBus globalEventBus) : IDiscBotEventBus
         {
             if (_handlers.TryGetValue(eventType, out var handlers))
             {
-                handlers.Remove(handler);
+                var toRemove = handlers.FirstOrDefault(m => m.Handler.Equals(handler));
+                if (toRemove is not null)
+                {
+                    handlers.Remove(toRemove);
+                }
             }
         }
     }
@@ -151,13 +156,24 @@ public class DiscBotEventBus(IGlobalEventBus globalEventBus) : IDiscBotEventBus
             return Task.CompletedTask;
         }
 
-        // Subscribe to Global bus events that should be forwarded to DiscBot
-        _globalEventBus.Subscribe<IEvent>(async evt =>
+        // Subscribe to specific Global bus events that should be forwarded to DiscBot
+        // Note: We need to subscribe to specific event types, not the generic IEvent interface
+        _globalEventBus.Subscribe<ChallengeCreated>(async evt =>
         {
+            Console.WriteLine($"🔍 DEBUG: DiscBotEventBus received ChallengeCreated event");
+            Console.WriteLine($"   EventBusType: {evt.EventBusType}");
+            Console.WriteLine($"   EventId: {evt.EventId}");
+            Console.WriteLine($"   ChallengeId: {evt.ChallengeId}");
+
             // Only handle events targeting Global bus from other boundaries
             if (evt.EventBusType == EventBusType.Global)
             {
+                Console.WriteLine($"   Forwarding to local handlers...");
                 await PublishLocallyAsync(evt);
+            }
+            else
+            {
+                Console.WriteLine($"   Ignoring non-Global event");
             }
         });
 
@@ -169,7 +185,7 @@ public class DiscBotEventBus(IGlobalEventBus globalEventBus) : IDiscBotEventBus
         where TEvent : class, IEvent
     {
         var eventType = @event.GetType();
-        List<Delegate>? handlersCopy = null;
+        List<EventHandlerMetadata>? handlersCopy = null;
 
         lock (_lock)
         {
@@ -181,12 +197,34 @@ public class DiscBotEventBus(IGlobalEventBus globalEventBus) : IDiscBotEventBus
 
         if (handlersCopy is not null)
         {
-            foreach (var handler in handlersCopy)
+            // Phase 1: Execute all Write handlers
+            var writeHandlers = handlersCopy.Where(m => m.Type == HandlerType.Write).ToList();
+            if (writeHandlers.Count > 0)
             {
-                if (handler is Func<TEvent, Task> typedHandler)
+                var writeTasks = new List<Task>();
+                foreach (var metadata in writeHandlers)
                 {
-                    await typedHandler(@event);
+                    if (metadata.Handler is Func<TEvent, Task> typedHandler)
+                    {
+                        writeTasks.Add(typedHandler(@event));
+                    }
                 }
+                await Task.WhenAll(writeTasks);
+            }
+
+            // Phase 2: Execute all Read handlers
+            var readHandlers = handlersCopy.Where(m => m.Type == HandlerType.Read).ToList();
+            if (readHandlers.Count > 0)
+            {
+                var readTasks = new List<Task>();
+                foreach (var metadata in readHandlers)
+                {
+                    if (metadata.Handler is Func<TEvent, Task> typedHandler)
+                    {
+                        readTasks.Add(typedHandler(@event));
+                    }
+                }
+                await Task.WhenAll(readTasks);
             }
         }
     }

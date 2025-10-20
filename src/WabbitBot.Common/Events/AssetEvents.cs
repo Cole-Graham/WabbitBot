@@ -1,3 +1,4 @@
+using WabbitBot.Common.Attributes;
 using WabbitBot.Common.Events.Interfaces;
 
 namespace WabbitBot.Common.Events;
@@ -91,7 +92,13 @@ public record FileIngested(
 /// <param name="CdnUrl">The Discord CDN URL</param>
 /// <param name="SourceMessageId">The Discord message ID where the file was uploaded</param>
 /// <param name="ChannelId">The channel where the message was sent</param>
+[EventGenerator(
+    pubTargetClass: "WabbitBot.DiscBot.App.Utilities.CdnCapture",
+    subTargetClasses: ["WabbitBot.Core.Common.Services.FileSystemService"],
+    writeHandlers: ["WabbitBot.Core.Common.Services.FileSystemService"]
+)]
 public record FileCdnLinkReported(string CanonicalFileName, string CdnUrl, ulong SourceMessageId, ulong ChannelId)
+    : IEvent
 {
     public EventBusType EventBusType => EventBusType.Global;
     public Guid EventId { get; init; } = Guid.NewGuid();

@@ -14,6 +14,12 @@ namespace WabbitBot.DiscBot.App.Utilities
         public required string CanonicalFileName { get; init; }
 
         /// <summary>
+        /// Relative path under app base directory (e.g., "data/images/maps/discord/map_01.jpg").
+        /// Provided by AssetResolver from FileSystemService for locating the file.
+        /// </summary>
+        public string? RelativePathUnderAppBase { get; init; }
+
+        /// <summary>
         /// MIME content type of the asset (e.g., "image/jpeg", "image/png").
         /// Used for proper content type headers when uploading to Discord.
         /// </summary>
@@ -24,8 +30,9 @@ namespace WabbitBot.DiscBot.App.Utilities
         /// Automatically infers content type from file extension.
         /// </summary>
         /// <param name="canonicalFileName">The canonical filename (e.g., "thumbnail.jpg")</param>
+        /// <param name="relativePathUnderAppBase">Optional relative path under app base</param>
         /// <returns>An attachment hint with appropriate content type</returns>
-        public static AttachmentHint ForImage(string canonicalFileName)
+        public static AttachmentHint ForImage(string canonicalFileName, string? relativePathUnderAppBase = null)
         {
             var extension = Path.GetExtension(canonicalFileName).ToLowerInvariant();
             var contentType = extension switch
@@ -37,7 +44,12 @@ namespace WabbitBot.DiscBot.App.Utilities
                 _ => "image/jpeg",
             };
 
-            return new AttachmentHint { CanonicalFileName = canonicalFileName, ContentType = contentType };
+            return new AttachmentHint
+            {
+                CanonicalFileName = canonicalFileName,
+                RelativePathUnderAppBase = relativePathUnderAppBase,
+                ContentType = contentType,
+            };
         }
     }
 }
