@@ -17,10 +17,11 @@ namespace WabbitBot.Core.Common.Utilities
 
         public async Task<string> GetCurrentSchemaVersionAsync()
         {
-            var migrations = await _context.Database.GetAppliedMigrationsAsync();
-            var latestMigration = migrations.OrderByDescending(m => m).FirstOrDefault();
-
-            return ParseMigrationToSchemaVersion(latestMigration);
+            var latest = await _context
+                .SchemaMetadata.OrderByDescending(x => x.AppliedAt)
+                .Select(x => x.SchemaVersion)
+                .FirstOrDefaultAsync();
+            return string.IsNullOrWhiteSpace(latest) ? "000-0.0" : latest!;
         }
 
         public async Task ValidateCompatibilityAsync()
@@ -36,16 +37,7 @@ namespace WabbitBot.Core.Common.Utilities
             }
         }
 
-        private string ParseMigrationToSchemaVersion(string? migrationName)
-        {
-            if (string.IsNullOrEmpty(migrationName))
-                return "000-0.0";
-
-            // TODO: Implement a real parsing logic based on migration naming convention.
-            // For now, we'll just return a placeholder.
-            // e.g., "20240101120000_AddPlayerStats" -> "001-1.2"
-            return "001-1.0"; // Placeholder
-        }
+        // Migration-name parsing removed; source of truth is SchemaMetadata.
     }
 
     public class IncompatibleVersionException : Exception

@@ -17,37 +17,29 @@ namespace WabbitBot.Core.Common.Interfaces
         /// <summary>
         /// Adds a player to a team with the specified role and roster group
         /// </summary>
-        Task AddPlayer(Guid teamId, Guid playerId, TeamSizeRosterGroup rosterGroup, TeamRole role = TeamRole.Core);
+        Task AddPlayer(Guid teamId, Guid playerId, TeamSizeRosterGroup rosterGroup, RosterRole role = RosterRole.Core);
 
-        /// <summary>
-        /// Removes a player from a team
-        /// </summary>
-        Task RemovePlayer(Guid teamId, Guid playerId);
+        // Removing players is handled via deactivation
 
         /// <summary>
         /// Updates the role of a player in a team
         /// </summary>
-        Task UpdatePlayerRole(Guid teamId, Guid playerId, TeamRole newRole);
+        Task UpdatePlayerRole(Guid teamId, Guid playerId, RosterRole newRole);
 
         /// <summary>
-        /// Changes the captain of a team
+        /// Changes the captain for a specific roster group in a team
         /// </summary>
-        Task ChangeCaptain(Guid teamId, Guid newCaptainId);
+        Task ChangeCaptain(Guid teamId, TeamSizeRosterGroup rosterGroup, Guid newCaptainId);
 
         /// <summary>
         /// Sets the team manager status of a player
         /// </summary>
-        Task SetTeamManagerStatus(Guid teamId, Guid playerId, bool isTeamManager);
+        Task SetTeamManagerStatus(Guid teamId, Guid playerId, bool IsRosterManager);
 
         /// <summary>
-        /// Deactivates a player in a team
+        /// Deactivates a player for a specific roster group in a team
         /// </summary>
         Task DeactivatePlayer(Guid teamId, Guid playerId);
-
-        /// <summary>
-        /// Reactivates a player in a team
-        /// </summary>
-        Task ReactivatePlayer(Guid teamId, Guid playerId);
 
         /// <summary>
         /// Updates the Scrimmage stats for a team after a match result

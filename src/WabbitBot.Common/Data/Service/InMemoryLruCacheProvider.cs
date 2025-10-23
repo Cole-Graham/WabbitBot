@@ -30,7 +30,7 @@ namespace WabbitBot.Common.Data.Service
             _defaultExpiry = defaultExpiry ?? TimeSpan.FromHours(1);
         }
 
-        public Task<bool> TryGetAsync(object id, out TEntity? entity)
+        public Task<bool> TryGetAsync(object id, out TEntity? entity, CancellationToken cancellationToken = default)
         {
             var key = id.ToString()!;
             entity = default;
@@ -47,7 +47,7 @@ namespace WabbitBot.Common.Data.Service
             return Task.FromResult(false);
         }
 
-        public Task SetAsync(object id, TEntity entity)
+        public Task SetAsync(object id, TEntity entity, CancellationToken cancellationToken = default)
         {
             var key = id.ToString()!;
             var entry = new CacheEntry
@@ -66,14 +66,14 @@ namespace WabbitBot.Common.Data.Service
             return Task.CompletedTask;
         }
 
-        public Task RemoveAsync(object id)
+        public Task RemoveAsync(object id, CancellationToken cancellationToken = default)
         {
             var key = id.ToString()!;
             _cache.TryRemove(key, out _);
             return Task.CompletedTask;
         }
 
-        public Task<IEnumerable<TEntity>> GetAllAsync()
+        public Task<IEnumerable<TEntity>> GetAllAsync(CancellationToken cancellationToken = default)
         {
             var now = DateTime.UtcNow;
             var items = _cache.Where(kv => !kv.Value.IsExpired).Select(kv => kv.Value.Value).ToArray();

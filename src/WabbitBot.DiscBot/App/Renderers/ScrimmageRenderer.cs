@@ -100,7 +100,7 @@ namespace WabbitBot.DiscBot.App.Renderers
                 {
                     return await db
                         .Teams.Where(t => t.Id == challengerTeamId)
-                        .Select(t => new { t.TeamCaptainId, t.Name })
+                        .Select(t => new { t.TeamMajorId, t.Name })
                         .FirstOrDefaultAsync();
                 });
 
@@ -108,32 +108,32 @@ namespace WabbitBot.DiscBot.App.Renderers
                 {
                     return await db
                         .Teams.Where(t => t.Id == opponentTeamId)
-                        .Select(t => new { t.TeamCaptainId, t.Name })
+                        .Select(t => new { t.TeamMajorId, t.Name })
                         .FirstOrDefaultAsync();
                 });
 
                 // Get captain Discord mentions
                 var challengerCaptainMention = await CoreService.WithDbContext(async db =>
                 {
-                    if (challengerCaptain?.TeamCaptainId is null)
+                    if (challengerCaptain?.TeamMajorId is null)
                         return "Unknown Captain";
                     var captain = await db
                         .Players.Include(p => p.MashinaUser)
-                        .FirstOrDefaultAsync(p => p.Id == challengerCaptain.TeamCaptainId);
+                        .FirstOrDefaultAsync(p => p.Id == challengerCaptain.TeamMajorId);
                     return captain?.MashinaUser?.DiscordUserId is not null
-                        ? $"<@{captain.MashinaUser.DiscordUserId}>"
+                        ? $"<@{captain.MashinaUser.DiscordMention}>"
                         : "Unknown Captain";
                 });
 
                 var opponentCaptainMention = await CoreService.WithDbContext(async db =>
                 {
-                    if (opponentCaptain?.TeamCaptainId is null)
+                    if (opponentCaptain?.TeamMajorId is null)
                         return "Unknown Captain";
                     var captain = await db
                         .Players.Include(p => p.MashinaUser)
-                        .FirstOrDefaultAsync(p => p.Id == opponentCaptain.TeamCaptainId);
+                        .FirstOrDefaultAsync(p => p.Id == opponentCaptain.TeamMajorId);
                     return captain?.MashinaUser?.DiscordUserId is not null
-                        ? $"<@{captain.MashinaUser.DiscordUserId}>"
+                        ? $"<@{captain.MashinaUser.DiscordMention}>"
                         : "Unknown Captain";
                 });
 
@@ -146,11 +146,15 @@ namespace WabbitBot.DiscBot.App.Renderers
                 {
                     var challenge = await db.ScrimmageChallenges.FirstOrDefaultAsync(c => c.Id == challengeId);
 
-                    if (challenge?.ChallengerTeamPlayerIds == null || !challenge.ChallengerTeamPlayerIds.Any())
+                    if (challenge == null)
                         return new List<ChallengerPlayerInfo>();
 
+                    // Construct full player list: issuer + teammates
+                    var playerIds = new List<Guid> { challenge.IssuedByPlayerId };
+                    playerIds.AddRange(challenge.ChallengerTeammateIds);
+
                     return await db
-                        .Players.Where(p => challenge.ChallengerTeamPlayerIds.Contains(p.Id))
+                        .Players.Where(p => playerIds.Contains(p.Id))
                         .Include(p => p.MashinaUser)
                         .Select(p => new ChallengerPlayerInfo
                         {
@@ -163,7 +167,7 @@ namespace WabbitBot.DiscBot.App.Renderers
                         .ToListAsync();
                 });
 
-                // Get opponent team roster for teammate selection
+                // Get opponent team roster for teammate selection (include all active members)
                 var opponentRoster = await CoreService.WithDbContext(async db =>
                 {
                     return await db
@@ -171,7 +175,7 @@ namespace WabbitBot.DiscBot.App.Renderers
                         .SelectMany(t => t.Rosters)
                         .Where(r => r.RosterGroup == TeamCore.TeamSizeRosterGrouping.GetRosterGroup(teamSize))
                         .SelectMany(r => r.RosterMembers)
-                        .Where(tm => tm.IsActive)
+                        .Where(tm => tm.ValidTo == null)
                         .Include(tm => tm.MashinaUser)
                         .Select(tm => new
                         {
@@ -217,10 +221,10 @@ namespace WabbitBot.DiscBot.App.Renderers
                                 [
                                     new DiscordSelectComponent(
                                         $"select_teammates_{challengeId}",
-                                        "Select Your Teammates",
+                                        "Select Your Team Players",
                                         teammateOptions,
-                                        minOptions: teamSize.GetPlayersPerTeam() - 1, // Exclude captain
-                                        maxOptions: teamSize.GetPlayersPerTeam() - 1
+                                        minOptions: teamSize.GetPlayersPerTeam(),
+                                        maxOptions: teamSize.GetPlayersPerTeam()
                                     ),
                                 ]
                             )
@@ -265,7 +269,7 @@ namespace WabbitBot.DiscBot.App.Renderers
                             && tm.ReceiveScrimmagePings
                             && tm.MashinaUser != null
                         )
-                        .Select(tm => tm.MashinaUser!.DiscordUserId!)
+                        .Select(tm => tm.MashinaUser!.DiscordUserId)
                         .ToListAsync();
                 });
 
@@ -281,12 +285,16 @@ namespace WabbitBot.DiscBot.App.Renderers
                 }
 
                 Console.WriteLine(
-                    $"🔍 DEBUG: About to send challenge container to channel: {DiscBotService.ScrimmageChannel?.Id}"
+                    $"🔍 DEBUG: About to send challenge container to channel: {DiscBotService.ChallengeFeedChannel?.Id}"
                 );
-                var sentMessage = await message.SendAsync(DiscBotService.ScrimmageChannel);
+                // if (DiscBotService.ChallengeFeedChannel is null || DiscBotService.ChallengeFeedChannel.Id == 0)
+                // {
+                //     return Result<ChallengeContainerResult>.Failure("Challenge feed channel not found");
+                // }
+                var sentMessage = await message.SendAsync(DiscBotService.ChallengeFeedChannel!);
                 Console.WriteLine($"🔍 DEBUG: Challenge container sent successfully, message ID: {sentMessage.Id}");
                 return Result<ChallengeContainerResult>.CreateSuccess(
-                    new ChallengeContainerResult(DiscBotService.ScrimmageChannel, sentMessage)
+                    new ChallengeContainerResult(DiscBotService.ChallengeFeedChannel!, sentMessage)
                 );
             }
             catch (Exception ex)
@@ -363,11 +371,11 @@ namespace WabbitBot.DiscBot.App.Renderers
         /// Renders an interactive challenge configuration container for user to configure challenge details.
         /// </summary>
         public static async Task<Result<DiscordContainerComponent>> RenderChallengeConfigurationAsync(
-            ulong userId,
+            ulong discordUserId,
             TeamSize teamSize,
             Team challengerTeam,
             TeamRoster challengerRoster,
-            string? selectedOpponentTeamId = null,
+            Guid? selectedOpponentTeamId = null,
             List<Guid>? selectedPlayerIds = null,
             int? bestOf = null
         )
@@ -389,7 +397,7 @@ namespace WabbitBot.DiscBot.App.Renderers
                 {
                     var userTeamIds =
                         await db
-                            .Players.Where(p => p.MashinaUser.DiscordUserId == userId)
+                            .Players.Where(p => p.MashinaUser.DiscordUserId == discordUserId)
                             .Select(p => p.TeamIds)
                             .FirstOrDefaultAsync() ?? [];
 
@@ -408,7 +416,7 @@ namespace WabbitBot.DiscBot.App.Renderers
                     .Select(t => new DiscordSelectComponentOption(
                         t.Name,
                         t.Id.ToString(),
-                        isDefault: selectedOpponentTeamId == t.Id.ToString()
+                        isDefault: selectedOpponentTeamId == t.Id
                     ))
                     .ToList();
 
@@ -433,13 +441,15 @@ namespace WabbitBot.DiscBot.App.Renderers
                 // Player selection (from challenger roster)
                 // The challenge issuer is automatically included, so they only need to select teammates
                 var activeRosterMembers = challengerRoster
-                    .RosterMembers.Where(m => m.IsActive && m.MashinaUser is not null)
-                    .OrderByDescending(m => m.Role == TeamRole.Captain)
+                    .RosterMembers.Where(m => m.ValidTo == null && m.MashinaUser is not null)
+                    .OrderByDescending(m => m.Role == RosterRole.Captain)
                     .ThenBy(m => m.MashinaUser!.DiscordUsername)
                     .ToList();
 
                 // Find the challenge issuer
-                var issuerMember = activeRosterMembers.FirstOrDefault(m => m.MashinaUser!.DiscordUserId == userId);
+                var issuerMember = activeRosterMembers.FirstOrDefault(m =>
+                    m.MashinaUser!.DiscordUserId == discordUserId
+                );
                 var issuerPlayerId = issuerMember?.PlayerId;
 
                 var requiredPlayers = teamSize.GetPlayersPerTeam();
@@ -448,7 +458,7 @@ namespace WabbitBot.DiscBot.App.Renderers
                 // Filter out the issuer from selectable options if this is not a 1v1
                 var selectableMembers =
                     teammatesRequired > 0
-                        ? activeRosterMembers.Where(m => m.MashinaUser!.DiscordUserId != userId).ToList()
+                        ? activeRosterMembers.Where(m => m.MashinaUser!.DiscordUserId != discordUserId).ToList()
                         : activeRosterMembers;
 
                 var playerOptions = selectableMembers
@@ -473,7 +483,9 @@ namespace WabbitBot.DiscBot.App.Renderers
                 else
                 {
                     // For 1v1, no selection needed - issuer is the only player
-                    components.Add(new DiscordTextDisplayComponent($"**Player:** <@{userId}> (you) - auto-selected"));
+                    components.Add(
+                        new DiscordTextDisplayComponent($"**Player:** <@{discordUserId}> (you) - auto-selected")
+                    );
                 }
 
                 // Best of selection - only render if configuration allows BO3
@@ -502,79 +514,82 @@ namespace WabbitBot.DiscBot.App.Renderers
 
                 components.Add(new DiscordSeparatorComponent(true));
 
-                // Show opponent info if selected
-                if (
-                    !string.IsNullOrEmpty(selectedOpponentTeamId)
-                    && Guid.TryParse(selectedOpponentTeamId, out var oppTeamGuid)
-                )
+                // Use WithDbContext to access navigation properties within the same context
+                var opponentInfoText = await CoreService.WithDbContext(async dbContext =>
                 {
-                    // Use WithDbContext to access navigation properties within the same context
-                    var opponentInfoText = await CoreService.WithDbContext(async dbContext =>
+                    if (selectedOpponentTeamId is null)
                     {
-                        var opponentTeam = await dbContext
-                            .Teams.Include(t => t.Rosters)
-                            .ThenInclude(r => r.RosterMembers)
-                            .ThenInclude(rm => rm.MashinaUser)
-                            .FirstOrDefaultAsync(t => t.Id == oppTeamGuid);
-
-                        if (opponentTeam is null)
-                            return string.Empty;
-
-                        var opponentRoster = opponentTeam.Rosters.FirstOrDefault(r => r.RosterGroup == rosterGroup);
-                        if (opponentRoster is null)
-                            return $"\n**Opponent Team:** {opponentTeam.Name}";
-
-                        // Get captain info
-                        var captain = opponentRoster.RosterMembers.FirstOrDefault(m =>
-                            m.Role == TeamRole.Captain && m.IsActive
-                        );
-
-                        var infoText = $"\n**Opponent Team:** {opponentTeam.Name}";
-                        if (captain?.MashinaUser is not null)
-                        {
-                            infoText += $"\n**Captain:** {captain.MashinaUser.DiscordMention}";
-                        }
-
-                        // Show active roster members
-                        var activeMembers = opponentRoster
-                            .RosterMembers.Where(m =>
-                                m.IsActive && m.MashinaUser is not null && m.PlayerId != issuerPlayerId
-                            )
-                            .ToList();
-
-                        if (activeMembers.Any())
-                        {
-                            infoText += $"\n**Roster ({activeMembers.Count} players):**\n";
-                            foreach (var member in activeMembers)
-                            {
-                                var roleIcon = member.Role == TeamRole.Captain ? "👑" : "🛡️";
-                                infoText += $"{roleIcon} {member.MashinaUser!.DiscordMention}\n";
-                            }
-                        }
-
-                        return infoText;
-                    });
-
-                    if (!string.IsNullOrEmpty(opponentInfoText))
-                    {
-                        components.Add(new DiscordTextDisplayComponent(opponentInfoText));
+                        return string.Empty;
                     }
+                    var opponentTeam = await dbContext
+                        .Teams.Include(t => t.Rosters)
+                        .ThenInclude(r => r.RosterMembers)
+                        .ThenInclude(rm => rm.MashinaUser)
+                        .FirstOrDefaultAsync(t => t.Id == selectedOpponentTeamId.Value);
+
+                    if (opponentTeam is null)
+                    {
+                        // This should never happen if the UI is working correctly
+                        // Log the error and return a generic message
+                        Console.WriteLine(
+                            $"ERROR: Selected opponent team {selectedOpponentTeamId} not found in database"
+                        );
+                        return "⚠️ Selected team is no longer available. Please refresh and try again.";
+                    }
+
+                    var opponentRoster = opponentTeam.Rosters.FirstOrDefault(r => r.RosterGroup == rosterGroup);
+                    if (opponentRoster is null)
+                        return $"# {opponentTeam.Name}";
+
+                    // Get captain info
+                    var captain = opponentRoster.RosterMembers.FirstOrDefault(m =>
+                        m.Role == RosterRole.Captain && m.ValidTo == null
+                    );
+
+                    var infoText = $"\n# {opponentTeam.Name}";
+                    if (captain?.MashinaUser is not null)
+                    {
+                        infoText += $"\n✪ {captain.MashinaUser.DiscordMention}";
+                    }
+
+                    // Show active roster members
+                    var activeMembers = opponentRoster
+                        .RosterMembers.Where(m =>
+                            m.ValidTo == null && m.MashinaUser is not null && m.PlayerId != issuerPlayerId
+                        )
+                        .ToList();
+
+                    if (activeMembers.Any())
+                    {
+                        foreach (var member in activeMembers)
+                        {
+                            if (member.Role != RosterRole.Captain)
+                                infoText += $"\n     {member.MashinaUser!.DiscordMention}";
+                        }
+                    }
+
+                    return infoText;
+                });
+
+                if (!string.IsNullOrEmpty(opponentInfoText))
+                {
+                    components.Add(new DiscordTextDisplayComponent(opponentInfoText));
                 }
 
                 // Action buttons
                 // Note: selectedPlayerIds includes the issuer, so check against requiredPlayers not teammatesRequired
                 var issueButton = new DiscordButtonComponent(
                     DiscordButtonStyle.Success,
-                    $"challenge_issue_{challengerTeam.Id}_{userId}",
+                    $"challenge_issue_{challengerTeam.Id}_{discordUserId}",
                     "Issue Challenge",
-                    disabled: string.IsNullOrEmpty(selectedOpponentTeamId)
+                    disabled: selectedOpponentTeamId is null
                         || selectedPlayerIds is null
                         || selectedPlayerIds.Count != requiredPlayers
                 );
 
                 var cancelButton = new DiscordButtonComponent(
                     DiscordButtonStyle.Secondary,
-                    $"challenge_cancel_{challengerTeam.Id}_{userId}",
+                    $"challenge_cancel_{challengerTeam.Id}_{discordUserId}",
                     "Cancel"
                 );
 

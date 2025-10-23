@@ -27,9 +27,11 @@ namespace WabbitBot.Core.Common.Database.Tests
             // Arrays and JSONB mappings for Postgres
             entity.Property(p => p.TeamIds).HasColumnType("uuid[]");
 
-            entity.Property(p => p.PreviousGameUsernames).HasColumnType("text[]");
+            entity.Property(p => p.PreviousSteamUsernames).HasColumnType("text[]");
 
             entity.Property(p => p.TeamJoinCooldowns).HasColumnType("jsonb");
+
+            entity.Property(p => p.CurrentPlatformIds).HasColumnType("jsonb");
 
             entity.Property(p => p.PreviousPlatformIds).HasColumnType("jsonb");
         }

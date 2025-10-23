@@ -1,5 +1,11 @@
 <Project>
     <PropertyGroup>
+        <Version>0.1.0</Version>
+        <FileVersion>0.1.0.0</FileVersion>
+        <AssemblyVersion>0.1.0.0</AssemblyVersion>
+        <InformationalVersion>0.1.0+$(SourceRevisionId)</InformationalVersion>
+    </PropertyGroup>
+    <PropertyGroup>
         <OutputPath>$(MSBuildThisFileDirectory)src/output/bin/$(Configuration)</OutputPath>
     </PropertyGroup>
 </Project>

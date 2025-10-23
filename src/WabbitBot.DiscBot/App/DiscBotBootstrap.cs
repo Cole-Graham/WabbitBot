@@ -102,19 +102,26 @@ namespace WabbitBot.DiscBot.App
                             {
                                 // Guild-specific registration for development (instant updates)
                                 commands.AddCommands<ScrimmageCommands>(debugGuildId.Value);
+                                commands.AddCommands<UserCommands>(debugGuildId.Value);
+                                commands.AddCommands<TeamCommands>(debugGuildId.Value);
+                                commands.AddCommands<ConfigCommands>(debugGuildId.Value);
                                 Console.WriteLine(
-                                    $"🔧 [{environment.ToUpperInvariant()}] Commands registered to guild {debugGuildId.Value} for instant updates"
+                                    $"🔧 [{environment.ToUpperInvariant()}] Commands registered to guild"
+                                        + $" {debugGuildId.Value} for instant updates"
                                 );
                             }
                             else
                             {
                                 // Global registration for production (takes up to 1 hour to update)
                                 commands.AddCommands<ScrimmageCommands>();
+                                commands.AddCommands<UserCommands>();
+                                commands.AddCommands<TeamCommands>();
+                                commands.AddCommands<ConfigCommands>();
                                 if (isDevelopment)
                                 {
                                     Console.WriteLine(
-                                        "⚠️  [DEVELOPMENT] Commands registered globally - updates may take up to 1 hour. "
-                                            + "Set Bot:DebugGuildId for instant updates."
+                                        "⚠️  [DEVELOPMENT] Commands registered globally - updates may take up to"
+                                            + " 1 hour. Set Bot:DebugGuildId for instant updates."
                                     );
                                 }
                                 else
@@ -124,8 +131,6 @@ namespace WabbitBot.DiscBot.App
                                     );
                                 }
                             }
-
-                            // TODO: Add other command classes as they are implemented
                         }
                     )
                     .ConfigureEventHandlers(b =>
@@ -211,7 +216,7 @@ namespace WabbitBot.DiscBot.App
 
                 // Delegate to appropriate handler based on custom ID pattern
                 // Handlers return Result for immediate feedback
-                Common.Models.Result? result = null;
+                Result? result = null;
 
                 // Check if it's a select menu or button based on component type
                 var isSelectMenu = args.Interaction.Data.ComponentType == DiscordComponentType.StringSelect;
@@ -236,6 +241,15 @@ namespace WabbitBot.DiscBot.App
                 )
                 {
                     result = await Handlers.ScrimmageHandler.HandleSelectMenuInteractionAsync(client, args);
+                }
+                // Route team roles editor interactions
+                else if (isSelectMenu && customId.StartsWith("team_roles_", StringComparison.Ordinal))
+                {
+                    result = await TeamApp.ProcessSelectMenuInteractionAsync(client, args);
+                }
+                else if (customId.StartsWith("team_roles_", StringComparison.Ordinal))
+                {
+                    result = await TeamApp.ProcessButtonInteractionAsync(client, args);
                 }
                 else if (customId.StartsWith("match_", StringComparison.Ordinal))
                 {

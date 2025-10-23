@@ -526,9 +526,20 @@ namespace WabbitBot.DiscBot.App
                 return Result.Failure("Container or thread not found");
             }
 
+            if (match.Team1Players is null)
+            {
+                return Result.Failure("Team 1 players not found");
+            }
+            if (match.Team2Players is null)
+            {
+                return Result.Failure("Team 2 players not found");
+            }
+
             // Restore the original select menu interface
             // We'll need to get the player data to recreate the container
-            var playerIds = isChallengerTeam ? match.Team1PlayerIds : match.Team2PlayerIds;
+            var playerIds = isChallengerTeam
+                ? match.Team1Players.Select(p => p.Id).ToList()
+                : match.Team2Players.Select(p => p.Id).ToList();
             var players = new List<Player>();
             foreach (var playerId in playerIds)
             {
@@ -607,9 +618,18 @@ namespace WabbitBot.DiscBot.App
                 return Result.Failure("Player not found");
             }
 
+            if (match.Team1Players is null)
+            {
+                return Result.Failure("Team 1 players not found");
+            }
+            if (match.Team2Players is null)
+            {
+                return Result.Failure("Team 2 players not found");
+            }
+
             // Determine which team requested
-            bool team1Requested = match.Team1PlayerIds.Contains(getRequestingPlayer.Id);
-            bool team2Requested = match.Team2PlayerIds.Contains(getRequestingPlayer.Id);
+            bool team1Requested = match.Team1Players.Any(p => p.Id == getRequestingPlayer.Id);
+            bool team2Requested = match.Team2Players.Any(p => p.Id == getRequestingPlayer.Id);
 
             if (!team1Requested && !team2Requested)
             {
@@ -692,47 +712,57 @@ namespace WabbitBot.DiscBot.App
             var team1 = getTeam1.Data;
             var team2 = getTeam2.Data;
 
+            if (match.Team1Players is null)
+            {
+                return Result.Failure("Team 1 players not found");
+            }
+            if (match.Team2Players is null)
+            {
+                return Result.Failure("Team 2 players not found");
+            }
+
             // Get all players
             var team1Players = new List<Player>();
-            foreach (var playerId in match.Team1PlayerIds)
+            foreach (var player in match.Team1Players)
             {
-                var getPlayer = await CoreService.Players.GetByIdAsync(playerId, DatabaseComponent.Repository);
-                if (getPlayer.Success && getPlayer.Data is not null)
-                {
-                    team1Players.Add(getPlayer.Data);
-                }
+                team1Players.Add(player);
             }
 
             var team2Players = new List<Player>();
-            foreach (var playerId in match.Team2PlayerIds)
+            foreach (var player in match.Team2Players)
             {
-                var getPlayer = await CoreService.Players.GetByIdAsync(playerId, DatabaseComponent.Repository);
-                if (getPlayer.Success && getPlayer.Data is not null)
-                {
-                    team2Players.Add(getPlayer.Data);
-                }
+                team2Players.Add(player);
             }
 
-            // Determine who issued and who accepted
             // The team that requested the rematch is the challenger
-            // The team that accepted is the opponent
-            bool team1Requested = match.Team1PlayerIds.Contains(match.Team1PlayerIds.FirstOrDefault()); // Need to get from stored rematch request info
-            // For now, assume team1 is always challenger
-            var challengerTeam = team1;
-            var opponentTeam = team2;
-            var challengerPlayers = team1Players;
-            var opponentPlayers = team2Players;
-            var issuedByPlayer = team1Players.First();
+            bool acceptingPlayerIsTeam1 = match.Team1Players.Any(p => p.Id == getAcceptingPlayer.Id);
+            bool acceptingPlayerIsTeam2 = match.Team2Players.Any(p => p.Id == getAcceptingPlayer.Id);
+
+            if (!acceptingPlayerIsTeam1 && !acceptingPlayerIsTeam2)
+            {
+                return Result.Failure("Accepting player is not part of this match");
+            }
+
+            bool team1Requested = acceptingPlayerIsTeam2;
+            bool team2Requested = acceptingPlayerIsTeam1;
+
+            var challengerTeam = team1Requested ? team1 : team2;
+            var opponentTeam = team1Requested ? team2 : team1;
+            var challengerPlayers = team1Requested ? team1Players : team2Players;
+            var opponentPlayers = team1Requested ? team2Players : team1Players;
+            var issuedByPlayer = challengerPlayers.First();
             var acceptedByPlayer = getAcceptingPlayer;
 
             // Create a new challenge similar to ScrimmageCore.Factory.CreateChallenge
-            var challengeResult = await Core.Scrimmages.ScrimmageCore.Factory.CreateChallenge(
-                challengerTeam.Id,
-                opponentTeam.Id,
-                issuedByPlayer.Id,
-                [.. challengerPlayers.Select(p => p.Id)],
-                match.TeamSize,
-                match.BestOf
+            // Note: CreateChallengeAsync expects teammate IDs (not including the issuer)
+            var teammateIds = challengerPlayers.Where(p => p.Id != issuedByPlayer.Id).Select(p => p.Id).ToList();
+            var challengeResult = await Core.Scrimmages.ScrimmageCore.CreateChallengeAsync(
+                ChallengerTeamId: challengerTeam.Id,
+                OpponentTeamId: opponentTeam.Id,
+                IssuedByPlayerId: issuedByPlayer.Id,
+                SelectedTeammateIds: teammateIds,
+                teamSize: match.TeamSize,
+                bestOf: match.BestOf
             );
 
             if (!challengeResult.Success || challengeResult.Data is null)
@@ -759,12 +789,14 @@ namespace WabbitBot.DiscBot.App
                 challenge.Id,
                 challengerTeam.Id,
                 opponentTeam.Id,
-                challengerPlayers.Select(p => p.Id).ToList(),
-                opponentPlayers.Select(p => p.Id).ToList(),
+                [.. challengerPlayers],
+                [.. opponentPlayers],
                 issuedByPlayer.Id,
                 acceptedByPlayer.Id,
                 match.TeamSize,
-                match.BestOf
+                match.BestOf,
+                challengerTeam.ScrimmageTeamStats[match.TeamSize],
+                opponentTeam.ScrimmageTeamStats[match.TeamSize]
             );
 
             if (!scrimmageResult.Success || scrimmageResult.Data is null)
@@ -892,9 +924,18 @@ namespace WabbitBot.DiscBot.App
                 return Result.Failure("Player not found");
             }
 
+            if (match.Team1Players is null)
+            {
+                return Result.Failure("Team 1 players not found");
+            }
+            if (match.Team2Players is null)
+            {
+                return Result.Failure("Team 2 players not found");
+            }
+
             bool isOnTeam =
-                (teamId == match.Team1Id && match.Team1PlayerIds.Contains(player.Id))
-                || (teamId == match.Team2Id && match.Team2PlayerIds.Contains(player.Id));
+                (teamId == match.Team1Id && match.Team1Players.Any(p => p.Id == player.Id))
+                || (teamId == match.Team2Id && match.Team2Players.Any(p => p.Id == player.Id));
 
             if (!isOnTeam)
             {

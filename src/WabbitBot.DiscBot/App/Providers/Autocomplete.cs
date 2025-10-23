@@ -153,7 +153,7 @@ namespace WabbitBot.DiscBot.App.Providers
                     .SelectMany(t => t.Rosters)
                     .Where(r => r.RosterGroup == rosterGroup) // Filter to the right roster group
                     .SelectMany(r => r.RosterMembers) // Get members from that roster
-                    .Where(tm => tm.IsActive)
+                    .Where(tm => tm.ValidTo == null)
                     .Include(tm => tm.MashinaUser)
                     .Where(tm =>
                         tm.MashinaUser != null
@@ -252,7 +252,7 @@ namespace WabbitBot.DiscBot.App.Providers
                     .Where(c =>
                         c.ChallengerTeam != null
                         && c.OpponentTeam != null
-                        && (c.IssuedByPlayerId == player.Id || c.ChallengerTeam.TeamCaptainId == player.Id)
+                        && (c.IssuedByPlayerId == player.Id || c.ChallengerTeam.TeamMajorId == player.Id)
                     )
                     .Where(c =>
                         EF.Functions.ILike(c.ChallengerTeam!.Name, $"%{term}%")
@@ -309,17 +309,22 @@ namespace WabbitBot.DiscBot.App.Providers
                         && g.Match.Team1 != null
                         && g.Match.Team2 != null
                         && g.Map != null
-                        && (g.Match.Team1PlayerIds.Contains(player.Id) || g.Match.Team2PlayerIds.Contains(player.Id))
+                        && (
+                            g.Match.Team1Players != null
+                            && g.Match.Team1Players.Any(p => p.Id == player.Id)
+                            && g.Match.Team2Players != null
+                            && g.Match.Team2Players.Any(p => p.Id == player.Id)
+                        )
                     )
                     .Where(g =>
-                        EF.Functions.ILike(g.Match.Team1!.Name, $"%{term}%")
-                        || EF.Functions.ILike(g.Match.Team2!.Name, $"%{term}%")
-                        || EF.Functions.ILike(g.Map!.Name, $"%{term}%")
+                        EF.Functions.ILike(g.Match.Team1.Name, $"%{term}%")
+                        || EF.Functions.ILike(g.Match.Team2.Name, $"%{term}%")
+                        || EF.Functions.ILike(g.Map.Name, $"%{term}%")
                     )
                     .OrderByDescending(g => g.CreatedAt)
                     .Select(g => new
                     {
-                        DisplayName = $"{g.Match.Team1!.Name} vs {g.Match.Team2!.Name} - Game {g.GameNumber} ({g.Map!.Name})",
+                        DisplayName = $"{g.Match.Team1.Name} vs {g.Match.Team2.Name} - Game {g.GameNumber} ({g.Map.Name})",
                         g.Id,
                     })
                     .Take(25)
@@ -358,27 +363,23 @@ namespace WabbitBot.DiscBot.App.Providers
 
                 // Find scrimmages where:
                 // 1. Scrimmage is in progress (CompletedAt is null)
-                // 2. User is in one of the teams (check ChallengerTeamPlayerIds or OpponentTeamPlayerIds)
+                // 2. User is in one of the teams (check ChallengerTeamPlayers or OpponentTeamPlayers)
                 return await db
-                    .Scrimmages.Include(s => s.Match)
-                    .ThenInclude(m => m!.Team1)
-                    .Include(s => s.Match)
-                    .ThenInclude(m => m!.Team2)
+                    .Scrimmages.Include(s => s.ChallengerTeam)
+                    .Include(s => s.OpponentTeam)
                     .Where(s =>
                         s.CompletedAt == null
-                        && s.Match != null
-                        && s.Match.Team1 != null
-                        && s.Match.Team2 != null
                         && (
-                            s.ChallengerTeamPlayerIds.Contains(player.Id) || s.OpponentTeamPlayerIds.Contains(player.Id)
+                            s.ChallengerTeamPlayers.Any(p => p.Id == player.Id)
+                            || s.OpponentTeamPlayers.Any(p => p.Id == player.Id)
                         )
                     )
                     .Where(s =>
-                        EF.Functions.ILike(s.Match!.Team1!.Name, $"%{term}%")
-                        || EF.Functions.ILike(s.Match!.Team2!.Name, $"%{term}%")
+                        EF.Functions.ILike(s.ChallengerTeam.Name, $"%{term}%")
+                        || EF.Functions.ILike(s.OpponentTeam.Name, $"%{term}%")
                     )
                     .OrderByDescending(s => s.StartedAt)
-                    .Select(s => new { DisplayName = $"{s.Match!.Team1!.Name} vs {s.Match!.Team2!.Name}", s.Id })
+                    .Select(s => new { DisplayName = $"{s.ChallengerTeam.Name} vs {s.OpponentTeam.Name}", s.Id })
                     .Take(25)
                     .ToListAsync();
             });
@@ -427,11 +428,13 @@ namespace WabbitBot.DiscBot.App.Providers
 
                 // Determine which team the user is on
                 var userTeamPlayerIds =
-                    scrimmage.ChallengerTeamPlayerIds.Contains(currentUser.Id) ? scrimmage.ChallengerTeamPlayerIds
-                    : scrimmage.OpponentTeamPlayerIds.Contains(currentUser.Id) ? scrimmage.OpponentTeamPlayerIds
-                    : new List<Guid>();
+                    scrimmage.ChallengerTeamPlayers.Any(p => p.Id == currentUser.Id)
+                        ? scrimmage.ChallengerTeamPlayers.Select(p => p.Id)
+                    : scrimmage.OpponentTeamPlayers.Any(p => p.Id == currentUser.Id)
+                        ? scrimmage.OpponentTeamPlayers.Select(p => p.Id)
+                    : [];
 
-                if (userTeamPlayerIds.Count == 0)
+                if (!userTeamPlayerIds.Any())
                 {
                     return [];
                 }
@@ -508,16 +511,16 @@ namespace WabbitBot.DiscBot.App.Providers
 
                 // Determine which team the user is on
                 Guid userTeamId;
-                List<Guid> currentPlayerIds;
-                if (scrimmage.ChallengerTeamPlayerIds.Contains(currentUser.Id))
+                ICollection<Guid> currentPlayerIds;
+                if (scrimmage.ChallengerTeamPlayers.Any(p => p.Id == currentUser.Id))
                 {
                     userTeamId = scrimmage.ChallengerTeamId;
-                    currentPlayerIds = scrimmage.ChallengerTeamPlayerIds;
+                    currentPlayerIds = [.. scrimmage.ChallengerTeamPlayers.Select(p => p.Id)];
                 }
-                else if (scrimmage.OpponentTeamPlayerIds.Contains(currentUser.Id))
+                else if (scrimmage.OpponentTeamPlayers.Any(p => p.Id == currentUser.Id))
                 {
                     userTeamId = scrimmage.OpponentTeamId;
-                    currentPlayerIds = scrimmage.OpponentTeamPlayerIds;
+                    currentPlayerIds = [.. scrimmage.OpponentTeamPlayers.Select(p => p.Id)];
                 }
                 else
                 {
@@ -533,7 +536,7 @@ namespace WabbitBot.DiscBot.App.Providers
                     .SelectMany(t => t.Rosters)
                     .Where(r => r.RosterGroup == rosterGroup)
                     .SelectMany(r => r.RosterMembers)
-                    .Where(tm => tm.IsActive && !currentPlayerIds.Contains(tm.PlayerId))
+                    .Where(tm => tm.ValidTo == null && !currentPlayerIds.Contains(tm.PlayerId))
                     .Include(tm => tm.MashinaUser)
                     .Where(tm =>
                         tm.MashinaUser != null

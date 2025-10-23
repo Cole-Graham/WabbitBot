@@ -157,20 +157,27 @@ namespace WabbitBot.Core.Common.Models.Common
                                 if (
                                     (
                                         !string.IsNullOrEmpty(rp.PlayerUserId)
-                                        && player
-                                            .PreviousPlatformIds.GetValueOrDefault("EugenSystems")
-                                            ?.Contains(rp.PlayerUserId) == true
+                                        && (
+                                            player.CurrentPlatformIds.GetValueOrDefault("EugenSystems")
+                                                == rp.PlayerUserId
+                                            || player
+                                                .PreviousPlatformIds.GetValueOrDefault("EugenSystems")
+                                                ?.Contains(rp.PlayerUserId) == true
+                                        )
                                     )
                                     || (
                                         ExtractSteamId(rp.PlayerAvatar) is string steamId
-                                        && player.PreviousPlatformIds.GetValueOrDefault("Steam")?.Contains(steamId)
-                                            == true
+                                        && (
+                                            player.CurrentPlatformIds.GetValueOrDefault("Steam") == steamId
+                                            || player.PreviousPlatformIds.GetValueOrDefault("Steam")?.Contains(steamId)
+                                                == true
+                                        )
                                     )
                                     || (
                                         !string.IsNullOrEmpty(rp.PlayerName)
                                         && (
-                                            player.GameUsername == rp.PlayerName
-                                            || player.PreviousGameUsernames.Contains(rp.PlayerName)
+                                            player.CurrentSteamUsername == rp.PlayerName
+                                            || player.PreviousSteamUsernames.Contains(rp.PlayerName)
                                         )
                                     )
                                 )
@@ -313,8 +320,22 @@ namespace WabbitBot.Core.Common.Models.Common
                 var NewGame = Factory.CreateGame(Match.Id, Match, mapId, Match.TeamSize, gameNumber);
 
                 // 3) Set teams/players from the match
-                NewGame.Team1PlayerIds = [.. Match.Team1PlayerIds];
-                NewGame.Team2PlayerIds = [.. Match.Team2PlayerIds];
+                if (Match.Team1Players is not null)
+                {
+                    NewGame.Team1PlayerIds = [.. Match.Team1Players.Select(p => p.Id)];
+                }
+                else
+                {
+                    return Result<Game>.Failure("Team 1 players not found");
+                }
+                if (Match.Team2Players is not null)
+                {
+                    NewGame.Team2PlayerIds = [.. Match.Team2Players.Select(p => p.Id)];
+                }
+                else
+                {
+                    return Result<Game>.Failure("Team 2 players not found");
+                }
 
                 // 4) Persist
                 var createResult = await CoreService.Games.CreateAsync(NewGame, DatabaseComponent.Repository);
@@ -383,19 +404,26 @@ namespace WabbitBot.Core.Common.Models.Common
                             var isMatch =
                                 (
                                     !string.IsNullOrEmpty(rp.PlayerUserId)
-                                    && player
-                                        .PreviousPlatformIds.GetValueOrDefault("EugenSystems")
-                                        ?.Contains(rp.PlayerUserId) == true
+                                    && (
+                                        player.CurrentPlatformIds.GetValueOrDefault("EugenSystems") == rp.PlayerUserId
+                                        || player
+                                            .PreviousPlatformIds.GetValueOrDefault("EugenSystems")
+                                            ?.Contains(rp.PlayerUserId) == true
+                                    )
                                 )
                                 || (
                                     ExtractSteamId(rp.PlayerAvatar) is string steamId
-                                    && player.PreviousPlatformIds.GetValueOrDefault("Steam")?.Contains(steamId) == true
+                                    && (
+                                        player.CurrentPlatformIds.GetValueOrDefault("Steam") == steamId
+                                        || player.PreviousPlatformIds.GetValueOrDefault("Steam")?.Contains(steamId)
+                                            == true
+                                    )
                                 )
                                 || (
                                     !string.IsNullOrEmpty(rp.PlayerName)
                                     && (
-                                        player.GameUsername == rp.PlayerName
-                                        || player.PreviousGameUsernames.Contains(rp.PlayerName)
+                                        player.CurrentSteamUsername == rp.PlayerName
+                                        || player.PreviousSteamUsernames.Contains(rp.PlayerName)
                                     )
                                 );
 

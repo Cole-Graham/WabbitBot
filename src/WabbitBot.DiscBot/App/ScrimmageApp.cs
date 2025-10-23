@@ -22,8 +22,7 @@ namespace WabbitBot.DiscBot.App
     public partial class ScrimmageApp : IScrimmageApp
     {
         // State manager for challenge configuration messages
-        private static readonly InteractiveMessageStateManager<ChallengeConfigurationSelections> _challengeStateManager =
-            new();
+        private static readonly MessageStateManager<ChallengeConfigurationSelections> _challengeStateManager = new();
 
         #region Buttons
         /// <summary>
@@ -114,36 +113,48 @@ namespace WabbitBot.DiscBot.App
             var interaction = args.Interaction;
             var customId = interaction.Data.CustomId;
 
+            Console.WriteLine($"[DEBUG] ProcessSelectMenuInteractionAsync - CustomId: {customId}");
+            Console.WriteLine($"[DEBUG] User: {interaction.User.Username} ({interaction.User.Id})");
+            Console.WriteLine($"[DEBUG] Values count: {interaction.Data.Values?.Count() ?? 0}");
+
             try
             {
                 // Opponent team selection
                 if (customId.StartsWith("challenge_opponent_", StringComparison.Ordinal))
                 {
+                    Console.WriteLine("[DEBUG] Routing to ProcessOpponentSelectionAsync");
                     return await ProcessOpponentSelectionAsync(interaction, customId);
                 }
 
                 // Player selection
                 if (customId.StartsWith("challenge_players_", StringComparison.Ordinal))
                 {
+                    Console.WriteLine("[DEBUG] Routing to ProcessPlayerSelectionAsync");
                     return await ProcessPlayerSelectionAsync(interaction, customId);
                 }
 
                 // Best of selection
                 if (customId.StartsWith("challenge_bestof_", StringComparison.Ordinal))
                 {
+                    Console.WriteLine("[DEBUG] Routing to ProcessBestOfSelectionAsync");
                     return await ProcessBestOfSelectionAsync(interaction, customId);
                 }
 
                 // Teammate selection from challenge container
                 if (customId.StartsWith("select_teammates_", StringComparison.Ordinal))
                 {
+                    Console.WriteLine("[DEBUG] Routing to ProcessTeammateSelectionAsync");
                     return await ProcessTeammateSelectionAsync(interaction, customId);
                 }
 
+                Console.WriteLine($"[ERROR] Unknown custom ID: {customId}");
                 return Result.Failure($"Unknown custom ID: {customId}");
             }
             catch (Exception ex)
             {
+                Console.WriteLine($"[ERROR] ProcessSelectMenuInteractionAsync failed: {ex.Message}");
+                Console.WriteLine($"[ERROR] Stack trace: {ex.StackTrace}");
+
                 await DiscBotService.ErrorHandler.CaptureAsync(
                     ex,
                     $"Failed to handle select menu interaction: {customId}",
@@ -156,13 +167,13 @@ namespace WabbitBot.DiscBot.App
                     await interaction.CreateResponseAsync(
                         DiscordInteractionResponseType.ChannelMessageWithSource,
                         new DiscordInteractionResponseBuilder()
-                            .WithContent("An error occurred while processing your selection. Please try again.")
+                            .WithContent($"An error occurred while processing your selection: {ex.Message}")
                             .AsEphemeral()
                     );
                 }
-                catch
+                catch (Exception responseEx)
                 {
-                    // Response was already sent, ignore
+                    Console.WriteLine($"[ERROR] Failed to send error response: {responseEx.Message}");
                 }
 
                 return Result.Failure($"Failed to handle select menu interaction: {ex.Message}");
@@ -197,35 +208,33 @@ namespace WabbitBot.DiscBot.App
             }
             var Challenge = getChallenge.Data;
 
-            // Get opponent team ID and player IDs from the challenge
+            // Get opponent team ID from the challenge
             var OpponentTeamId = Challenge.OpponentTeamId;
 
             // Check if opponent team players have been selected
-            if (Challenge.OpponentTeamPlayerIds is null || Challenge.OpponentTeamPlayerIds.Count == 0)
+            if (
+                Challenge.OpponentTeammateIds is null
+                || Challenge.OpponentTeammateIds.Count == 0
+                || !Challenge.AcceptedByPlayerId.HasValue
+            )
             {
                 return Result.Failure("Opponent team players not selected yet");
             }
 
-            var OpponentSelectedPlayerIds = Challenge.OpponentTeamPlayerIds.ToArray();
-            var getAcceptedByPlayer = await CoreService.WithDbContext(async db =>
-                await db.Players.FirstOrDefaultAsync(p => p.MashinaUser.DiscordUserId == interaction.User.Id)
+            // OpponentTeammateIds now contains the complete list of selected players
+            var opponentPlayerIds = Challenge.OpponentTeammateIds.ToList();
+
+            var OpponentSelectedPlayers = await CoreService.WithDbContext(async db =>
+                await db.Players.Where(p => opponentPlayerIds.Contains(p.Id)).ToListAsync()
             );
-            if (getAcceptedByPlayer == null)
-            {
-                return Result.Failure("Accepted by player not found");
-            }
-            var AcceptedByPlayerId = getAcceptedByPlayer.Id;
+
+            var AcceptedByPlayerId = Challenge.AcceptedByPlayerId.Value;
 
             // Acknowledge interaction
             await interaction.CreateResponseAsync(DiscordInteractionResponseType.DeferredMessageUpdate);
 
             // Publish ScrimmageAccepted (Global) to Core
-            await ProcessChallengeAcceptedAsync(
-                Challenge,
-                OpponentTeamId,
-                OpponentSelectedPlayerIds,
-                AcceptedByPlayerId
-            );
+            await ProcessChallengeAcceptedAsync(Challenge, OpponentTeamId, OpponentSelectedPlayers, AcceptedByPlayerId);
 
             return Result.CreateSuccess("Challenge accepted");
         }
@@ -399,7 +408,7 @@ namespace WabbitBot.DiscBot.App
 
             // Authorization check: must be admin OR the issuer OR the team captain
             var isIssuer = player.Id == challenge.IssuedByPlayerId;
-            var isCaptain = player.Id == challengerTeam.TeamCaptainId;
+            var isCaptain = player.Id == challengerTeam.TeamMajorId;
 
             if (!isModerator && !isIssuer && !isCaptain)
             {
@@ -518,7 +527,7 @@ namespace WabbitBot.DiscBot.App
         public static async Task<Result> ProcessChallengeAcceptedAsync(
             ScrimmageChallenge Challenge,
             Guid OpponentTeamId,
-            Guid[] OpponentSelectedPlayerIds,
+            List<Player> OpponentSelectedPlayers,
             Guid AcceptedByPlayerId
         )
         {
@@ -536,7 +545,7 @@ namespace WabbitBot.DiscBot.App
             var pubResult = await PublishChallengeAcceptedAsync(
                 Challenge.Id,
                 OpponentTeamId,
-                [.. OpponentSelectedPlayerIds],
+                [.. OpponentSelectedPlayers.Select(p => p.Id)],
                 AcceptedByPlayerId
             );
             if (!pubResult.Success)
@@ -578,11 +587,20 @@ namespace WabbitBot.DiscBot.App
                 var Match = getMatch.Data;
                 Match.ChannelId = DiscBotService.ScrimmageChannel.Id;
 
+                if (Match.Team1Players is null)
+                {
+                    return Result<ScrimmageThreadsResult>.Failure("Team 1 players not found");
+                }
+                if (Match.Team2Players is null)
+                {
+                    return Result<ScrimmageThreadsResult>.Failure("Team 2 players not found");
+                }
+
                 var ChallengerTeamMentions = new List<string>();
-                foreach (var playerId in Match.Team1PlayerIds)
+                foreach (var player in Match.Team1Players)
                 {
                     var getChallengerPlayer = await CoreService.Players.GetByIdAsync(
-                        playerId,
+                        player.Id,
                         DatabaseComponent.Repository
                     );
                     if (
@@ -593,10 +611,10 @@ namespace WabbitBot.DiscBot.App
                     }
                 }
                 var OpponentTeamMentions = new List<string>();
-                foreach (var playerId in Match.Team2PlayerIds)
+                foreach (var player in Match.Team2Players)
                 {
                     var getOpponentPlayer = await CoreService.Players.GetByIdAsync(
-                        playerId,
+                        player.Id,
                         DatabaseComponent.Repository
                     );
                     if (getOpponentPlayer.Success && getOpponentPlayer.Data?.MashinaUser?.DiscordMention is not null)
@@ -609,20 +627,37 @@ namespace WabbitBot.DiscBot.App
                 {
                     return Result<ScrimmageThreadsResult>.Failure("Scrimmage challenge not found");
                 }
-                if (Scrimmage.ScrimmageChallenge.ChallengerTeamPlayers == null)
+
+                // Construct challenger team players: issuer + teammates
+                var challengerPlayerIds = new List<Guid> { Scrimmage.ScrimmageChallenge.IssuedByPlayerId };
+                challengerPlayerIds.AddRange(Scrimmage.ScrimmageChallenge.ChallengerTeammateIds);
+                var challengerPlayers = await CoreService.WithDbContext(async db =>
+                    await db.Players.Where(p => challengerPlayerIds.Contains(p.Id)).ToListAsync()
+                );
+
+                // Construct opponent team players: acceptor + teammates
+                if (!Scrimmage.ScrimmageChallenge.AcceptedByPlayerId.HasValue)
                 {
-                    return Result<ScrimmageThreadsResult>.Failure("Challenger team players not found");
+                    return Result<ScrimmageThreadsResult>.Failure("Challenge not yet accepted");
                 }
-                if (Scrimmage.ScrimmageChallenge.OpponentTeamPlayers == null)
+                if (
+                    Scrimmage.ScrimmageChallenge.OpponentTeammateIds is null
+                    || Scrimmage.ScrimmageChallenge.OpponentTeammateIds.Count == 0
+                )
                 {
-                    return Result<ScrimmageThreadsResult>.Failure("Opponent team players not found");
+                    return Result<ScrimmageThreadsResult>.Failure("Opponent teammates not selected");
                 }
+                // OpponentTeammateIds now contains the complete list of selected players
+                var opponentPlayerIds = Scrimmage.ScrimmageChallenge.OpponentTeammateIds.ToList();
+                var opponentPlayers = await CoreService.WithDbContext(async db =>
+                    await db.Players.Where(p => opponentPlayerIds.Contains(p.Id)).ToListAsync()
+                );
 
                 // Build messages
                 var getContainers = await MatchRenderer.RenderScrimmageMatchContainersAsync(
                     Match.Id,
-                    Scrimmage.ScrimmageChallenge.ChallengerTeamPlayers.ToArray(),
-                    Scrimmage.ScrimmageChallenge.OpponentTeamPlayers?.ToArray()
+                    [.. challengerPlayers],
+                    [.. opponentPlayers]
                 );
                 if (!getContainers.Success || getContainers.Data == null)
                 {
@@ -694,240 +729,233 @@ namespace WabbitBot.DiscBot.App
         {
             try
             {
-                // Get the scrimmage with all necessary navigation properties
-                var scrimmageResult = await CoreService.Scrimmages.GetByIdAsync(
-                    scrimmageId,
-                    DatabaseComponent.Repository
-                );
-                if (!scrimmageResult.Success || scrimmageResult.Data is null)
+                // Single consolidated database query for all required data
+                var validationData = await CoreService.WithDbContext(async db =>
                 {
-                    return Result<string>.Failure("Scrimmage not found.");
-                }
+                    var scrimmage = await db.Scrimmages.FirstOrDefaultAsync(s => s.Id == scrimmageId);
+                    if (scrimmage is null || scrimmage.CompletedAt.HasValue)
+                    {
+                        return null;
+                    }
 
-                var scrimmage = scrimmageResult.Data;
+                    var requestingPlayer = await db.Players.FirstOrDefaultAsync(p =>
+                        p.MashinaUser.DiscordUserId == requestingUserId
+                    );
+                    if (requestingPlayer is null)
+                    {
+                        return null;
+                    }
 
-                // Verify scrimmage is active
-                if (scrimmage.CompletedAt.HasValue)
-                {
-                    return Result<string>.Failure("Cannot substitute players in a completed scrimmage.");
-                }
+                    // Determine team and check if player is on that team
+                    var isOnChallengerTeam = scrimmage.ChallengerTeamPlayers.Any(p => p.Id == playerOutId);
+                    var isOnOpponentTeam = scrimmage.OpponentTeamPlayers.Any(p => p.Id == playerOutId);
+                    if (!isOnChallengerTeam && !isOnOpponentTeam)
+                    {
+                        return null;
+                    }
 
-                // Get the requesting player
-                var requestingPlayer = await CoreService.WithDbContext(async db =>
-                    await db.Players.FirstOrDefaultAsync(p => p.MashinaUser.DiscordUserId == requestingUserId)
-                );
+                    var teamId = isOnChallengerTeam ? scrimmage.ChallengerTeamId : scrimmage.OpponentTeamId;
+                    var team = await db.Teams.FirstOrDefaultAsync(t => t.Id == teamId);
+                    if (team is null)
+                    {
+                        return null;
+                    }
 
-                if (requestingPlayer is null)
-                {
-                    return Result<string>.Failure("You must be registered as a player to substitute.");
-                }
-
-                // Determine which team the player to sub out is on
-                bool isOnChallengerTeam = scrimmage.ChallengerTeamPlayerIds.Contains(playerOutId);
-                bool isOnOpponentTeam = scrimmage.OpponentTeamPlayerIds.Contains(playerOutId);
-
-                if (!isOnChallengerTeam && !isOnOpponentTeam)
-                {
-                    return Result<string>.Failure("The player to substitute out is not in this scrimmage.");
-                }
-
-                // Get team info for permission check
-                var teamId = isOnChallengerTeam ? scrimmage.ChallengerTeamId : scrimmage.OpponentTeamId;
-                var teamResult = await CoreService.Teams.GetByIdAsync(teamId, DatabaseComponent.Repository);
-                if (!teamResult.Success || teamResult.Data is null)
-                {
-                    return Result<string>.Failure("Team not found.");
-                }
-
-                var team = teamResult.Data;
-
-                // Verify permission: must be team captain, team manager, or the player being substituted
-                var isTeamCaptain = team.TeamCaptainId == requestingPlayer.Id;
-                var isPlayerBeingSubbed = playerOutId == requestingPlayer.Id;
-
-                var isTeamManager = await CoreService.WithDbContext(async db =>
-                {
                     var rosterGroup = TeamCore.TeamSizeRosterGrouping.GetRosterGroup(scrimmage.TeamSize);
-                    return await db.TeamMembers.AnyAsync(tm =>
+
+                    // Check permissions and roster membership in single query
+                    var IsRosterManager = await db.TeamMembers.AnyAsync(tm =>
                         tm.TeamRoster.TeamId == teamId
                         && tm.TeamRoster.RosterGroup == rosterGroup
                         && tm.PlayerId == requestingPlayer.Id
-                        && tm.IsTeamManager
+                        && tm.IsRosterManager
                     );
+
+                    var isOnRoster = await db.TeamMembers.AnyAsync(tm =>
+                        tm.TeamRoster.TeamId == teamId
+                        && tm.TeamRoster.RosterGroup == rosterGroup
+                        && tm.PlayerId == playerInId
+                        && tm.ValidTo == null
+                    );
+
+                    // Get both players in one go
+                    var playerIds = new[] { playerOutId, playerInId };
+                    var players = await db.Players.Where(p => playerIds.Contains(p.Id)).ToListAsync();
+                    var playerOut = players.FirstOrDefault(p => p.Id == playerOutId);
+                    var playerIn = players.FirstOrDefault(p => p.Id == playerInId);
+
+                    return new
+                    {
+                        Scrimmage = scrimmage,
+                        RequestingPlayer = requestingPlayer,
+                        Team = team,
+                        IsOnChallengerTeam = isOnChallengerTeam,
+                        IsTeamCaptain = team.TeamMajorId == requestingPlayer.Id,
+                        IsPlayerBeingSubbed = playerOutId == requestingPlayer.Id,
+                        IsRosterManager = IsRosterManager,
+                        IsOnRoster = isOnRoster,
+                        PlayerOut = playerOut,
+                        PlayerIn = playerIn,
+                        AlreadyInScrimmage = scrimmage.ChallengerTeamPlayers.Any(p => p.Id == playerInId)
+                            || scrimmage.OpponentTeamPlayers.Any(p => p.Id == playerInId),
+                    };
                 });
 
-                if (!isTeamCaptain && !isTeamManager && !isPlayerBeingSubbed)
+                // Validation checks
+                if (validationData is null)
+                {
+                    return Result<string>.Failure(
+                        "Invalid substitution request: scrimmage not found, completed, or player not in scrimmage."
+                    );
+                }
+
+                if (
+                    !validationData.IsTeamCaptain
+                    && !validationData.IsRosterManager
+                    && !validationData.IsPlayerBeingSubbed
+                )
                 {
                     return Result<string>.Failure(
                         "Only the team captain, a team manager, or the player being substituted can make substitutions."
                     );
                 }
 
-                // Verify the player to sub in is not already in the scrimmage
-                if (
-                    scrimmage.ChallengerTeamPlayerIds.Contains(playerInId)
-                    || scrimmage.OpponentTeamPlayerIds.Contains(playerInId)
-                )
+                if (validationData.AlreadyInScrimmage)
                 {
                     return Result<string>.Failure("The substitute player is already in this scrimmage.");
                 }
 
-                // Verify the player to sub in is on the team's roster
-                var isOnRoster = await CoreService.WithDbContext(async db =>
-                {
-                    var rosterGroup = TeamCore.TeamSizeRosterGrouping.GetRosterGroup(scrimmage.TeamSize);
-                    return await db.TeamMembers.AnyAsync(tm =>
-                        tm.TeamRoster.TeamId == teamId
-                        && tm.TeamRoster.RosterGroup == rosterGroup
-                        && tm.PlayerId == playerInId
-                        && tm.IsActive
-                    );
-                });
-
-                if (!isOnRoster)
+                if (!validationData.IsOnRoster)
                 {
                     return Result<string>.Failure(
                         "The substitute player is not on the team's roster for this game size."
                     );
                 }
 
-                // Get player names for response message
-                var playerOutResult = await CoreService.Players.GetByIdAsync(playerOutId, DatabaseComponent.Repository);
-                var playerInResult = await CoreService.Players.GetByIdAsync(playerInId, DatabaseComponent.Repository);
-
-                if (!playerOutResult.Success || playerOutResult.Data is null)
+                if (validationData.PlayerOut is null || validationData.PlayerIn is null)
                 {
-                    return Result<string>.Failure("Player to substitute out not found.");
+                    return Result<string>.Failure("One or both players not found.");
                 }
 
-                if (!playerInResult.Success || playerInResult.Data is null)
+                var scrimmage = validationData.Scrimmage;
+                var playerOut = validationData.PlayerOut;
+                var playerIn = validationData.PlayerIn;
+                var isOnChallengerTeam = validationData.IsOnChallengerTeam;
+
+                // Helper to replace player in collection
+                void ReplacePlayerInList(ICollection<Player> collection, Player oldPlayer, Player newPlayer)
                 {
-                    return Result<string>.Failure("Substitute player not found.");
+                    collection.Remove(oldPlayer);
+                    collection.Add(newPlayer);
                 }
 
-                var playerOut = playerOutResult.Data;
-                var playerIn = playerInResult.Data;
-
-                // Update scrimmage player lists
+                // Simulate substitution and validate lineup per TeamRules before committing
+                var simulatedChallenger = scrimmage.ChallengerTeamPlayers.Select(p => p.Id).ToList();
+                var simulatedOpponent = scrimmage.OpponentTeamPlayers.Select(p => p.Id).ToList();
                 if (isOnChallengerTeam)
                 {
-                    var index = scrimmage.ChallengerTeamPlayerIds.IndexOf(playerOutId);
-                    scrimmage.ChallengerTeamPlayerIds[index] = playerInId;
+                    var idx = simulatedChallenger.IndexOf(playerOut.Id);
+                    if (idx >= 0)
+                        simulatedChallenger[idx] = playerIn.Id;
                 }
                 else
                 {
-                    var index = scrimmage.OpponentTeamPlayerIds.IndexOf(playerOutId);
-                    scrimmage.OpponentTeamPlayerIds[index] = playerInId;
+                    var idx = simulatedOpponent.IndexOf(playerOut.Id);
+                    if (idx >= 0)
+                        simulatedOpponent[idx] = playerIn.Id;
                 }
 
-                // Update the scrimmage
+                var teamIdForValidation = isOnChallengerTeam ? scrimmage.ChallengerTeamId : scrimmage.OpponentTeamId;
+                var lineupIds = isOnChallengerTeam ? simulatedChallenger : simulatedOpponent;
+                var lineupValidation = await TeamCore.Validation.ValidateLineupForMatch(
+                    teamIdForValidation,
+                    scrimmage.TeamSize,
+                    lineupIds
+                );
+
+                if (!lineupValidation.Success)
+                {
+                    return Result<string>.Failure(lineupValidation.ErrorMessage ?? "Substitution violates team rules.");
+                }
+
+                // Update scrimmage player lists (full combined lists)
+                if (isOnChallengerTeam)
+                {
+                    ReplacePlayerInList(scrimmage.ChallengerTeamPlayers, playerOut, playerIn);
+                }
+                else
+                {
+                    ReplacePlayerInList(scrimmage.OpponentTeamPlayers, playerOut, playerIn);
+                }
+
                 await CoreService.Scrimmages.UpdateAsync(scrimmage, DatabaseComponent.Repository);
 
-                // Update the match if it exists
-                if (scrimmage.Match is not null)
+                // Update match and games if they exist
+                bool hasActiveGames = false;
+                if (scrimmage.MatchId.HasValue)
                 {
                     var matchResult = await CoreService.Matches.GetByIdAsync(
-                        scrimmage.Match.Id,
+                        scrimmage.MatchId.Value,
                         DatabaseComponent.Repository
                     );
+
                     if (matchResult.Success && matchResult.Data is not null)
                     {
                         var match = matchResult.Data;
 
+                        if (match.Team1Players is null || match.Team2Players is null)
+                        {
+                            return Result<string>.Failure("Match player data is incomplete.");
+                        }
+
                         // Update match player lists
                         if (isOnChallengerTeam)
                         {
-                            var index = match.Team1PlayerIds.IndexOf(playerOutId);
-                            match.Team1PlayerIds[index] = playerInId;
+                            ReplacePlayerInList(match.Team1Players, playerOut, playerIn);
                         }
                         else
                         {
-                            var index = match.Team2PlayerIds.IndexOf(playerOutId);
-                            match.Team2PlayerIds[index] = playerInId;
+                            ReplacePlayerInList(match.Team2Players, playerOut, playerIn);
                         }
 
                         await CoreService.Matches.UpdateAsync(match, DatabaseComponent.Repository);
 
-                        // Update active games in the match
-                        var activeGames = match.Games.Where(g =>
-                            MatchCore.Accessors.GetCurrentSnapshot(g).CompletedAt == null
-                        );
+                        // Update active games - batch process them
+                        var activeGameIds = match
+                            .Games.Where(g => MatchCore.Accessors.GetCurrentSnapshot(g).CompletedAt == null)
+                            .Select(g => g.Id)
+                            .ToList();
 
-                        foreach (var game in activeGames)
+                        if (activeGameIds.Any())
                         {
-                            var gameResult = await CoreService.Games.GetByIdAsync(
-                                game.Id,
-                                DatabaseComponent.Repository
+                            hasActiveGames = true;
+                            await UpdateActiveGamesForSubstitution(
+                                activeGameIds,
+                                playerOutId,
+                                playerInId,
+                                isOnChallengerTeam
                             );
-                            if (gameResult.Success && gameResult.Data is not null)
-                            {
-                                var activeGame = gameResult.Data;
-
-                                // Update game player lists
-                                if (isOnChallengerTeam)
-                                {
-                                    var index = activeGame.Team1PlayerIds.IndexOf(playerOutId);
-                                    activeGame.Team1PlayerIds[index] = playerInId;
-                                }
-                                else
-                                {
-                                    var index = activeGame.Team2PlayerIds.IndexOf(playerOutId);
-                                    activeGame.Team2PlayerIds[index] = playerInId;
-                                }
-
-                                // Check if player out had submitted a deck code and clear it
-                                var currentSnapshot = MatchCore.Accessors.GetCurrentSnapshot(activeGame);
-                                if (currentSnapshot.PlayerDeckCodes.ContainsKey(playerOutId))
-                                {
-                                    // Create a new snapshot with the deck code removed
-                                    var newSnapshot = MatchCore.Factory.CreateGameStateSnapshotFromOther(
-                                        currentSnapshot
-                                    );
-                                    newSnapshot.PlayerDeckCodes.Remove(playerOutId);
-                                    newSnapshot.PlayerDeckSubmittedAt.Remove(playerOutId);
-                                    newSnapshot.PlayerDeckConfirmed.Remove(playerOutId);
-                                    newSnapshot.PlayerDeckConfirmedAt.Remove(playerOutId);
-
-                                    // Also update the denormalized player IDs in the snapshot
-                                    if (isOnChallengerTeam)
-                                    {
-                                        var index = newSnapshot.Team1PlayerIds.IndexOf(playerOutId);
-                                        newSnapshot.Team1PlayerIds[index] = playerInId;
-                                    }
-                                    else
-                                    {
-                                        var index = newSnapshot.Team2PlayerIds.IndexOf(playerOutId);
-                                        newSnapshot.Team2PlayerIds[index] = playerInId;
-                                    }
-
-                                    activeGame.StateHistory.Add(newSnapshot);
-                                }
-
-                                await CoreService.Games.UpdateAsync(activeGame, DatabaseComponent.Repository);
-                            }
                         }
                     }
                 }
 
+                // Build response message
                 var playerOutName =
                     playerOut.MashinaUser?.DiscordGlobalname
                     ?? playerOut.MashinaUser?.DiscordUsername
-                    ?? playerOut.GameUsername;
+                    ?? playerOut.CurrentSteamUsername;
                 var playerInName =
                     playerIn.MashinaUser?.DiscordGlobalname
                     ?? playerIn.MashinaUser?.DiscordUsername
-                    ?? playerIn.GameUsername;
+                    ?? playerIn.CurrentSteamUsername;
 
-                return Result<string>.CreateSuccess(
-                    $"Successfully substituted **{playerOutName}** with **{playerInName}**. "
-                        + (
-                            scrimmage.Match?.Games.Any(g =>
-                                MatchCore.Accessors.GetCurrentSnapshot(g).CompletedAt == null
-                            ) == true
-                                ? "The previous player's deck submission has been cleared if it existed."
-                                : ""
-                        )
-                );
+                var message = $"Successfully substituted **{playerOutName}** with **{playerInName}**.";
+                if (hasActiveGames)
+                {
+                    message += " The previous player's deck submission has been cleared if it existed.";
+                }
+
+                return Result<string>.CreateSuccess(message);
             }
             catch (Exception ex)
             {
@@ -939,28 +967,149 @@ namespace WabbitBot.DiscBot.App
                 return Result<string>.Failure($"An error occurred while substituting the player: {ex.Message}");
             }
         }
+
+        /// <summary>
+        /// Updates active games with player substitution and clears any deck submissions from the substituted player.
+        /// </summary>
+        private static async Task UpdateActiveGamesForSubstitution(
+            List<Guid> activeGameIds,
+            Guid playerOutId,
+            Guid playerInId,
+            bool isOnChallengerTeam
+        )
+        {
+            foreach (var gameId in activeGameIds)
+            {
+                var gameResult = await CoreService.Games.GetByIdAsync(gameId, DatabaseComponent.Repository);
+                if (!gameResult.Success || gameResult.Data is null)
+                {
+                    continue;
+                }
+
+                var game = gameResult.Data;
+
+                // Update game player ID lists
+                var playerList = isOnChallengerTeam ? game.Team1PlayerIds : game.Team2PlayerIds;
+                var index = playerList.IndexOf(playerOutId);
+                if (index >= 0)
+                {
+                    playerList[index] = playerInId;
+                }
+
+                // Handle deck submission cleanup if player had submitted
+                var currentSnapshot = MatchCore.Accessors.GetCurrentSnapshot(game);
+                if (currentSnapshot.PlayerDeckCodes.ContainsKey(playerOutId))
+                {
+                    var newSnapshot = MatchCore.Factory.CreateGameStateSnapshotFromOther(currentSnapshot);
+
+                    // Remove player out's deck submission
+                    newSnapshot.PlayerDeckCodes.Remove(playerOutId);
+                    newSnapshot.PlayerDeckSubmittedAt.Remove(playerOutId);
+                    newSnapshot.PlayerDeckConfirmed.Remove(playerOutId);
+                    newSnapshot.PlayerDeckConfirmedAt.Remove(playerOutId);
+
+                    // Update player IDs in snapshot
+                    var snapshotPlayerList = isOnChallengerTeam
+                        ? newSnapshot.Team1PlayerIds
+                        : newSnapshot.Team2PlayerIds;
+                    var snapshotIndex = snapshotPlayerList.IndexOf(playerOutId);
+                    if (snapshotIndex >= 0)
+                    {
+                        snapshotPlayerList[snapshotIndex] = playerInId;
+                    }
+
+                    game.StateHistory.Add(newSnapshot);
+                }
+
+                await CoreService.Games.UpdateAsync(game, DatabaseComponent.Repository);
+            }
+        }
         #endregion
 
         #region Challenge Configuration Handlers
         private static async Task<Result> ProcessOpponentSelectionAsync(DiscordInteraction interaction, string customId)
         {
-            // Track the selection
-            var selections = interaction.Data.Values.ToArray();
-            var selectedOpponentTeamId = selections.Length > 0 ? selections[0] : null;
+            try
+            {
+                Console.WriteLine($"[DEBUG] ProcessOpponentSelectionAsync started - CustomId: {customId}");
 
-            _challengeStateManager.UpdateState(
-                interaction.Message.Id,
-                state =>
+                // Track the selection
+                var selections = interaction.Data.Values.ToArray();
+                var selectedOpponentTeamId = selections.Length > 0 ? selections[0] : null;
+
+                Console.WriteLine($"[DEBUG] Selections count: {selections.Length}");
+                Console.WriteLine($"[DEBUG] Selected opponent team ID: {selectedOpponentTeamId}");
+
+                if (interaction.Message is null)
                 {
-                    state.OpponentTeamId = selectedOpponentTeamId;
-                    return state;
+                    Console.WriteLine("[ERROR] Message not found in ProcessOpponentSelectionAsync");
+                    return Result.Failure("Message not found in ProcessOpponentSelectionAsync");
                 }
-            );
 
-            // Update button state with the interaction response
-            await UpdateChallengeButtonStateAsync(interaction);
+                Console.WriteLine($"[DEBUG] Message ID: {interaction.Message.Id}");
 
-            return Result.CreateSuccess("Opponent selected");
+                // Handle case where no selection was made (user deselected or didn't select)
+                if (string.IsNullOrEmpty(selectedOpponentTeamId))
+                {
+                    Console.WriteLine("[DEBUG] No opponent team selected - reverting to initial state");
+
+                    // Clear the opponent team selection in state
+                    _challengeStateManager.UpdateState(
+                        interaction.Message.Id,
+                        state =>
+                        {
+                            state.OpponentTeamId = null;
+                            return state;
+                        }
+                    );
+
+                    // Update button state to reflect no selection
+                    await UpdateChallengeButtonStateAsync(interaction);
+                    return Result.CreateSuccess("Opponent selection cleared");
+                }
+
+                // Validate that the selected ID is a valid GUID
+                if (!Guid.TryParse(selectedOpponentTeamId, out var selectedOpponentTeamGuid))
+                {
+                    Console.WriteLine($"[ERROR] Invalid opponent team ID format: {selectedOpponentTeamId}");
+                    return Result.Failure(
+                        $"Invalid opponent team ID format: {selectedOpponentTeamId}. Please try selecting a team again."
+                    );
+                }
+
+                Console.WriteLine($"[DEBUG] Parsed opponent team GUID: {selectedOpponentTeamGuid}");
+
+                _challengeStateManager.UpdateState(
+                    interaction.Message.Id,
+                    state =>
+                    {
+                        Console.WriteLine($"[DEBUG] Updating state - OpponentTeamId: {selectedOpponentTeamGuid}");
+                        state.OpponentTeamId = selectedOpponentTeamGuid;
+                        return state;
+                    }
+                );
+
+                Console.WriteLine("[DEBUG] About to call UpdateChallengeButtonStateAsync");
+
+                // Update button state with the interaction response
+                await UpdateChallengeButtonStateAsync(interaction);
+
+                Console.WriteLine("[DEBUG] ProcessOpponentSelectionAsync completed successfully");
+                return Result.CreateSuccess("Opponent selected");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[ERROR] ProcessOpponentSelectionAsync failed: {ex.Message}");
+                Console.WriteLine($"[ERROR] Stack trace: {ex.StackTrace}");
+
+                await DiscBotService.ErrorHandler.CaptureAsync(
+                    ex,
+                    $"Failed to process opponent selection: {customId}",
+                    nameof(ProcessOpponentSelectionAsync)
+                );
+
+                return Result.Failure($"Failed to process opponent selection: {ex.Message}");
+            }
         }
 
         private static async Task<Result> ProcessPlayerSelectionAsync(DiscordInteraction interaction, string customId)
@@ -986,6 +1135,11 @@ namespace WabbitBot.DiscBot.App
                 selectedPlayerIds.Insert(0, issuerPlayerId.Value);
             }
 
+            if (interaction.Message is null)
+            {
+                return Result.Failure("Message not found in ProcessOpponentSelectionAsync");
+            }
+
             // Track the selection
             _challengeStateManager.UpdateState(
                 interaction.Message.Id,
@@ -1007,6 +1161,11 @@ namespace WabbitBot.DiscBot.App
             // Get selected best of value
             var selections = interaction.Data.Values.ToArray();
             var bestOf = selections.Length > 0 && int.TryParse(selections[0], out var bo) ? bo : 1;
+
+            if (interaction.Message is null)
+            {
+                return Result.Failure("Message not found in ProcessBestOfSelectionAsync");
+            }
 
             // Track the selection
             _challengeStateManager.UpdateState(
@@ -1043,16 +1202,7 @@ namespace WabbitBot.DiscBot.App
                 .Where(id => id != Guid.Empty)
                 .ToList();
 
-            if (selectedTeammateIds.Count == 0)
-            {
-                await interaction.CreateResponseAsync(
-                    DiscordInteractionResponseType.ChannelMessageWithSource,
-                    new DiscordInteractionResponseBuilder().WithContent("No teammates selected.").AsEphemeral()
-                );
-                return Result.Failure("No teammates selected");
-            }
-
-            // Get the challenge
+            // Get the challenge to check team size requirements
             var challengeResult = await CoreService.ScrimmageChallenges.GetByIdAsync(
                 challengeId,
                 DatabaseComponent.Repository
@@ -1068,6 +1218,27 @@ namespace WabbitBot.DiscBot.App
             }
 
             var challenge = challengeResult.Data;
+            var requiredPlayers = challenge.TeamSize.GetPlayersPerTeam();
+
+            if (selectedTeammateIds.Count != requiredPlayers)
+            {
+                await interaction.CreateResponseAsync(
+                    DiscordInteractionResponseType.ChannelMessageWithSource,
+                    new DiscordInteractionResponseBuilder()
+                        .WithContent(
+                            $"Please select exactly {requiredPlayers} players for a {challenge.TeamSize} match."
+                        )
+                        .AsEphemeral()
+                );
+                return Result.Failure(
+                    $"Incorrect number of players selected. Required: {requiredPlayers}, Selected: {selectedTeammateIds.Count}"
+                );
+            }
+
+            if (interaction.Message is null)
+            {
+                return Result.Failure("Message not found in ProcessTeammateSelectionAsync");
+            }
 
             // Verify the user is a member of the opponent team
             var userPlayer = await CoreService.WithDbContext(async db =>
@@ -1095,7 +1266,7 @@ namespace WabbitBot.DiscBot.App
                     .SelectMany(t => t.Rosters)
                     .Where(r => r.RosterGroup == TeamCore.TeamSizeRosterGrouping.GetRosterGroup(challenge.TeamSize))
                     .SelectMany(r => r.RosterMembers)
-                    .Where(tm => tm.PlayerId == userPlayer && tm.IsActive)
+                    .Where(tm => tm.PlayerId == userPlayer && tm.ValidTo == null)
                     .AnyAsync();
             });
 
@@ -1110,12 +1281,8 @@ namespace WabbitBot.DiscBot.App
                 return Result.Failure("Unauthorized - not team member");
             }
 
-            // Add the captain to the selected players
-            var allOpponentPlayerIds = new List<Guid> { userPlayer };
-            allOpponentPlayerIds.AddRange(selectedTeammateIds);
-
-            // Update the challenge with selected opponent team players
-            challenge.OpponentTeamPlayerIds = allOpponentPlayerIds;
+            // Store opponent teammate IDs (complete list of selected players)
+            challenge.OpponentTeammateIds = selectedTeammateIds.ToList();
             challenge.AcceptedByPlayerId = userPlayer;
 
             var updateResult = await CoreService.ScrimmageChallenges.UpdateAsync(
@@ -1150,33 +1317,95 @@ namespace WabbitBot.DiscBot.App
         {
             try
             {
+                Console.WriteLine("[DEBUG] UpdateChallengeButtonStateAsync started");
+
+                if (interaction.Message is null)
+                {
+                    Console.WriteLine("[ERROR] Message not found in UpdateChallengeButtonStateAsync");
+                    throw new InvalidOperationException("Message not found in UpdateChallengeButtonStateAsync");
+                }
+
+                Console.WriteLine($"[DEBUG] Message ID: {interaction.Message.Id}");
+
                 // Get current state
+                Console.WriteLine("[DEBUG] Extracting configuration state...");
                 var configState = await ExtractConfigurationStateAsync(interaction.Message);
+
+                Console.WriteLine(
+                    $"[DEBUG] Config state success: {configState.Success}, Has data: {configState.Data is not null}"
+                );
+
                 if (!configState.Success || configState.Data is null)
                 {
+                    Console.WriteLine($"[ERROR] Failed to extract config state: {configState.ErrorMessage}");
                     return;
                 }
 
+                Console.WriteLine(
+                    $"[DEBUG] Config state - DiscordUserId: {configState.Data.DiscordUserId},"
+                        + $" TeamSize: {configState.Data.TeamSize}"
+                );
+                Console.WriteLine($"[DEBUG] Config state - ChallengerTeam ID: {configState.Data.ChallengerTeam?.Id}");
+
                 // Get tracked selections
+                Console.WriteLine("[DEBUG] Getting tracked selections...");
                 var selections = _challengeStateManager.GetState(interaction.Message.Id);
+
                 if (selections is null)
                 {
+                    Console.WriteLine("[ERROR] No selections found in state manager");
+                    return;
+                }
+
+                Console.WriteLine($"[DEBUG] Selections - OpponentTeamId: {selections.OpponentTeamId}");
+                Console.WriteLine($"[DEBUG] Selections - PlayerIds count: {selections.PlayerIds?.Count ?? 0}");
+                Console.WriteLine($"[DEBUG] Selections - BestOf: {selections.BestOf}");
+
+                if (configState.Data.ChallengerRoster is null)
+                {
+                    Console.WriteLine("[ERROR] Challenger roster not found in UpdateChallengeButtonStateAsync");
+                    throw new InvalidOperationException(
+                        "Challenger roster not found in UpdateChallengeButtonStateAsync"
+                    );
+                }
+
+                Console.WriteLine(
+                    $"[DEBUG] ChallengerRoster count: {configState.Data.ChallengerRoster.RosterMembers.Count}"
+                );
+
+                Console.WriteLine("[DEBUG] About to render challenge configuration...");
+                Console.WriteLine(
+                    $"[DEBUG] Rendering with - OpponentTeamId: {selections.OpponentTeamId}, PlayerIds:"
+                        + $"{selections.PlayerIds?.Count ?? 0}, BestOf: {selections.BestOf ?? 1}"
+                );
+
+                if (configState.Data.ChallengerTeam is null)
+                {
+                    Console.WriteLine("[ERROR] Challenger team not found in UpdateChallengeButtonStateAsync");
                     return;
                 }
 
                 // Re-render the entire container with selections preserved
-                var containerResult = await Renderers.ScrimmageRenderer.RenderChallengeConfigurationAsync(
-                    configState.Data.UserId,
+                // OpponentTeamId, PlayerIds, and BestOf can all be null
+                var containerResult = await ScrimmageRenderer.RenderChallengeConfigurationAsync(
+                    configState.Data.DiscordUserId,
                     configState.Data.TeamSize,
                     configState.Data.ChallengerTeam,
                     configState.Data.ChallengerRoster,
                     selections.OpponentTeamId,
                     selections.PlayerIds,
-                    selections.BestOf
+                    selections.BestOf ?? 1
+                );
+
+                Console.WriteLine(
+                    $"[DEBUG] Container render result - Success: {containerResult.Success},"
+                        + $" Has data: {containerResult.Data is not null}"
                 );
 
                 if (containerResult.Success && containerResult.Data is not null)
                 {
+                    Console.WriteLine("[DEBUG] Creating interaction response to update message...");
+
                     // Use the interaction response to update the message (preserves selections)
                     await interaction.CreateResponseAsync(
                         DiscordInteractionResponseType.UpdateMessage,
@@ -1184,11 +1413,45 @@ namespace WabbitBot.DiscBot.App
                             .EnableV2Components()
                             .AddContainerComponent(containerResult.Data)
                     );
+
+                    Console.WriteLine("[DEBUG] Interaction response created successfully");
                 }
+                else
+                {
+                    Console.WriteLine($"[ERROR] Container render failed: {containerResult.ErrorMessage}");
+                }
+
+                Console.WriteLine("[DEBUG] UpdateChallengeButtonStateAsync completed");
             }
-            catch
+            catch (Exception ex)
             {
-                // Silently fail - button state update is not critical
+                Console.WriteLine($"[ERROR] UpdateChallengeButtonStateAsync failed: {ex.Message}");
+                Console.WriteLine($"[ERROR] Stack trace: {ex.StackTrace}");
+
+                await DiscBotService.ErrorHandler.CaptureAsync(
+                    ex,
+                    "Failed to update challenge button state",
+                    nameof(UpdateChallengeButtonStateAsync)
+                );
+
+                // Try to send an error response if we haven't responded yet
+                try
+                {
+                    if (interaction.ResponseState == DiscordInteractionResponseState.Unacknowledged)
+                    {
+                        Console.WriteLine("[DEBUG] Attempting to send error response to user...");
+                        await interaction.CreateResponseAsync(
+                            DiscordInteractionResponseType.ChannelMessageWithSource,
+                            new DiscordInteractionResponseBuilder()
+                                .WithContent($"Failed to update challenge configuration: {ex.Message}")
+                                .AsEphemeral()
+                        );
+                    }
+                }
+                catch (Exception responseEx)
+                {
+                    Console.WriteLine($"[ERROR] Failed to send error response: {responseEx.Message}");
+                }
             }
         }
 
@@ -1228,6 +1491,11 @@ namespace WabbitBot.DiscBot.App
 
                 await interaction.CreateResponseAsync(DiscordInteractionResponseType.DeferredMessageUpdate);
 
+                if (interaction.Message is null)
+                {
+                    throw new InvalidOperationException("Message not found in ProcessIssueChallengeButtonAsync");
+                }
+
                 // Get tracked selections
                 var selections = _challengeStateManager.GetState(interaction.Message.Id);
                 if (selections is null)
@@ -1250,7 +1518,7 @@ namespace WabbitBot.DiscBot.App
                 var state = configState.Data;
 
                 // Validate we have all required selections
-                if (string.IsNullOrEmpty(selections.OpponentTeamId))
+                if (selections.OpponentTeamId is null)
                 {
                     await interaction.CreateFollowupMessageAsync(
                         new DiscordFollowupMessageBuilder()
@@ -1280,8 +1548,16 @@ namespace WabbitBot.DiscBot.App
                     challengerTeamId,
                     DatabaseComponent.Repository
                 );
+
+                if (state.SelectedOpponentTeamId is null)
+                {
+                    throw new InvalidOperationException(
+                        "Opponent team not selected in ProcessIssueChallengeButtonAsync"
+                    );
+                }
+
                 var opponentTeamResult = await CoreService.Teams.GetByIdAsync(
-                    Guid.Parse(state.SelectedOpponentTeamId),
+                    state.SelectedOpponentTeamId.Value,
                     DatabaseComponent.Repository
                 );
 
@@ -1358,6 +1634,21 @@ namespace WabbitBot.DiscBot.App
                 // Clean up tracked selections
                 _challengeStateManager.RemoveState(interaction.Message.Id);
 
+                // Delete the temporary thread if this message is in one
+                try
+                {
+                    if (interaction.Channel is DiscordThreadChannel threadChannel)
+                    {
+                        Console.WriteLine($"🔍 DEBUG: Deleting temporary thread: {threadChannel.Name}");
+                        await threadChannel.DeleteAsync();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"⚠️  Warning: Could not delete temporary thread: {ex.Message}");
+                    // Continue anyway - thread deletion is not critical
+                }
+
                 return Result.CreateSuccess("Challenge issued successfully");
             }
             catch (Exception ex)
@@ -1381,6 +1672,11 @@ namespace WabbitBot.DiscBot.App
                 new DiscordInteractionResponseBuilder().WithContent("Challenge configuration cancelled.").AsEphemeral()
             );
 
+            if (interaction.Message is null)
+            {
+                return Result.Failure("Message not found in ProcessCancelConfigurationButtonAsync");
+            }
+
             // Delete the configuration message
             try
             {
@@ -1394,6 +1690,21 @@ namespace WabbitBot.DiscBot.App
             // Clean up tracked selections
             _challengeStateManager.RemoveState(interaction.Message.Id);
 
+            // Delete the thread if this message is in one
+            try
+            {
+                if (interaction.Channel is DiscordThreadChannel threadChannel)
+                {
+                    Console.WriteLine($"[DEBUG] Deleting cancelled challenge setup thread: {threadChannel.Name}");
+                    await threadChannel.DeleteAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[WARN] Failed to delete cancelled challenge thread: {ex.Message}");
+                // Continue anyway - thread deletion is not critical
+            }
+
             return Result.CreateSuccess("Configuration cancelled");
         }
 
@@ -1406,84 +1717,191 @@ namespace WabbitBot.DiscBot.App
         {
             try
             {
+                Console.WriteLine("[DEBUG] ExtractConfigurationStateAsync started");
+                Console.WriteLine($"[DEBUG] Message has components: {message.Components is not null}");
+
                 var container = message.Components?.OfType<DiscordContainerComponent>().FirstOrDefault();
                 if (container is null)
                 {
+                    Console.WriteLine("[ERROR] No container found in message");
                     return Result<ChallengeConfigurationState>.Failure("No container found in message");
                 }
 
-                var state = new ChallengeConfigurationState();
+                Console.WriteLine($"[DEBUG] Container has {container.Components.Count} components");
 
-                // Parse the components to extract state
+                ChallengeConfigurationState? state = null;
+                Guid? challengerTeamId = null;
+                ulong? discordUserId = null;
+
                 foreach (var component in container.Components)
                 {
+                    Console.WriteLine($"[DEBUG] Component type: {component.GetType().Name}");
+
                     if (component is DiscordActionRowComponent actionRow)
                     {
+                        Console.WriteLine($"[DEBUG] ActionRow has {actionRow.Components.Count} child components");
+
                         foreach (var child in actionRow.Components)
                         {
+                            Console.WriteLine($"[DEBUG] Child component type: {child.GetType().Name}");
+
                             // Extract opponent team selection (just get the challenger team ID from custom ID)
-                            if (
-                                child is DiscordSelectComponent select
-                                && select.CustomId.Contains("challenge_opponent_")
-                            )
+                            if (child is DiscordSelectComponent select)
                             {
-                                var teamIdStr = select.CustomId.Replace("challenge_opponent_", "");
-                                if (Guid.TryParse(teamIdStr, out var teamId))
+                                Console.WriteLine($"[DEBUG] SelectComponent CustomId: {select.CustomId}");
+
+                                if (select.CustomId.Contains("challenge_opponent_", StringComparison.Ordinal))
                                 {
-                                    state.ChallengerTeamId = teamId;
+                                    var teamIdStr = select.CustomId.Replace(
+                                        "challenge_opponent_",
+                                        "",
+                                        StringComparison.Ordinal
+                                    );
+                                    Console.WriteLine($"[DEBUG] Extracted team ID string: {teamIdStr}");
+
+                                    if (Guid.TryParse(teamIdStr, out var teamId))
+                                    {
+                                        challengerTeamId = teamId;
+                                        Console.WriteLine($"[DEBUG] Parsed challenger team ID: {challengerTeamId}");
+                                    }
                                 }
                             }
 
                             // Extract user ID from issue button
-                            if (child is DiscordButtonComponent button && button.CustomId.Contains("challenge_issue_"))
+                            if (child is DiscordButtonComponent button)
                             {
-                                var parts = button.CustomId.Replace("challenge_issue_", "").Split('_');
-                                if (parts.Length >= 2 && ulong.TryParse(parts[1], out var userId))
+                                Console.WriteLine($"[DEBUG] ButtonComponent CustomId: {button.CustomId}");
+
+                                if (button.CustomId.Contains("challenge_issue_", StringComparison.Ordinal))
                                 {
-                                    state.UserId = userId;
+                                    var parts = button
+                                        .CustomId.Replace("challenge_issue_", "", StringComparison.Ordinal)
+                                        .Split('_');
+                                    Console.WriteLine($"[DEBUG] Button ID parts count: {parts.Length}");
+
+                                    if (parts.Length >= 2)
+                                    {
+                                        Console.WriteLine(
+                                            $"[DEBUG] Team ID part: {parts[0]}, User ID part: {parts[1]}"
+                                        );
+
+                                        if (ulong.TryParse(parts[1], out var userId))
+                                        {
+                                            discordUserId = userId;
+                                            Console.WriteLine($"[DEBUG] Parsed Discord user ID: {discordUserId}");
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
                 }
 
-                // Load the team and roster data with eager loading
-                if (state.ChallengerTeamId != Guid.Empty)
-                {
-                    state.ChallengerTeam = await CoreService.WithDbContext(async db =>
-                    {
-                        return await db
-                            .Teams.Include(t => t.Rosters)
-                            .ThenInclude(r => r.RosterMembers)
-                            .ThenInclude(m => m.MashinaUser)
-                            .FirstOrDefaultAsync(t => t.Id == state.ChallengerTeamId);
-                    });
+                Console.WriteLine(
+                    $"[DEBUG] Final extraction - ChallengerTeamId: {challengerTeamId}, DiscordUserId: {discordUserId}"
+                );
 
-                    if (state.ChallengerTeam is not null)
+                if (challengerTeamId is not null && discordUserId is not null)
+                {
+                    Console.WriteLine("[DEBUG] Creating ChallengeConfigurationState");
+                    state = new ChallengeConfigurationState
                     {
-                        // Infer team size from roster with active members
-                        var rosterWithMembers = state.ChallengerTeam.Rosters.FirstOrDefault(r =>
-                            r.RosterMembers.Any(m => m.IsActive)
-                        );
-                        if (rosterWithMembers is not null)
-                        {
-                            // Infer team size from roster group
-                            state.TeamSize = rosterWithMembers.RosterGroup switch
-                            {
-                                TeamSizeRosterGroup.Solo => TeamSize.OneVOne,
-                                TeamSizeRosterGroup.Duo => TeamSize.TwoVTwo,
-                                TeamSizeRosterGroup.Squad => TeamSize.ThreeVThree,
-                                _ => TeamSize.TwoVTwo,
-                            };
-                            state.ChallengerRoster = rosterWithMembers;
-                        }
-                    }
+                        ChallengerTeamId = challengerTeamId.Value,
+                        DiscordUserId = discordUserId.Value,
+                    };
+                }
+                else
+                {
+                    Console.WriteLine(
+                        $"[ERROR] Invalid challenger team or user ID - TeamId null: {challengerTeamId is null},"
+                            + $" UserId null: {discordUserId is null}"
+                    );
+                    return Result<ChallengeConfigurationState>.Failure("Invalid challenger team or user ID");
                 }
 
+                // Load the team and roster data with eager loading
+                if (state is not null)
+                {
+                    Console.WriteLine(
+                        $"[DEBUG] Loading team from database - ChallengerTeamId: {state.ChallengerTeamId}"
+                    );
+
+                    var teamResult = await CoreService.TryWithDbContext(
+                        async db =>
+                        {
+                            var team = await db
+                                .Teams.Include(t => t.Rosters)
+                                .ThenInclude(r => r.RosterMembers)
+                                .ThenInclude(m => m.MashinaUser)
+                                .FirstOrDefaultAsync(t => t.Id == state.ChallengerTeamId);
+
+                            if (team is null)
+                            {
+                                throw new InvalidOperationException($"Team not found: {state.ChallengerTeamId}");
+                            }
+
+                            return team;
+                        },
+                        "Load challenger team for challenge configuration"
+                    );
+
+                    if (!teamResult.Success || teamResult.Data is null)
+                    {
+                        Console.WriteLine($"[ERROR] Failed to load challenger team: {teamResult.ErrorMessage}");
+                        return Result<ChallengeConfigurationState>.Failure(
+                            $"Failed to load challenger team: {teamResult.ErrorMessage}"
+                        );
+                    }
+
+                    state.ChallengerTeam = teamResult.Data;
+                    Console.WriteLine(
+                        $"[DEBUG] Team loaded - Name: {state.ChallengerTeam.Name},"
+                            + $" Rosters count: {state.ChallengerTeam.Rosters.Count}"
+                    );
+
+                    // Infer team size from roster with active members
+                    var rosterWithMembers = state.ChallengerTeam.Rosters.FirstOrDefault(r =>
+                        r.RosterMembers.Any(m => m.ValidTo == null)
+                    );
+
+                    if (rosterWithMembers is not null)
+                    {
+                        Console.WriteLine(
+                            $"[DEBUG] Found roster with active members - Group: {rosterWithMembers.RosterGroup}"
+                        );
+
+                        // Infer team size from roster group
+                        state.TeamSize = rosterWithMembers.RosterGroup switch
+                        {
+                            TeamSizeRosterGroup.Solo => TeamSize.OneVOne,
+                            TeamSizeRosterGroup.Duo => TeamSize.TwoVTwo,
+                            TeamSizeRosterGroup.Squad => TeamSize.ThreeVThree,
+                            _ => TeamSize.TwoVTwo,
+                        };
+                        state.ChallengerRoster = rosterWithMembers;
+
+                        Console.WriteLine($"[DEBUG] Team size set to: {state.TeamSize}");
+                    }
+                    else
+                    {
+                        Console.WriteLine("[ERROR] No roster with active members found");
+                        return Result<ChallengeConfigurationState>.Failure("No roster with active members found");
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("[ERROR] Failed to extract configuration state - state is null");
+                    return Result<ChallengeConfigurationState>.Failure("Failed to extract configuration state");
+                }
+
+                Console.WriteLine("[DEBUG] State extracted successfully");
                 return Result<ChallengeConfigurationState>.CreateSuccess(state, "State extracted");
             }
             catch (Exception ex)
             {
+                Console.WriteLine($"[ERROR] ExtractConfigurationStateAsync exception: {ex.Message}");
+                Console.WriteLine($"[ERROR] Stack trace: {ex.StackTrace}");
+
                 await DiscBotService.ErrorHandler.CaptureAsync(
                     ex,
                     "Failed to extract configuration state",
@@ -1508,12 +1926,12 @@ namespace WabbitBot.DiscBot.App
 
     internal class ChallengeConfigurationState
     {
-        public Guid ChallengerTeamId { get; set; }
-        public ulong UserId { get; set; }
+        public required Guid ChallengerTeamId { get; set; }
+        public virtual Team ChallengerTeam { get; set; } = null!;
+        public required ulong DiscordUserId { get; set; }
         public TeamSize TeamSize { get; set; }
-        public Team ChallengerTeam { get; set; } = null!;
-        public TeamRoster ChallengerRoster { get; set; } = null!;
-        public string? SelectedOpponentTeamId { get; set; }
+        public TeamRoster? ChallengerRoster { get; set; }
+        public Guid? SelectedOpponentTeamId { get; set; }
         public List<Guid>? SelectedPlayerIds { get; set; }
         public int? BestOf { get; set; }
     }
@@ -1523,7 +1941,7 @@ namespace WabbitBot.DiscBot.App
     /// </summary>
     internal class ChallengeConfigurationSelections
     {
-        public string? OpponentTeamId { get; set; }
+        public Guid? OpponentTeamId { get; set; }
         public List<Guid>? PlayerIds { get; set; }
         public int? BestOf { get; set; }
     }

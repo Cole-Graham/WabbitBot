@@ -31,13 +31,18 @@ namespace WabbitBot.Core.Common.Models.Common
         public List<Guid> TeamIds { get; set; } = [];
 
         /// <summary>
-        /// Key: Platform name (e.g., "EugenSystems", "Discord", "Steam", "EpicGames"), Value: List of user IDs from that platform.
+        /// Current platform IDs. Key: Platform name (e.g., "Steam", "EpicGames"), Value: Current user ID for that platform.
+        /// </summary>
+        public Dictionary<string, string> CurrentPlatformIds { get; set; } = [];
+
+        /// <summary>
+        /// Historical platform IDs. Key: Platform name (e.g., "Steam", "EpicGames"), Value: List of previous user IDs from that platform.
         /// </summary>
         public Dictionary<string, List<string>> PreviousPlatformIds { get; set; } = [];
 
-        // Game usernames parsed from submitted replay data
-        public string? GameUsername { get; set; }
-        public List<string> PreviousGameUsernames { get; set; } = [];
+        // Steam usernames parsed from submitted replay data
+        public string? CurrentSteamUsername { get; set; }
+        public List<string> PreviousSteamUsernames { get; set; } = [];
 
         public override Domain Domain => Domain.Common;
     }

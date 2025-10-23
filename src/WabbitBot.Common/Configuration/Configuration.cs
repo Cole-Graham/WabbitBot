@@ -66,33 +66,116 @@ namespace WabbitBot.Common.Configuration
             if (_botOptions.Scrimmage.KFactor <= 0)
                 throw new InvalidOperationException("K-factor must be positive");
 
-            // Validate roster size ranges
-            if (
-                _botOptions.Scrimmage.RosterSizeRanges.Solo.Min <= 0
-                || _botOptions.Scrimmage.RosterSizeRanges.Solo.Max <= 0
-            )
-                throw new InvalidOperationException("Solo roster size range must be positive");
+            // Validate TeamRules configuration
+            var teamRules = _botOptions.Scrimmage.TeamRules;
+            if (teamRules is null)
+            {
+                throw new InvalidOperationException("TeamRules configuration is required");
+            }
 
-            if (
-                _botOptions.Scrimmage.RosterSizeRanges.Duo.Min <= 0
-                || _botOptions.Scrimmage.RosterSizeRanges.Duo.Max <= 0
-            )
-                throw new InvalidOperationException("Duo roster size range must be positive");
+            if (teamRules.BaseRules is null || teamRules.BaseRules.MatchCaptainsRequiredCount <= 0)
+            {
+                throw new InvalidOperationException("BaseRules.MatchCaptainsRequiredCount must be positive");
+            }
 
-            if (
-                _botOptions.Scrimmage.RosterSizeRanges.Squad.Min <= 0
-                || _botOptions.Scrimmage.RosterSizeRanges.Squad.Max <= 0
-            )
-                throw new InvalidOperationException("Squad roster size range must be positive");
+            void ValidateRosterRules(string name, TeamRosterRules rules)
+            {
+                if (rules is null)
+                {
+                    throw new InvalidOperationException($"TeamRules.{name} is required");
+                }
 
-            if (_botOptions.Scrimmage.RosterSizeRanges.Solo.Min > _botOptions.Scrimmage.RosterSizeRanges.Solo.Max)
-                throw new InvalidOperationException("Solo roster minimum cannot exceed maximum");
+                if (rules.CaptainRosterSlots < 0 || rules.CoreRosterSlots < 0 || rules.MaxRosterSlots <= 0)
+                {
+                    throw new InvalidOperationException(
+                        $"TeamRules.{name} slots must be non-negative and MaxRosterSlots positive"
+                    );
+                }
 
-            if (_botOptions.Scrimmage.RosterSizeRanges.Duo.Min > _botOptions.Scrimmage.RosterSizeRanges.Duo.Max)
-                throw new InvalidOperationException("Duo roster minimum cannot exceed maximum");
+                if (rules.MaxRosterSlots < rules.CaptainRosterSlots + rules.CoreRosterSlots)
+                {
+                    throw new InvalidOperationException(
+                        $"TeamRules.{name}.MaxRosterSlots must be >= CaptainRosterSlots + CoreRosterSlots"
+                    );
+                }
+            }
 
-            if (_botOptions.Scrimmage.RosterSizeRanges.Squad.Min > _botOptions.Scrimmage.RosterSizeRanges.Squad.Max)
-                throw new InvalidOperationException("Squad roster minimum cannot exceed maximum");
+            ValidateRosterRules("Solo", teamRules.Solo);
+            ValidateRosterRules("Duo", teamRules.Duo);
+            ValidateRosterRules("Squad", teamRules.Squad);
+
+            int EffectiveCaptains(TeamMatchRules match) =>
+                match.MatchCaptainsRequiredCount > 0
+                    ? match.MatchCaptainsRequiredCount!.Value
+                    : teamRules.BaseRules.MatchCaptainsRequiredCount;
+
+            void ValidateMatchRules(string sizeName, TeamMatchRules? match)
+            {
+                if (match is null)
+                {
+                    throw new InvalidOperationException($"TeamRules match rules for {sizeName} are required");
+                }
+
+                if (match.MatchCorePlayersRequiredCount < 0 || match.MatchCorePlayersEqualToCaptainCount < 0)
+                {
+                    throw new InvalidOperationException($"{sizeName} match rule counts must be non-negative");
+                }
+
+                var effCap = EffectiveCaptains(match);
+                if (effCap <= 0 && match.MatchCorePlayersEqualToCaptainCount <= 0)
+                {
+                    throw new InvalidOperationException(
+                        $"{sizeName} must allow at least one valid lineup path (captain or core equivalence)"
+                    );
+                }
+            }
+
+            // Required per-group match rules
+            ValidateMatchRules("1v1", teamRules.Solo.OneVOne);
+            ValidateMatchRules("2v2", teamRules.Duo.TwoVTwo);
+            ValidateMatchRules("3v3", teamRules.Squad.ThreeVThree);
+            // Optional: 4v4 if configured
+            if (teamRules.Squad.FourVFour is not null)
+            {
+                ValidateMatchRules("4v4", teamRules.Squad.FourVFour);
+            }
+
+            // Validate TeamConfig configuration
+            var teamConfig = _botOptions.Scrimmage.TeamConfig;
+            if (teamConfig is null)
+            {
+                throw new InvalidOperationException("TeamConfig configuration is required");
+            }
+
+            if (teamConfig.BaseConfig is null)
+            {
+                throw new InvalidOperationException("TeamConfig.BaseConfig is required");
+            }
+
+            if (teamConfig.BaseConfig.RejoinTeamCooldownDays < 0)
+                throw new InvalidOperationException("RejoinTeamCooldownDays must be non-negative");
+            if (teamConfig.BaseConfig.ChangeCaptainCooldownDays < 0)
+                throw new InvalidOperationException("ChangeCaptainCooldownDays must be non-negative");
+            if (teamConfig.BaseConfig.ChangeCoreCooldownDays < 0)
+                throw new InvalidOperationException("ChangeCoreCooldownDays must be non-negative");
+
+            void ValidateGroupConfig(string name, TeamGroupConfig cfg)
+            {
+                if (cfg is null)
+                    throw new InvalidOperationException($"TeamConfig.{name} is required");
+                if (cfg.UserTeamMembershipLimitCount < 0)
+                    throw new InvalidOperationException(
+                        $"TeamConfig.{name}.UserTeamMembershipLimitCount must be non-negative"
+                    );
+                if (cfg.ChangeCoreCooldownDays.HasValue && cfg.ChangeCoreCooldownDays.Value < 0)
+                    throw new InvalidOperationException(
+                        $"TeamConfig.{name}.ChangeCoreCooldownDays must be non-negative if set"
+                    );
+            }
+
+            ValidateGroupConfig("Solo", teamConfig.Solo);
+            ValidateGroupConfig("Duo", teamConfig.Duo);
+            ValidateGroupConfig("Squad", teamConfig.Squad);
 
             if (_botOptions.Scrimmage.MaxConcurrentScrimmages <= 0)
                 throw new InvalidOperationException("Max concurrent scrimmages must be positive");
@@ -223,6 +306,7 @@ namespace WabbitBot.Common.Configuration
         public ulong? SignupChannel { get; set; } = null;
         public ulong? StandingsChannel { get; set; } = null;
         public ulong? ScrimmageChannel { get; set; } = null;
+        public ulong? ChallengeFeedChannel { get; set; } = null;
     }
 
     public class RolesOptions
@@ -243,7 +327,8 @@ namespace WabbitBot.Common.Configuration
     public class ScrimmageOptions
     {
         public const string SectionName = "Bot:Scrimmage";
-        public RosterSizeRanges RosterSizeRanges { get; set; } = new();
+        public TeamRules TeamRules { get; set; } = new();
+        public TeamConfigOptions TeamConfig { get; set; } = new();
         public int TeamJoinLimit { get; set; } = 5; // Number of teams a player can join
         public int RejoinTeamAfterDays { get; set; } = 7; // Timeout for re-joining a team
         public int MaxConcurrentScrimmages { get; set; } = 10;
@@ -401,14 +486,102 @@ namespace WabbitBot.Common.Configuration
         public bool IsInTournamentPool { get; set; } = true;
     }
 
-    public class RosterSizeRanges
+    public class TeamRules
     {
-        public RosterSizeRange Solo { get; set; } = new(1, 1);
-        public RosterSizeRange Duo { get; set; } = new(4, 5);
-        public RosterSizeRange Squad { get; set; } = new(8, 10);
+        public TeamBaseRules BaseRules { get; set; } = new();
+        public TeamRosterRules Solo { get; set; } =
+            new()
+            {
+                CaptainRosterSlots = 1,
+                CoreRosterSlots = 0,
+                MaxRosterSlots = 1,
+                OneVOne = new TeamMatchRules
+                {
+                    MatchCaptainsRequiredCount = null,
+                    MatchCorePlayersRequiredCount = 0,
+                    MatchCorePlayersEqualToCaptainCount = 1,
+                },
+            };
+        public TeamRosterRules Duo { get; set; } =
+            new()
+            {
+                CaptainRosterSlots = 1,
+                CoreRosterSlots = 2,
+                MaxRosterSlots = 4,
+                TwoVTwo = new TeamMatchRules
+                {
+                    MatchCaptainsRequiredCount = null,
+                    MatchCorePlayersRequiredCount = 0,
+                    MatchCorePlayersEqualToCaptainCount = 2,
+                },
+            };
+        public TeamRosterRules Squad { get; set; } =
+            new()
+            {
+                CaptainRosterSlots = 2,
+                CoreRosterSlots = 4,
+                MaxRosterSlots = 10,
+                ThreeVThree = new TeamMatchRules
+                {
+                    MatchCaptainsRequiredCount = 1,
+                    MatchCorePlayersRequiredCount = 1,
+                    MatchCorePlayersEqualToCaptainCount = 3,
+                },
+                FourVFour = new TeamMatchRules
+                {
+                    MatchCaptainsRequiredCount = 1,
+                    MatchCorePlayersRequiredCount = 1,
+                    MatchCorePlayersEqualToCaptainCount = 4,
+                },
+            };
     }
 
-    public record RosterSizeRange(int Min, int Max);
+    public class TeamBaseRules
+    {
+        public int MatchCaptainsRequiredCount { get; set; } = 1;
+    }
+
+    public class TeamRosterRules
+    {
+        public int CaptainRosterSlots { get; set; }
+        public int CoreRosterSlots { get; set; }
+        public int MaxRosterSlots { get; set; }
+
+        public TeamMatchRules? OneVOne { get; set; }
+        public TeamMatchRules? TwoVTwo { get; set; }
+        public TeamMatchRules? ThreeVThree { get; set; }
+        public TeamMatchRules? FourVFour { get; set; }
+    }
+
+    public class TeamMatchRules
+    {
+        // Nullable to allow per-size override of captains required; falls back to BaseRules when null or <= 0
+        public int? MatchCaptainsRequiredCount { get; set; }
+        public int MatchCorePlayersRequiredCount { get; set; }
+        public int MatchCorePlayersEqualToCaptainCount { get; set; }
+    }
+
+    // Scrimmage Team configuration (membership and cooldowns)
+    public class TeamConfigOptions
+    {
+        public TeamBaseConfig BaseConfig { get; set; } = new();
+        public TeamGroupConfig Solo { get; set; } = new() { UserTeamMembershipLimitCount = 1 };
+        public TeamGroupConfig Duo { get; set; } = new() { UserTeamMembershipLimitCount = 4 };
+        public TeamGroupConfig Squad { get; set; } = new() { UserTeamMembershipLimitCount = 6 };
+    }
+
+    public class TeamBaseConfig
+    {
+        public int RejoinTeamCooldownDays { get; set; } = 7;
+        public int ChangeCaptainCooldownDays { get; set; } = 14;
+        public int ChangeCoreCooldownDays { get; set; } = 14;
+    }
+
+    public class TeamGroupConfig
+    {
+        public int UserTeamMembershipLimitCount { get; set; }
+        public int? ChangeCoreCooldownDays { get; set; }
+    }
 
     public class DivisionConfiguration
     {

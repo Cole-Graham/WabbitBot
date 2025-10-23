@@ -11,7 +11,6 @@ namespace WabbitBot.DiscBot.App.Utilities;
 public static class EmbedStyling
 {
     #region Universal Styling Utilities
-
     /// <summary>
     /// Gets the default embed color for general use
     /// </summary>

@@ -258,7 +258,7 @@ namespace WabbitBot.Core.Scrimmages
 
                 // Calculate gap scaling
                 bool winnerIsHigher = winnerRating > loserRating;
-                double gapScaling = 1.0;
+                double gapScaling;
                 Guid higherRatedTeamId = winnerIsHigher ? winnerTeamId : loserTeamId;
 
                 if (winnerIsHigher)

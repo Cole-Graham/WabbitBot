@@ -45,9 +45,9 @@ namespace WabbitBot.SourceGenerators.Generators.Database
                     predicate: static (node, _) =>
                         node
                             is Microsoft.CodeAnalysis.CSharp.Syntax.ClassDeclarationSyntax
-                        {
-                            AttributeLists.Count: > 0
-                        },
+                            {
+                                AttributeLists.Count: > 0
+                            },
                     transform: static (ctx, _) =>
                     {
                         var classDecl = (Microsoft.CodeAnalysis.CSharp.Syntax.ClassDeclarationSyntax)ctx.Node;
@@ -123,6 +123,26 @@ namespace WabbitBot.SourceGenerators.Generators.Database
                     if (!tuple.Right)
                         return;
                     spc.AddSource("EntityConfigFactory.Generated.g.cs", tuple.Left);
+                }
+            );
+
+            // Generate repository adapter registrations
+            var repositoryAdapterSource = entityInfos.Select(
+                (entities, ct) =>
+                {
+                    ct.ThrowIfCancellationRequested();
+                    var nonNull = entities.OfType<WabbitBot.Generator.Shared.Metadata.EntityMetadataInfo>();
+                    return GenerateRepositoryAdapterRegistrations(nonNull);
+                }
+            );
+
+            context.RegisterSourceOutput(
+                repositoryAdapterSource.Combine(isCoreProject),
+                (spc, tuple) =>
+                {
+                    if (!tuple.Right)
+                        return;
+                    spc.AddSource("CoreService.RepositoryAdapterRegistrations.g.cs", tuple.Left);
                 }
             );
         }
@@ -266,6 +286,44 @@ namespace WabbitBot.SourceGenerators.Generators.Database
 
             sb.AppendLine("    }");
             sb.AppendLine("}");
+            return SourceText.From(sb.ToString(), Encoding.UTF8);
+        }
+
+        private SourceText GenerateRepositoryAdapterRegistrations(
+            IEnumerable<WabbitBot.Generator.Shared.Metadata.EntityMetadataInfo> entityMetadata
+        )
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine(
+                CreateFileHeader("EntityMetadataGenerator", "Auto-generated repository adapter registrations")
+            );
+            sb.AppendLine("using System;");
+            sb.AppendLine("using WabbitBot.Common.Data;");
+            sb.AppendLine("using WabbitBot.Core.Common.Database;");
+            sb.AppendLine("using WabbitBot.Core.Common.Models.Common;");
+            sb.AppendLine("using WabbitBot.Core.Common.Models.Scrimmage;");
+            sb.AppendLine("using WabbitBot.Core.Common.Models.Tournament;");
+            sb.AppendLine("using WabbitBot.Core.Common.Models.Leaderboard;");
+            sb.AppendLine();
+            sb.AppendLine("namespace WabbitBot.Core.Common.Services");
+            sb.AppendLine("{");
+            sb.AppendLine("    public static partial class CoreService");
+            sb.AppendLine("    {");
+            sb.AppendLine("        static partial void RegisterRepositoryAdapters_Generated()");
+            sb.AppendLine("        {");
+
+            foreach (var metadata in entityMetadata)
+            {
+                var entityTypeName = metadata.EntityType.ToDisplayString();
+                sb.AppendLine(
+                    $"            RepositoryAdapterRegistry.RegisterAdapter(new EfRepositoryAdapter<{entityTypeName}>());"
+                );
+            }
+
+            sb.AppendLine("        }");
+            sb.AppendLine("    }");
+            sb.AppendLine("}");
+
             return SourceText.From(sb.ToString(), Encoding.UTF8);
         }
 

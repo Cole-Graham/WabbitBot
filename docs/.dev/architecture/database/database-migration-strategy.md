@@ -260,36 +260,27 @@ pg_dump wabbitbot > backup_$(date +%Y%m%d_%H%M%S).sql
 
 ## Application Startup Migration Strategy
 
-### Automatic Migration on Startup (Recommended)
+### WabbitBot startup policy (no runtime DI)
+- Development: apply migrations on startup when `Bot:Database:RunMigrationsOnStartup=true`.
+- Production: disabled by default; migrate via deployment step or one-time flag.
+
 ```csharp
-public class Program
+// Pseudocode matching WabbitBot.Host
+var useEnsureCreated = config["Bot:Database:UseEnsureCreated"] == "true";
+var runMigrations = config["Bot:Database:RunMigrationsOnStartup"] == "true";
+
+await using var db = WabbitBotDbContextProvider.CreateDbContext();
+if (runMigrations)
 {
-    public static void Main(string[] args)
-    {
-        var host = CreateHostBuilder(args).Build();
-
-        // Apply migrations automatically on startup
-        using (var scope = host.Services.CreateScope())
-        {
-            var dbContext = scope.ServiceProvider.GetRequiredService<WabbitBotDbContext>();
-
-            try
-            {
-                // Apply any pending migrations
-                dbContext.Database.Migrate();
-
-                _logger.LogInformation("Database migrations applied successfully");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to apply database migrations");
-                throw;
-            }
-        }
-
-        host.Run();
-    }
+    await db.Database.MigrateAsync();
 }
+else if (useEnsureCreated)
+{
+    await db.Database.EnsureCreatedAsync();
+}
+
+var tracker = new SchemaVersionTracker(db);
+await tracker.ValidateCompatibilityAsync();
 ```
 
 ### Health Check Integration

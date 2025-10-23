@@ -47,8 +47,8 @@ namespace WabbitBot.Core.Scrimmages
                 double opponentRating,
                 double challengerConfidence,
                 double opponentConfidence,
-                double challengerRatingChange,
-                double opponentRatingChange,
+                double? challengerRatingChange,
+                double? opponentRatingChange,
                 TeamSize teamSize
             )
             {
@@ -71,6 +71,15 @@ namespace WabbitBot.Core.Scrimmages
                         }
                     }
 
+                    if (challengerRatingChange is null)
+                    {
+                        return Result<ProvenPotentialRecord>.Failure("Challenger rating change is required");
+                    }
+                    if (opponentRatingChange is null)
+                    {
+                        return Result<ProvenPotentialRecord>.Failure("Opponent rating change is required");
+                    }
+
                     var record = new ProvenPotentialRecord
                     {
                         Id = Guid.NewGuid(),
@@ -85,15 +94,13 @@ namespace WabbitBot.Core.Scrimmages
                         OpponentRating = opponentRating,
                         ChallengerConfidence = challengerConfidence,
                         OpponentConfidence = opponentConfidence,
-                        ChallengerOriginalRatingChange = challengerRatingChange,
-                        OpponentOriginalRatingChange = opponentRatingChange,
+                        ChallengerOriginalRatingChange = challengerRatingChange.Value,
+                        OpponentOriginalRatingChange = opponentRatingChange.Value,
                         RatingAdjustment = 0.0,
                         NewPlayerMatchCountAtCreation = newPlayerMatchCount,
                         TeamSize = teamSize,
-                        IsComplete = false,
                         AppliedThresholds = new HashSet<double>(),
                         LastCheckedAt = DateTime.UtcNow,
-                        CrossedThresholds = 0,
                     };
 
                     var createResult = await CoreService.ProvenPotentialRecords.CreateAsync(

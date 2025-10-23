@@ -26,7 +26,7 @@ namespace WabbitBot.Core.Common.Models.Common
             // ------------------------ Factory & Initialization ---------------------------
             public static Match CreateMatch(
                 TeamSize teamSize,
-                Guid parentId,
+                Scrimmage.Scrimmage scrimmage,
                 MatchParentType parentType,
                 int bestOf = 1,
                 bool playToCompletion = false
@@ -34,8 +34,10 @@ namespace WabbitBot.Core.Common.Models.Common
             {
                 var match = new Match
                 {
+                    Team1Id = scrimmage.ChallengerTeamId,
+                    Team2Id = scrimmage.OpponentTeamId,
                     TeamSize = teamSize,
-                    ParentId = parentId,
+                    ParentId = scrimmage.Id,
                     ParentType = parentType,
                     BestOf = bestOf,
                     PlayToCompletion = playToCompletion,
@@ -176,49 +178,15 @@ namespace WabbitBot.Core.Common.Models.Common
                 //    then set teams/players from the scrimmage
                 var NewMatch = Factory.CreateMatch(
                     Scrimmage.TeamSize,
-                    Scrimmage.Id,
+                    Scrimmage,
                     MatchParentType.Scrimmage,
                     Scrimmage.BestOf
                 );
 
                 NewMatch.Team1Id = Scrimmage.ChallengerTeamId;
                 NewMatch.Team2Id = Scrimmage.OpponentTeamId;
-                NewMatch.Team1PlayerIds = [.. Scrimmage.ChallengerTeamPlayerIds];
-                NewMatch.Team2PlayerIds = [.. Scrimmage.OpponentTeamPlayerIds];
-                var getChallengerTeam = await CoreService.Teams.GetByIdAsync(
-                    Scrimmage.ChallengerTeamId,
-                    DatabaseComponent.Repository
-                );
-                if (!getChallengerTeam.Success || getChallengerTeam.Data is null)
-                    return Result<Match>.Failure("Challenger team not found");
-                var ChallengerTeam = getChallengerTeam.Data;
-                var getOpponentTeam = await CoreService.Teams.GetByIdAsync(
-                    Scrimmage.OpponentTeamId,
-                    DatabaseComponent.Repository
-                );
-                if (!getOpponentTeam.Success || getOpponentTeam.Data is null)
-                    return Result<Match>.Failure("Team 2 not found");
-                var OpponentTeam = getOpponentTeam.Data;
-                NewMatch.Team1 = ChallengerTeam;
-                NewMatch.Team2 = OpponentTeam;
-
-                // Build Match Participants
-                var Team1Players = new List<Player>();
-                var Team2Players = new List<Player>();
-                foreach (var playerId in Scrimmage.ChallengerTeamPlayerIds)
-                {
-                    var playerResult = await CoreService.Players.GetByIdAsync(playerId, DatabaseComponent.Repository);
-                    if (!playerResult.Success || playerResult.Data is null)
-                        return Result<Match>.Failure("Player not found");
-                    Team1Players.Add(playerResult.Data);
-                }
-                foreach (var playerId in Scrimmage.OpponentTeamPlayerIds)
-                {
-                    var playerResult = await CoreService.Players.GetByIdAsync(playerId, DatabaseComponent.Repository);
-                    if (!playerResult.Success || playerResult.Data is null)
-                        return Result<Match>.Failure("Player not found");
-                    Team2Players.Add(playerResult.Data);
-                }
+                NewMatch.Team1Players = [.. Scrimmage.ChallengerTeamPlayers];
+                NewMatch.Team2Players = [.. Scrimmage.OpponentTeamPlayers];
 
                 // 3) Persist
                 var createResult = await CoreService.Matches.CreateAsync(NewMatch, DatabaseComponent.Repository);
@@ -228,7 +196,7 @@ namespace WabbitBot.Core.Common.Models.Common
                 NewMatch = createResult.Data;
 
                 // Optional: link back to scrimmage entity and persist if needed
-                Scrimmage.Match = NewMatch;
+                Scrimmage.MatchId = NewMatch.Id;
                 await CoreService.Scrimmages.UpdateAsync(Scrimmage, DatabaseComponent.Repository);
 
                 return Result<Match>.CreateSuccess(NewMatch);

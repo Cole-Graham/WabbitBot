@@ -1,3 +1,4 @@
+using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using WabbitBot.Common.Data.Interfaces;
 using WabbitBot.Common.Models;
@@ -24,13 +25,17 @@ namespace WabbitBot.Core.Scrimmages
                 Guid ScrimmageChallengeId,
                 Guid ChallengerTeamId,
                 Guid OpponentTeamId,
-                ICollection<Guid> ChallengerTeamPlayerIds,
-                ICollection<Guid> OpponentTeamPlayerIds,
+                ICollection<Player> ChallengerTeamPlayers,
+                ICollection<Player> OpponentTeamPlayers,
                 Guid IssuedByPlayerId,
                 Guid AcceptedByPlayerId,
+                int bestOf,
                 TeamSize teamSize,
-                int bestOf = 1,
-                ScrimmageStatus state = ScrimmageStatus.Accepted
+                double challengerTeamRating,
+                double opponentTeamRating,
+                double challengerTeamConfidence,
+                double opponentTeamConfidence,
+                double ratingRangeAtMatch
             )
             {
                 var scrimmage = new Scrimmage
@@ -38,67 +43,45 @@ namespace WabbitBot.Core.Scrimmages
                     ScrimmageChallengeId = ScrimmageChallengeId,
                     ChallengerTeamId = ChallengerTeamId,
                     OpponentTeamId = OpponentTeamId,
-                    ChallengerTeamPlayerIds = ChallengerTeamPlayerIds.ToList(),
-                    OpponentTeamPlayerIds = OpponentTeamPlayerIds.ToList(),
+                    ChallengerTeamPlayers = ChallengerTeamPlayers,
+                    OpponentTeamPlayers = OpponentTeamPlayers,
                     IssuedByPlayerId = IssuedByPlayerId,
                     AcceptedByPlayerId = AcceptedByPlayerId,
                     TeamSize = teamSize,
-                    BestOf = bestOf,
-                    StateHistory = new List<ScrimmageStateSnapshot> { new() { Status = state } },
                     StartedAt = DateTime.UtcNow,
+                    ChallengerTeamRating = challengerTeamRating,
+                    OpponentTeamRating = opponentTeamRating,
+                    ChallengerTeamConfidence = challengerTeamConfidence,
+                    OpponentTeamConfidence = opponentTeamConfidence,
+                    HigherRatedTeamId = challengerTeamRating > opponentTeamRating ? ChallengerTeamId : OpponentTeamId,
+                    RatingRangeAtMatch = ratingRangeAtMatch,
+                    BestOf = bestOf,
                 };
                 return scrimmage;
             }
 
-            public static async Task<Result<ScrimmageChallenge>> CreateChallenge(
+            public static ScrimmageChallenge CreateChallenge(
                 Guid ChallengerTeamId,
                 Guid OpponentTeamId,
                 Guid IssuedByPlayerId,
-                ICollection<Guid> SelectedPlayerIds,
+                ICollection<Guid> SelectedTeammateIds,
                 TeamSize teamSize,
                 int bestOf = 1
             )
             {
-                var challengerTeam = await CoreService.Teams.GetByIdAsync(
-                    ChallengerTeamId,
-                    DatabaseComponent.Repository
-                );
-                if (!challengerTeam.Success || challengerTeam.Data is null)
-                {
-                    return Result<ScrimmageChallenge>.Failure("Challenger team not found");
-                }
-                var opponentTeam = await CoreService.Teams.GetByIdAsync(OpponentTeamId, DatabaseComponent.Repository);
-                if (!opponentTeam.Success || opponentTeam.Data is null)
-                {
-                    return Result<ScrimmageChallenge>.Failure("Opponent team not found");
-                }
-
-                // Validate that the issued by player exists
-                var issuedByPlayerExists = await CoreService.WithDbContext(async db =>
-                    await db.Players.AnyAsync(p => p.Id == IssuedByPlayerId)
-                );
-                if (!issuedByPlayerExists)
-                {
-                    return Result<ScrimmageChallenge>.Failure("Issued by player not found");
-                }
-
-                // Combine challenge issuer and selected team members IDs
-                var challengerTeamPlayerIds = new List<Guid> { IssuedByPlayerId };
-                challengerTeamPlayerIds.AddRange(SelectedPlayerIds);
-
                 var scrimmageChallenge = new ScrimmageChallenge
                 {
-                    // Only set foreign key properties to avoid EF Core tracking conflicts
                     ChallengerTeamId = ChallengerTeamId,
                     OpponentTeamId = OpponentTeamId,
                     IssuedByPlayerId = IssuedByPlayerId,
-                    ChallengerTeamPlayerIds = challengerTeamPlayerIds,
+                    ChallengerTeammateIds = SelectedTeammateIds,
                     ChallengeStatus = ScrimmageChallengeStatus.Pending,
                     TeamSize = teamSize,
                     BestOf = bestOf,
                     ChallengeExpiresAt = DateTime.UtcNow.AddHours(1), // 1 hour challenge window
                 };
-                return Result<ScrimmageChallenge>.CreateSuccess(scrimmageChallenge);
+
+                return scrimmageChallenge;
             }
         }
         #endregion
@@ -149,64 +132,49 @@ namespace WabbitBot.Core.Scrimmages
             Guid ScrimmageChallengeId,
             Guid ChallengerTeamId,
             Guid OpponentTeamId,
-            ICollection<Guid> ChallengerTeamPlayerIds,
-            ICollection<Guid> OpponentTeamPlayerIds,
+            ICollection<Player> ChallengerTeamPlayers,
+            ICollection<Player> OpponentTeamPlayers,
             Guid IssuedByPlayerId,
             Guid AcceptedByPlayerId,
             TeamSize teamSize,
-            int bestOf = 1
+            int bestOf,
+            ScrimmageTeamStats challengerTeamStats,
+            ScrimmageTeamStats opponentTeamStats
         )
         {
             try
             {
+                var allTeamsResult = await CoreService.Teams.GetAllAsync(DatabaseComponent.Repository);
+                if (!allTeamsResult.Success)
+                {
+                    return Result<Scrimmage>.Failure("Failed to fetch all teams");
+                }
+                if (allTeamsResult.Data is null)
+                {
+                    return Result<Scrimmage>.Failure("No teams found");
+                }
+
+                var allTeamsList = allTeamsResult.Data.ToList();
+                var RatingRangeAtMatch =
+                    allTeamsList.Max(t => t.ScrimmageTeamStats[teamSize].CurrentRating)
+                    - allTeamsList.Min(t => t.ScrimmageTeamStats[teamSize].CurrentRating);
+
                 var Scrimmage = Factory.CreateScrimmage(
                     ScrimmageChallengeId,
                     ChallengerTeamId,
                     OpponentTeamId,
-                    ChallengerTeamPlayerIds,
-                    OpponentTeamPlayerIds,
+                    ChallengerTeamPlayers,
+                    OpponentTeamPlayers,
                     IssuedByPlayerId,
                     AcceptedByPlayerId,
+                    bestOf,
                     teamSize,
-                    bestOf
+                    challengerTeamStats.CurrentRating,
+                    opponentTeamStats.CurrentRating,
+                    challengerTeamStats.Confidence,
+                    opponentTeamStats.Confidence,
+                    RatingRangeAtMatch
                 );
-
-                // Navigation properties are set automatically by EF Core based on foreign keys
-                // Load team stats separately to avoid navigation property access
-                var challengerTeamStats = await CoreService.WithDbContext(async db =>
-                    await db
-                        .ScrimmageTeamStats.Where(s => s.TeamId == ChallengerTeamId && s.TeamSize == teamSize)
-                        .FirstOrDefaultAsync()
-                );
-                if (challengerTeamStats is null)
-                {
-                    return Result<Scrimmage>.Failure("Challenger team stats not found");
-                }
-
-                var opponentTeamStats = await CoreService.WithDbContext(async db =>
-                    await db
-                        .ScrimmageTeamStats.Where(s => s.TeamId == OpponentTeamId && s.TeamSize == teamSize)
-                        .FirstOrDefaultAsync()
-                );
-                if (opponentTeamStats is null)
-                {
-                    return Result<Scrimmage>.Failure("Opponent team stats not found");
-                }
-
-                // Data properties
-                Scrimmage.ChallengerTeamRating = challengerTeamStats.CurrentRating;
-                Scrimmage.OpponentTeamRating = opponentTeamStats.CurrentRating;
-                Scrimmage.ChallengerTeamConfidence = challengerTeamStats.Confidence;
-                Scrimmage.OpponentTeamConfidence = opponentTeamStats.Confidence;
-                // Calculate higher rated team
-                if (Scrimmage.ChallengerTeamRating > Scrimmage.OpponentTeamRating)
-                {
-                    Scrimmage.HigherRatedTeamId = Scrimmage.ChallengerTeamId;
-                }
-                else
-                {
-                    Scrimmage.HigherRatedTeamId = Scrimmage.OpponentTeamId;
-                }
 
                 var dbResult = await CoreService.Scrimmages.CreateAsync(Scrimmage, DatabaseComponent.Repository);
                 if (!dbResult.Success)
@@ -225,6 +193,42 @@ namespace WabbitBot.Core.Scrimmages
                 );
                 return Result<Scrimmage>.Failure(
                     $"An unexpected error occurred while creating the new Scrimmage: {ex.Message}"
+                );
+            }
+        }
+
+        public static async Task<Result<ScrimmageChallenge>> CreateChallengeAsync(
+            Guid ChallengerTeamId,
+            Guid OpponentTeamId,
+            Guid IssuedByPlayerId,
+            ICollection<Guid> SelectedTeammateIds,
+            TeamSize teamSize,
+            int bestOf = 1
+        )
+        {
+            try
+            {
+                // Store teammate IDs directly (not entities) to avoid circular dependencies
+                var challenge = Factory.CreateChallenge(
+                    ChallengerTeamId,
+                    OpponentTeamId,
+                    IssuedByPlayerId,
+                    SelectedTeammateIds,
+                    teamSize,
+                    bestOf
+                );
+
+                return Result<ScrimmageChallenge>.CreateSuccess(challenge);
+            }
+            catch (Exception ex)
+            {
+                await CoreService.ErrorHandler.CaptureAsync(
+                    ex,
+                    "Failed to create new Scrimmage Challenge.",
+                    nameof(CreateChallengeAsync)
+                );
+                return Result<ScrimmageChallenge>.Failure(
+                    $"An unexpected error occurred while creating the new Scrimmage Challenge: {ex.Message}"
                 );
             }
         }

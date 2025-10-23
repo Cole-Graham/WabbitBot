@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using WabbitBot.Common.Data;
 using WabbitBot.Common.Data.Interfaces;
-using WabbitBot.Common.Data.Schema;
 using WabbitBot.Common.Models;
 
 namespace WabbitBot.Common.Data.Service;

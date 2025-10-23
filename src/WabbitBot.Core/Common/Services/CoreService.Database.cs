@@ -4,10 +4,6 @@ using WabbitBot.Common.Data; // RepositoryAdapterRegistry
 using WabbitBot.Common.Data.Service;
 using WabbitBot.Common.Models;
 using WabbitBot.Core.Common.Database;
-using WabbitBot.Core.Common.Models.Common;
-using WabbitBot.Core.Common.Models.Leaderboard;
-using WabbitBot.Core.Common.Models.Scrimmage;
-using WabbitBot.Core.Common.Models.Tournament;
 
 namespace WabbitBot.Core.Common.Services
 {
@@ -91,55 +87,11 @@ namespace WabbitBot.Core.Common.Services
         /// </summary>
         public static void RegisterRepositoryAdapters()
         {
-            // Core entities
-            RepositoryAdapterRegistry.RegisterAdapter(new EfRepositoryAdapter<Player>());
-            RepositoryAdapterRegistry.RegisterAdapter(new EfRepositoryAdapter<Team>());
-            RepositoryAdapterRegistry.RegisterAdapter(new EfRepositoryAdapter<Map>());
-            RepositoryAdapterRegistry.RegisterAdapter(new EfRepositoryAdapter<Game>());
-            RepositoryAdapterRegistry.RegisterAdapter(new EfRepositoryAdapter<Match>());
-
-            // Scrimmage entities
-            RepositoryAdapterRegistry.RegisterAdapter(new EfRepositoryAdapter<ScrimmageChallenge>());
-            RepositoryAdapterRegistry.RegisterAdapter(new EfRepositoryAdapter<Scrimmage>());
-            RepositoryAdapterRegistry.RegisterAdapter(new EfRepositoryAdapter<ScrimmageStateSnapshot>());
-            RepositoryAdapterRegistry.RegisterAdapter(new EfRepositoryAdapter<ProvenPotentialRecord>());
-
-            // Team-related entities
-            RepositoryAdapterRegistry.RegisterAdapter(new EfRepositoryAdapter<TeamRoster>());
-            RepositoryAdapterRegistry.RegisterAdapter(new EfRepositoryAdapter<TeamMember>());
-            RepositoryAdapterRegistry.RegisterAdapter(new EfRepositoryAdapter<ScrimmageTeamStats>());
-            RepositoryAdapterRegistry.RegisterAdapter(new EfRepositoryAdapter<TournamentTeamStats>());
-            RepositoryAdapterRegistry.RegisterAdapter(new EfRepositoryAdapter<TeamVarietyStats>());
-            RepositoryAdapterRegistry.RegisterAdapter(new EfRepositoryAdapter<TeamOpponentEncounter>());
-
-            // Match-related entities
-            RepositoryAdapterRegistry.RegisterAdapter(new EfRepositoryAdapter<MatchStateSnapshot>());
-            RepositoryAdapterRegistry.RegisterAdapter(new EfRepositoryAdapter<GameStateSnapshot>());
-            RepositoryAdapterRegistry.RegisterAdapter(new EfRepositoryAdapter<Replay>());
-            RepositoryAdapterRegistry.RegisterAdapter(new EfRepositoryAdapter<ReplayPlayer>());
-
-            // User entities
-            RepositoryAdapterRegistry.RegisterAdapter(new EfRepositoryAdapter<MashinaUser>());
-
-            // Division entities
-            RepositoryAdapterRegistry.RegisterAdapter(new EfRepositoryAdapter<Division>());
-            RepositoryAdapterRegistry.RegisterAdapter(new EfRepositoryAdapter<DivisionStats>());
-            RepositoryAdapterRegistry.RegisterAdapter(new EfRepositoryAdapter<DivisionMapStats>());
-            RepositoryAdapterRegistry.RegisterAdapter(new EfRepositoryAdapter<DivisionLearningCurve>());
-
-            // Leaderboard entities
-            RepositoryAdapterRegistry.RegisterAdapter(new EfRepositoryAdapter<ScrimmageLeaderboard>());
-            RepositoryAdapterRegistry.RegisterAdapter(new EfRepositoryAdapter<TournamentLeaderboard>());
-            RepositoryAdapterRegistry.RegisterAdapter(new EfRepositoryAdapter<ScrimmageLeaderboardItem>());
-            RepositoryAdapterRegistry.RegisterAdapter(new EfRepositoryAdapter<TournamentLeaderboardItem>());
-            RepositoryAdapterRegistry.RegisterAdapter(new EfRepositoryAdapter<Season>());
-            RepositoryAdapterRegistry.RegisterAdapter(new EfRepositoryAdapter<SeasonConfig>());
-            RepositoryAdapterRegistry.RegisterAdapter(new EfRepositoryAdapter<RatingPercentileBreakpoints>());
-
-            // Tournament entities
-            RepositoryAdapterRegistry.RegisterAdapter(new EfRepositoryAdapter<Tournament>());
-            RepositoryAdapterRegistry.RegisterAdapter(new EfRepositoryAdapter<TournamentStateSnapshot>());
+            // Manual registrations (if any) go here. Generator-provided registrations come next.
+            RegisterRepositoryAdapters_Generated();
         }
+
+        static partial void RegisterRepositoryAdapters_Generated();
 
         /// <summary>
         /// Manually defined stub for cache provider registration. Intentionally empty by default; rely on

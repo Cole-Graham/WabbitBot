@@ -1,4 +1,5 @@
 using System.Linq;
+using Microsoft.EntityFrameworkCore;
 using WabbitBot.Common.Configuration;
 using WabbitBot.Common.Data.Interfaces;
 using WabbitBot.Common.Data.Service;
@@ -21,7 +22,7 @@ namespace WabbitBot.Core.Common.Models.Common
             public static Team CreateTeam(
                 Guid id,
                 string name,
-                Guid teamCaptainId,
+                Guid TeamMajorId,
                 TeamType teamType,
                 DateTime createdAt,
                 DateTime lastActive
@@ -31,7 +32,7 @@ namespace WabbitBot.Core.Common.Models.Common
                 {
                     Id = id,
                     Name = name,
-                    TeamCaptainId = teamCaptainId,
+                    TeamMajorId = TeamMajorId,
                     TeamType = teamType,
                     LastActive = lastActive,
                     CreatedAt = createdAt,
@@ -41,35 +42,52 @@ namespace WabbitBot.Core.Common.Models.Common
             public static TeamRoster CreateRoster(
                 Guid teamId,
                 TeamSizeRosterGroup rosterGroup,
-                Guid? rosterCaptainId = null
+                Guid rosterCaptainId,
+                Guid mashinaUserId,
+                string discordUserId
             )
             {
                 var scrimmageConfig = ConfigurationProvider.GetSection<ScrimmageOptions>(ScrimmageOptions.SectionName);
+                var maxSlots = GetMaxRosterSlots(rosterGroup, scrimmageConfig.TeamRules);
 
-                var rosterRange = GetRosterSizeRange(rosterGroup, scrimmageConfig.RosterSizeRanges);
-
-                return new TeamRoster
+                var roster = new TeamRoster
                 {
                     Id = Guid.NewGuid(),
                     TeamId = teamId,
                     RosterGroup = rosterGroup,
-                    MaxRosterSize = rosterRange.Max,
-                    RosterCaptainId = rosterCaptainId,
+                    MaxRosterSize = maxSlots,
                     LastActive = DateTime.UtcNow,
                     CreatedAt = DateTime.UtcNow,
                 };
+
+                roster.RosterMembers.Add(
+                    new TeamMember
+                    {
+                        TeamRosterId = roster.Id,
+                        MashinaUserId = mashinaUserId,
+                        PlayerId = rosterCaptainId,
+                        DiscordUserId = discordUserId,
+                        Role = RosterRole.Captain,
+                        ValidFrom = DateTime.UtcNow,
+                        IsRosterManager = true,
+                    }
+                );
+
+                return roster;
             }
 
-            private static (int Min, int Max) GetRosterSizeRange(TeamSizeRosterGroup group, RosterSizeRanges ranges)
+            private static int GetMaxRosterSlots(TeamSizeRosterGroup group, TeamRules rules)
             {
                 return group switch
                 {
-                    TeamSizeRosterGroup.Solo => (ranges.Solo.Min, ranges.Solo.Max),
-                    TeamSizeRosterGroup.Duo => (ranges.Duo.Min, ranges.Duo.Max),
-                    TeamSizeRosterGroup.Squad => (ranges.Squad.Min, ranges.Squad.Max),
-                    _ => (ranges.Solo.Min, ranges.Solo.Max),
+                    TeamSizeRosterGroup.Solo => rules.Solo.MaxRosterSlots,
+                    TeamSizeRosterGroup.Duo => rules.Duo.MaxRosterSlots,
+                    TeamSizeRosterGroup.Squad => rules.Squad.MaxRosterSlots,
+                    _ => rules.Solo.MaxRosterSlots,
                 };
             }
+
+            // role caps helper moved to TeamSizeRosterGrouping
         }
 
         public static class TeamSizeRosterGrouping
@@ -86,25 +104,28 @@ namespace WabbitBot.Core.Common.Models.Common
                 };
             }
 
-            public static (int Min, int Max) GetDefaultRosterSizeRange(TeamSizeRosterGroup group)
+            public static int GetMaxRosterSlots(TeamSizeRosterGroup group)
             {
                 var scrimmageConfig = ConfigurationProvider.GetSection<ScrimmageOptions>(ScrimmageOptions.SectionName);
-
                 return group switch
                 {
-                    TeamSizeRosterGroup.Solo => (
-                        scrimmageConfig.RosterSizeRanges.Solo.Min,
-                        scrimmageConfig.RosterSizeRanges.Solo.Max
-                    ),
-                    TeamSizeRosterGroup.Duo => (
-                        scrimmageConfig.RosterSizeRanges.Duo.Min,
-                        scrimmageConfig.RosterSizeRanges.Duo.Max
-                    ),
-                    TeamSizeRosterGroup.Squad => (
-                        scrimmageConfig.RosterSizeRanges.Squad.Min,
-                        scrimmageConfig.RosterSizeRanges.Squad.Max
-                    ),
-                    _ => (scrimmageConfig.RosterSizeRanges.Solo.Min, scrimmageConfig.RosterSizeRanges.Solo.Max),
+                    TeamSizeRosterGroup.Solo => scrimmageConfig.TeamRules.Solo.MaxRosterSlots,
+                    TeamSizeRosterGroup.Duo => scrimmageConfig.TeamRules.Duo.MaxRosterSlots,
+                    TeamSizeRosterGroup.Squad => scrimmageConfig.TeamRules.Squad.MaxRosterSlots,
+                    _ => scrimmageConfig.TeamRules.Solo.MaxRosterSlots,
+                };
+            }
+
+            public static (int CaptainSlots, int CoreSlots) GetRosterRoleCaps(TeamSizeRosterGroup group)
+            {
+                var scrimmageConfig = ConfigurationProvider.GetSection<ScrimmageOptions>(ScrimmageOptions.SectionName);
+                var rules = scrimmageConfig.TeamRules;
+                return group switch
+                {
+                    TeamSizeRosterGroup.Solo => (rules.Solo.CaptainRosterSlots, rules.Solo.CoreRosterSlots),
+                    TeamSizeRosterGroup.Duo => (rules.Duo.CaptainRosterSlots, rules.Duo.CoreRosterSlots),
+                    TeamSizeRosterGroup.Squad => (rules.Squad.CaptainRosterSlots, rules.Squad.CoreRosterSlots),
+                    _ => (rules.Solo.CaptainRosterSlots, rules.Solo.CoreRosterSlots),
                 };
             }
         }
@@ -157,7 +178,7 @@ namespace WabbitBot.Core.Common.Models.Common
             Guid teamId,
             Guid playerId,
             TeamSizeRosterGroup rosterGroup,
-            TeamRole role = TeamRole.Core
+            RosterRole role = RosterRole.Core
         )
         {
             var teamResult = await CoreService.Teams.GetByIdAsync(teamId, DatabaseComponent.Repository);
@@ -172,6 +193,35 @@ namespace WabbitBot.Core.Common.Models.Common
                 throw new InvalidOperationException($"Team with ID {teamId} not found.");
             }
 
+            // Enforce player membership limit for the roster group
+            var membershipLimitResult = await Validation.ValidateMembershipLimit(playerId, rosterGroup);
+            if (!membershipLimitResult.Success)
+            {
+                throw new InvalidOperationException(membershipLimitResult.ErrorMessage);
+            }
+
+            // Enforce rejoin cooldown for this team
+            var scrimmageConfig = ConfigurationProvider.GetSection<ScrimmageOptions>(ScrimmageOptions.SectionName);
+            var playerResult = await CoreService.Players.GetByIdAsync(playerId, DatabaseComponent.Repository);
+            if (!playerResult.Success)
+            {
+                throw new InvalidOperationException(
+                    $"Failed to retrieve player {playerId}: {playerResult.ErrorMessage}"
+                );
+            }
+            var player = playerResult.Data;
+            if (
+                player is not null
+                && player.TeamJoinCooldowns.TryGetValue(teamId, out var unlockAt)
+                && unlockAt > DateTime.UtcNow
+            )
+            {
+                var remaining = unlockAt - DateTime.UtcNow;
+                throw new InvalidOperationException(
+                    $"Player cannot rejoin this team yet. Try again in {remaining.Days}d {remaining.Hours}h {remaining.Minutes}m."
+                );
+            }
+
             // Validate roster group is allowed for this team type
             var validationResult = Validation.ValidateRosterGroupForTeamType(team.TeamType, rosterGroup);
             if (!validationResult.Success)
@@ -183,8 +233,7 @@ namespace WabbitBot.Core.Common.Models.Common
             var roster = Accessors.GetRosterForGroup(team, rosterGroup);
             if (roster == null)
             {
-                roster = Factory.CreateRoster(teamId, rosterGroup);
-                team.Rosters.Add(roster);
+                throw new InvalidOperationException($"Roster for group {rosterGroup} not found for team {teamId}");
             }
 
             if (roster.RosterMembers.Count >= roster.MaxRosterSize)
@@ -192,9 +241,35 @@ namespace WabbitBot.Core.Common.Models.Common
                 throw new InvalidOperationException($"Roster is full (max size: {roster.MaxRosterSize})");
             }
 
-            if (roster.RosterMembers.Any(m => m.PlayerId == playerId))
+            if (roster.RosterMembers.Any(m => m.PlayerId == playerId && m.ValidTo == null))
             {
                 throw new InvalidOperationException("Player is already on this roster");
+            }
+
+            // Enforce role caps from TeamRules
+            var (captainCap, coreCap) = TeamSizeRosterGrouping.GetRosterRoleCaps(rosterGroup);
+
+            if (role == RosterRole.Captain)
+            {
+                var currentCaptains = roster.RosterMembers.Count(m =>
+                    m.ValidTo == null && m.Role == RosterRole.Captain
+                );
+                if (currentCaptains >= captainCap)
+                {
+                    throw new InvalidOperationException(
+                        $"This roster already has the maximum of {captainCap} captains"
+                    );
+                }
+            }
+            else if (role == RosterRole.Core)
+            {
+                var currentCores = roster.RosterMembers.Count(m => m.ValidTo == null && m.Role == RosterRole.Core);
+                if (currentCores >= coreCap)
+                {
+                    throw new InvalidOperationException(
+                        $"This roster already has the maximum of {coreCap} core players"
+                    );
+                }
             }
 
             roster.RosterMembers.Add(
@@ -202,9 +277,8 @@ namespace WabbitBot.Core.Common.Models.Common
                 {
                     PlayerId = playerId,
                     Role = role,
-                    JoinedAt = DateTime.UtcNow,
-                    IsActive = true,
-                    IsTeamManager = role == TeamRole.Captain, // Captains are automatically team managers
+                    ValidFrom = DateTime.UtcNow,
+                    IsRosterManager = role == RosterRole.Captain, // Captains are automatically team managers
                 }
             );
 
@@ -225,97 +299,95 @@ namespace WabbitBot.Core.Common.Models.Common
             }
         }
 
-        // Legacy method for backward compatibility - routes to Squad roster by default
-        public async Task AddPlayer(Guid teamId, Guid playerId, TeamRole role = TeamRole.Core)
-        {
-            await AddPlayer(teamId, playerId, TeamSizeRosterGroup.Squad, role);
-        }
+        // Removing players is handled via deactivation
 
-        public async Task RemovePlayer(Guid teamId, Guid playerId)
+        public async Task UpdatePlayerRole(Guid teamId, Guid playerId, RosterRole newRole)
         {
-            var teamResult = await CoreService.Teams.GetByIdAsync(teamId, DatabaseComponent.Repository);
-            if (!teamResult.Success)
-            {
-                await CoreService.ErrorHandler.CaptureAsync(
-                    new Exception(
-                        $"Failed to retrieve team {teamId} for player removal: " + $"{teamResult.ErrorMessage}"
-                    ),
-                    "Team Remove Player Warning",
-                    nameof(RemovePlayer)
-                );
-                return; // Exit if team not found
-            }
-            var team = teamResult.Data;
+            var team = await CoreService.WithDbContext(async db =>
+                await db
+                    .Teams.Include(t => t.Rosters)
+                    .ThenInclude(r => r.RosterMembers)
+                    .FirstOrDefaultAsync(t => t.Id == teamId)
+            );
 
             if (team is null)
             {
                 await CoreService.ErrorHandler.CaptureAsync(
-                    new Exception($"Team {teamId} not found for player removal after successful retrieval."),
-                    "Team Remove Player Warning",
-                    nameof(RemovePlayer)
+                    new Exception($"Team {teamId} not found for player role update."),
+                    "Team Update Player Role Warning",
+                    nameof(UpdatePlayerRole)
                 );
                 return; // Exit if team not found
             }
 
-            // Find the member across all rosters
             var member = team.Rosters.SelectMany(r => r.RosterMembers).FirstOrDefault(m => m.PlayerId == playerId);
             if (member != null)
             {
-                // Remove from the specific roster
+                // Enforce caps when changing roles
                 var roster = team.Rosters.First(r => r.RosterMembers.Contains(member));
-                roster.RosterMembers.Remove(member);
-                var updateTeamResult = await CoreService.Teams.UpdateAsync(team, DatabaseComponent.Repository);
-                var updateTeamCacheResult = await CoreService.Teams.UpdateAsync(team, DatabaseComponent.Cache);
+                var (captainCap, coreCap) = TeamSizeRosterGrouping.GetRosterRoleCaps(roster.RosterGroup);
 
-                if (!updateTeamResult.Success || !updateTeamCacheResult.Success)
+                // Enforce core role change cooldown with override per group
+                var scrimmageConfig = ConfigurationProvider.GetSection<ScrimmageOptions>(ScrimmageOptions.SectionName);
+                int effectiveCoreCooldownDays = scrimmageConfig.TeamConfig.BaseConfig.ChangeCoreCooldownDays;
+                var overrideDays = roster.RosterGroup switch
                 {
-                    await CoreService.ErrorHandler.CaptureAsync(
-                        new Exception(
-                            $"Failed to remove player {playerId} from team {teamId}: "
-                                + $"{updateTeamResult.ErrorMessage} / "
-                                + $"{updateTeamCacheResult.ErrorMessage}"
-                        ),
-                        "Team Remove Player Warning",
-                        nameof(RemovePlayer)
-                    );
+                    TeamSizeRosterGroup.Solo => scrimmageConfig.TeamConfig.Solo.ChangeCoreCooldownDays,
+                    TeamSizeRosterGroup.Duo => scrimmageConfig.TeamConfig.Duo.ChangeCoreCooldownDays,
+                    TeamSizeRosterGroup.Squad => scrimmageConfig.TeamConfig.Squad.ChangeCoreCooldownDays,
+                    _ => null,
+                };
+                if (overrideDays.HasValue)
+                {
+                    effectiveCoreCooldownDays = overrideDays.Value;
                 }
-            }
-        }
+                bool touchesCore =
+                    member.Role != newRole && (newRole == RosterRole.Core || member.Role == RosterRole.Core);
+                if (touchesCore && roster.CoreRoleChangedAt.HasValue)
+                {
+                    var unlock = roster.CoreRoleChangedAt.Value.AddDays(effectiveCoreCooldownDays);
+                    if (unlock > DateTime.UtcNow)
+                    {
+                        var remaining = unlock - DateTime.UtcNow;
+                        throw new InvalidOperationException(
+                            $"Role change cooldown active for this roster. Try again in {remaining.Days}d {remaining.Hours}h {remaining.Minutes}m."
+                        );
+                    }
+                }
 
-        public async Task UpdatePlayerRole(Guid teamId, Guid playerId, TeamRole newRole)
-        {
-            var teamResult = await CoreService.Teams.GetByIdAsync(teamId, DatabaseComponent.Repository);
-            if (!teamResult.Success)
-            {
-                await CoreService.ErrorHandler.CaptureAsync(
-                    new Exception(
-                        $"Failed to retrieve team {teamId} for player role update: " + $"{teamResult.ErrorMessage}"
-                    ),
-                    "Team Update Player Role Warning",
-                    nameof(UpdatePlayerRole)
-                );
-                return; // Exit if team not found
-            }
-            var team = teamResult.Data;
+                if (newRole == RosterRole.Captain)
+                {
+                    var currentCaptains = roster.RosterMembers.Count(m =>
+                        m.ValidTo == null && m.Role == RosterRole.Captain
+                    );
+                    // If member already captain, allow; otherwise enforce cap
+                    if (member.Role != RosterRole.Captain && currentCaptains >= captainCap)
+                    {
+                        throw new InvalidOperationException(
+                            $"This roster already has the maximum of {captainCap} captains"
+                        );
+                    }
+                }
+                else if (newRole == RosterRole.Core)
+                {
+                    var currentCores = roster.RosterMembers.Count(m => m.ValidTo == null && m.Role == RosterRole.Core);
+                    if (member.Role != RosterRole.Core && currentCores >= coreCap)
+                    {
+                        throw new InvalidOperationException(
+                            $"This roster already has the maximum of {coreCap} core players"
+                        );
+                    }
+                }
 
-            if (team is null)
-            {
-                await CoreService.ErrorHandler.CaptureAsync(
-                    new Exception($"Team {teamId} not found for player role update after successful retrieval."),
-                    "Team Update Player Role Warning",
-                    nameof(UpdatePlayerRole)
-                );
-                return; // Exit if team not found
-            }
-
-            var member = team.Rosters.SelectMany(r => r.RosterMembers).FirstOrDefault(m => m.PlayerId == playerId);
-            if (member != null)
-            {
                 member.Role = newRole;
                 // Captains are automatically team managers
-                if (newRole == TeamRole.Captain)
+                if (newRole == RosterRole.Captain)
                 {
-                    member.IsTeamManager = true;
+                    member.IsRosterManager = true;
+                }
+                if (touchesCore)
+                {
+                    roster.CoreRoleChangedAt = DateTime.UtcNow;
                 }
                 var updateTeamResult = await CoreService.Teams.UpdateAsync(team, DatabaseComponent.Repository);
                 var updateTeamCacheResult = await CoreService.Teams.UpdateAsync(team, DatabaseComponent.Cache);
@@ -335,7 +407,52 @@ namespace WabbitBot.Core.Common.Models.Common
             }
         }
 
-        public async Task ChangeCaptain(Guid teamId, Guid newCaptainId)
+        public async Task ClearPlayerRole(Guid teamId, Guid playerId, bool clearManager)
+        {
+            // Load necessary navigation properties within the same DbContext to avoid lazy-load after disposal
+            var team = await CoreService.WithDbContext(async db =>
+                await db
+                    .Teams.Include(t => t.Rosters)
+                    .ThenInclude(r => r.RosterMembers)
+                    .FirstOrDefaultAsync(t => t.Id == teamId)
+            );
+
+            if (team is null)
+            {
+                await CoreService.ErrorHandler.CaptureAsync(
+                    new Exception($"Team {teamId} not found for clearing player role."),
+                    "Team Clear Player Role Warning",
+                    nameof(ClearPlayerRole)
+                );
+                return;
+            }
+
+            var member = team.Rosters.SelectMany(r => r.RosterMembers).FirstOrDefault(m => m.PlayerId == playerId);
+            if (member != null)
+            {
+                member.Role = null;
+                if (clearManager)
+                {
+                    member.IsRosterManager = false;
+                }
+                var updateTeamResult = await CoreService.Teams.UpdateAsync(team, DatabaseComponent.Repository);
+                var updateTeamCacheResult = await CoreService.Teams.UpdateAsync(team, DatabaseComponent.Cache);
+
+                if (!updateTeamResult.Success || !updateTeamCacheResult.Success)
+                {
+                    await CoreService.ErrorHandler.CaptureAsync(
+                        new Exception(
+                            $"Failed to clear player role for team {teamId}: "
+                                + $"{updateTeamResult.ErrorMessage} / {updateTeamCacheResult.ErrorMessage}"
+                        ),
+                        "Team Clear Player Role Warning",
+                        nameof(ClearPlayerRole)
+                    );
+                }
+            }
+        }
+
+        public async Task ChangeCaptain(Guid teamId, TeamSizeRosterGroup rosterGroup, Guid newCaptainId)
         {
             var teamResult = await CoreService.Teams.GetByIdAsync(teamId, DatabaseComponent.Repository);
             if (!teamResult.Success)
@@ -361,30 +478,47 @@ namespace WabbitBot.Core.Common.Models.Common
                 return; // Exit if team not found
             }
 
-            // Find current captain across all rosters
-            var currentCaptain = team
-                .Rosters.SelectMany(r => r.RosterMembers)
-                .FirstOrDefault(m => m.Role == TeamRole.Captain);
+            // Target roster
+            var roster = team.Rosters.FirstOrDefault(r => r.RosterGroup == rosterGroup);
+            if (roster is null)
+            {
+                throw new InvalidOperationException($"Roster for group {rosterGroup} not found for team {teamId}");
+            }
+
+            // Enforce captain change cooldown per roster
+            var scrimmageConfig = ConfigurationProvider.GetSection<ScrimmageOptions>(ScrimmageOptions.SectionName);
+            var captainCooldownDays = scrimmageConfig.TeamConfig.BaseConfig.ChangeCaptainCooldownDays;
+            if (roster.CaptainChangedAt.HasValue)
+            {
+                var unlock = roster.CaptainChangedAt.Value.AddDays(captainCooldownDays);
+                if (unlock > DateTime.UtcNow)
+                {
+                    var remaining = unlock - DateTime.UtcNow;
+                    throw new InvalidOperationException(
+                        $"Roster captain change cooldown active. Try again in {remaining.Days}d {remaining.Hours}h {remaining.Minutes}m."
+                    );
+                }
+            }
+
+            // Find current captain for this roster
+            var currentCaptain = roster.RosterMembers.FirstOrDefault(m => m.Role == RosterRole.Captain);
             if (currentCaptain != null)
             {
                 // Demote current captain to Core
-                currentCaptain.Role = TeamRole.Core;
+                currentCaptain.Role = RosterRole.Core;
                 // Remove manager status from outgoing captain
-                currentCaptain.IsTeamManager = false;
+                currentCaptain.IsRosterManager = false;
             }
 
-            // Find new captain across all rosters
-            var newCaptain = team
-                .Rosters.SelectMany(r => r.RosterMembers)
-                .FirstOrDefault(m => m.PlayerId == newCaptainId);
+            // Find new captain within this roster
+            var newCaptain = roster.RosterMembers.FirstOrDefault(m => m.PlayerId == newCaptainId);
             if (newCaptain != null)
             {
                 // Promote new captain
-                newCaptain.Role = TeamRole.Captain;
+                newCaptain.Role = RosterRole.Captain;
                 // Ensure new captain has manager status
-                newCaptain.IsTeamManager = true;
-                // Update team captain ID
-                team.TeamCaptainId = newCaptainId;
+                newCaptain.IsRosterManager = true;
+                roster.CaptainChangedAt = DateTime.UtcNow;
                 var updateTeamResult = await CoreService.Teams.UpdateAsync(team, DatabaseComponent.Repository);
                 var updateTeamCacheResult = await CoreService.Teams.UpdateAsync(team, DatabaseComponent.Cache);
 
@@ -403,7 +537,7 @@ namespace WabbitBot.Core.Common.Models.Common
             }
         }
 
-        public async Task SetTeamManagerStatus(Guid teamId, Guid playerId, bool isTeamManager)
+        public async Task SetTeamManagerStatus(Guid teamId, Guid playerId, bool IsRosterManager)
         {
             var teamResult = await CoreService.Teams.GetByIdAsync(teamId, DatabaseComponent.Repository);
             if (!teamResult.Success)
@@ -436,12 +570,12 @@ namespace WabbitBot.Core.Common.Models.Common
             if (member != null)
             {
                 // Captains are always team managers and cannot be demoted
-                if (member.Role == TeamRole.Captain && !isTeamManager)
+                if (member.Role == RosterRole.Captain && !IsRosterManager)
                 {
                     throw new InvalidOperationException("Team captains cannot have their manager status removed");
                 }
 
-                member.IsTeamManager = isTeamManager;
+                member.IsRosterManager = IsRosterManager;
                 var updateTeamResult = await CoreService.Teams.UpdateAsync(team, DatabaseComponent.Repository);
                 var updateTeamCacheResult = await CoreService.Teams.UpdateAsync(team, DatabaseComponent.Cache);
 
@@ -489,7 +623,7 @@ namespace WabbitBot.Core.Common.Models.Common
             var member = team.Rosters.SelectMany(r => r.RosterMembers).FirstOrDefault(m => m.PlayerId == playerId);
             if (member != null)
             {
-                member.IsActive = false;
+                member.ValidTo = DateTime.UtcNow;
                 var updateTeamResult = await CoreService.Teams.UpdateAsync(team, DatabaseComponent.Repository);
                 var updateTeamCacheResult = await CoreService.Teams.UpdateAsync(team, DatabaseComponent.Cache);
 
@@ -505,55 +639,28 @@ namespace WabbitBot.Core.Common.Models.Common
                         nameof(DeactivatePlayer)
                     );
                 }
-            }
-        }
 
-        public async Task ReactivatePlayer(Guid teamId, Guid playerId)
-        {
-            var teamResult = await CoreService.Teams.GetByIdAsync(teamId, DatabaseComponent.Repository);
-            if (!teamResult.Success)
-            {
-                // Log but don't fail if team not found (already reactivated or deleted)
-                await CoreService.ErrorHandler.CaptureAsync(
-                    new Exception(
-                        $"Failed to retrieve team {teamId} for reactivation: " + $"{teamResult.ErrorMessage}"
-                    ),
-                    "Team Reactivation Warning",
-                    nameof(ReactivatePlayer)
-                );
-                return; // Exit if team not found
-            }
-            var team = teamResult.Data;
-
-            if (team is null)
-            {
-                // Log but don't fail if team not found (already reactivated or deleted)
-                await CoreService.ErrorHandler.CaptureAsync(
-                    new Exception($"Team {teamId} not found for reactivation after successful retrieval."),
-                    "Team Reactivation Warning",
-                    nameof(ReactivatePlayer)
-                );
-                return; // Exit if team not found
-            }
-
-            var member = team.Rosters.SelectMany(r => r.RosterMembers).FirstOrDefault(m => m.PlayerId == playerId);
-            if (member != null)
-            {
-                member.IsActive = true;
-                var updateTeamRepoResult = await CoreService.Teams.UpdateAsync(team, DatabaseComponent.Repository);
-                var updateTeamCacheResult = await CoreService.Teams.UpdateAsync(team, DatabaseComponent.Cache);
-
-                if (!updateTeamRepoResult.Success || !updateTeamCacheResult.Success)
+                // Write rejoin cooldown for this player-team
+                var scrimmageConfig = ConfigurationProvider.GetSection<ScrimmageOptions>(ScrimmageOptions.SectionName);
+                var days = scrimmageConfig.TeamConfig.BaseConfig.RejoinTeamCooldownDays;
+                var playerResult = await CoreService.Players.GetByIdAsync(playerId, DatabaseComponent.Repository);
+                if (playerResult.Success && playerResult.Data is not null)
                 {
-                    await CoreService.ErrorHandler.CaptureAsync(
-                        new Exception(
-                            $"Failed to reactivate player {playerId} in team {teamId}: "
-                                + $"{updateTeamRepoResult.ErrorMessage} / "
-                                + $"{updateTeamCacheResult.ErrorMessage}"
-                        ),
-                        "Team Reactivation Warning",
-                        nameof(ReactivatePlayer)
-                    );
+                    var p = playerResult.Data;
+                    p.TeamJoinCooldowns[teamId] = DateTime.UtcNow.AddDays(days);
+                    var upRepo = await CoreService.Players.UpdateAsync(p, DatabaseComponent.Repository);
+                    var upCache = await CoreService.Players.UpdateAsync(p, DatabaseComponent.Cache);
+                    if (!upRepo.Success || !upCache.Success)
+                    {
+                        await CoreService.ErrorHandler.CaptureAsync(
+                            new Exception(
+                                $"Failed to set rejoin cooldown for player {playerId} and team {teamId}: "
+                                    + $"{upRepo.ErrorMessage} / {upCache.ErrorMessage}"
+                            ),
+                            "Team Deactivate Player Warning",
+                            nameof(DeactivatePlayer)
+                        );
+                    }
                 }
             }
         }
@@ -681,7 +788,7 @@ namespace WabbitBot.Core.Common.Models.Common
             {
                 return team
                     .Rosters.SelectMany(r => r.RosterMembers)
-                    .Where(m => m.IsActive && m.IsTeamManager)
+                    .Where(m => m.ValidTo == null && m.IsRosterManager)
                     .Select(m => m.PlayerId)
                     .Distinct()
                     .ToList();
@@ -689,7 +796,7 @@ namespace WabbitBot.Core.Common.Models.Common
 
             public static List<TeamMember> GetActiveMembers(Team team)
             {
-                return team.Rosters.SelectMany(r => r.RosterMembers).Where(m => m.IsActive).ToList();
+                return team.Rosters.SelectMany(r => r.RosterMembers).Where(m => m.ValidTo == null).ToList();
             }
 
             public static List<TeamMember> GetActiveMembersForRosterGroup(Team team, TeamSizeRosterGroup rosterGroup)
@@ -697,7 +804,7 @@ namespace WabbitBot.Core.Common.Models.Common
                 return team
                     .Rosters.Where(r => r.RosterGroup == rosterGroup)
                     .SelectMany(r => r.RosterMembers)
-                    .Where(m => m.IsActive)
+                    .Where(m => m.ValidTo == null)
                     .ToList();
             }
 
@@ -713,7 +820,9 @@ namespace WabbitBot.Core.Common.Models.Common
 
             public static bool HasActivePlayer(Team team, Guid playerId)
             {
-                return team.Rosters.SelectMany(r => r.RosterMembers).Any(m => m.PlayerId == playerId && m.IsActive);
+                return team
+                    .Rosters.SelectMany(r => r.RosterMembers)
+                    .Any(m => m.PlayerId == playerId && m.ValidTo == null);
             }
 
             public static bool HasActivePlayerInRosterGroup(Team team, Guid playerId, TeamSizeRosterGroup rosterGroup)
@@ -721,12 +830,12 @@ namespace WabbitBot.Core.Common.Models.Common
                 return team
                     .Rosters.Where(r => r.RosterGroup == rosterGroup)
                     .SelectMany(r => r.RosterMembers)
-                    .Any(m => m.PlayerId == playerId && m.IsActive);
+                    .Any(m => m.PlayerId == playerId && m.ValidTo == null);
             }
 
             public static int GetActivePlayerCount(Team team)
             {
-                return team.Rosters.SelectMany(r => r.RosterMembers).Count(m => m.IsActive);
+                return team.Rosters.SelectMany(r => r.RosterMembers).Count(m => m.ValidTo == null);
             }
 
             public static int GetActivePlayerCountForRosterGroup(Team team, TeamSizeRosterGroup rosterGroup)
@@ -734,14 +843,14 @@ namespace WabbitBot.Core.Common.Models.Common
                 return team
                     .Rosters.Where(r => r.RosterGroup == rosterGroup)
                     .SelectMany(r => r.RosterMembers)
-                    .Count(m => m.IsActive);
+                    .Count(m => m.ValidTo == null);
             }
 
             public static List<Guid> GetActivePlayerIds(Team team)
             {
                 return team
                     .Rosters.SelectMany(r => r.RosterMembers)
-                    .Where(m => m.IsActive)
+                    .Where(m => m.ValidTo == null)
                     .Select(m => m.PlayerId)
                     .Distinct()
                     .ToList();
@@ -752,7 +861,7 @@ namespace WabbitBot.Core.Common.Models.Common
                 return team
                     .Rosters.Where(r => r.RosterGroup == rosterGroup)
                     .SelectMany(r => r.RosterMembers)
-                    .Where(m => m.IsActive)
+                    .Where(m => m.ValidTo == null)
                     .Select(m => m.PlayerId)
                     .ToList();
             }
@@ -761,7 +870,7 @@ namespace WabbitBot.Core.Common.Models.Common
             {
                 return team
                     .Rosters.SelectMany(r => r.RosterMembers)
-                    .Where(m => m.IsActive && (m.Role == TeamRole.Core || m.Role == TeamRole.Captain))
+                    .Where(m => m.ValidTo == null && (m.Role == RosterRole.Core || m.Role == RosterRole.Captain))
                     .Select(m => m.PlayerId)
                     .Distinct()
                     .ToList();
@@ -771,7 +880,7 @@ namespace WabbitBot.Core.Common.Models.Common
             {
                 return team
                     .Rosters.SelectMany(r => r.RosterMembers)
-                    .Where(m => m.IsActive && m.Role == TeamRole.Captain)
+                    .Where(m => m.ValidTo == null && m.Role == RosterRole.Captain)
                     .Select(m => m.PlayerId)
                     .Distinct()
                     .ToList();
@@ -781,14 +890,14 @@ namespace WabbitBot.Core.Common.Models.Common
             {
                 return team
                     .Rosters.SelectMany(r => r.RosterMembers)
-                    .Any(m => m.PlayerId == playerId && m.IsActive && m.Role == TeamRole.Captain);
+                    .Any(m => m.PlayerId == playerId && m.ValidTo == null && m.Role == RosterRole.Captain);
             }
 
-            public static bool IsTeamManager(Team team, Guid playerId)
+            public static bool IsRosterManager(Team team, Guid playerId)
             {
                 return team
                     .Rosters.SelectMany(r => r.RosterMembers)
-                    .Any(m => m.PlayerId == playerId && m.IsActive && m.IsTeamManager);
+                    .Any(m => m.PlayerId == playerId && m.ValidTo == null && m.IsRosterManager);
             }
 
             public static bool IsValidForTeamSize(Team team, TeamSize teamSize)
@@ -908,6 +1017,101 @@ namespace WabbitBot.Core.Common.Models.Common
                 }
 
                 return TeamType.Team;
+            }
+
+            /// <summary>
+            /// Validates that the specified player has remaining membership slots for the given roster group.
+            /// </summary>
+            public static async Task<Result> ValidateMembershipLimit(Guid playerId, TeamSizeRosterGroup rosterGroup)
+            {
+                var cfg = ConfigurationProvider.GetSection<ScrimmageOptions>(ScrimmageOptions.SectionName).TeamConfig;
+                var limit = rosterGroup switch
+                {
+                    TeamSizeRosterGroup.Solo => cfg.Solo.UserTeamMembershipLimitCount,
+                    TeamSizeRosterGroup.Duo => cfg.Duo.UserTeamMembershipLimitCount,
+                    TeamSizeRosterGroup.Squad => cfg.Squad.UserTeamMembershipLimitCount,
+                    _ => cfg.Duo.UserTeamMembershipLimitCount,
+                };
+
+                var count = await CoreService.WithDbContext(async db =>
+                    await db.TeamMembers.CountAsync(tm =>
+                        tm.PlayerId == playerId && tm.ValidTo == null && tm.TeamRoster.RosterGroup == rosterGroup
+                    )
+                );
+
+                return count < limit
+                    ? Result.CreateSuccess()
+                    : Result.Failure("Player has reached the membership limit for this roster group.");
+            }
+
+            /// <summary>
+            /// Validates a proposed lineup against TeamRules for the given team size.
+            /// A lineup is valid if either the number of captains equals the effective required captain count,
+            /// or the number of core-role players equals the configured core equivalence count.
+            /// </summary>
+            public static async Task<Result> ValidateLineupForMatch(
+                Guid teamId,
+                TeamSize teamSize,
+                IEnumerable<Guid> lineupPlayerIds
+            )
+            {
+                var scrimmageConfig = ConfigurationProvider.GetSection<ScrimmageOptions>(ScrimmageOptions.SectionName);
+                var rules = scrimmageConfig.TeamRules;
+                var rosterGroup = TeamSizeRosterGrouping.GetRosterGroup(teamSize);
+
+                TeamMatchRules? matchRules = teamSize switch
+                {
+                    TeamSize.OneVOne => rules.Solo.OneVOne,
+                    TeamSize.TwoVTwo => rules.Duo.TwoVTwo,
+                    TeamSize.ThreeVThree => rules.Squad.ThreeVThree,
+                    TeamSize.FourVFour => rules.Squad.FourVFour,
+                    _ => rules.Duo.TwoVTwo,
+                };
+
+                if (matchRules is null)
+                {
+                    return Result.Failure("Match rules not configured for this team size.");
+                }
+
+                var effectiveCaptainsRequired = (
+                    matchRules.MatchCaptainsRequiredCount ?? rules.BaseRules.MatchCaptainsRequiredCount
+                );
+
+                var lineupIds = lineupPlayerIds.ToHashSet();
+
+                // Load roles for the lineup
+                var counts = await CoreService.WithDbContext(async db =>
+                {
+                    var members = await db
+                        .TeamMembers.Where(tm =>
+                            tm.TeamRoster.TeamId == teamId
+                            && tm.TeamRoster.RosterGroup == rosterGroup
+                            && tm.ValidTo == null
+                            && lineupIds.Contains(tm.PlayerId)
+                        )
+                        .Select(tm => tm.Role)
+                        .ToListAsync();
+
+                    var captainCount = members.Count(r => r == RosterRole.Captain);
+                    var coreCount = members.Count(r => r == RosterRole.Core);
+                    return (captainCount, coreCount);
+                });
+
+                var validByCaptain = counts.captainCount == effectiveCaptainsRequired;
+                var validByCore =
+                    matchRules.MatchCorePlayersEqualToCaptainCount > 0
+                    && counts.coreCount == matchRules.MatchCorePlayersEqualToCaptainCount;
+
+                if (validByCaptain || validByCore)
+                {
+                    return Result.CreateSuccess();
+                }
+
+                var expectedCore = matchRules.MatchCorePlayersEqualToCaptainCount;
+                var msg =
+                    $"Lineup invalid: needs either {effectiveCaptainsRequired} captain(s) or"
+                    + $" at least {expectedCore} core player(s).";
+                return Result.Failure(msg);
             }
         }
 

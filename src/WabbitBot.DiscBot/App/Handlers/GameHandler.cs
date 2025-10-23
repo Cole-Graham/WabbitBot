@@ -176,6 +176,25 @@ namespace WabbitBot.DiscBot.App.Handlers
                     return;
                 }
 
+                if (match.Team1Players is null)
+                {
+                    await DiscBotService.ErrorHandler.CaptureAsync(
+                        new InvalidOperationException("Match team 1 players not found"),
+                        "Match team 1 players not found",
+                        nameof(HandleScrimmageGameCreatedAsync)
+                    );
+                    return;
+                }
+                if (match.Team2Players is null)
+                {
+                    await DiscBotService.ErrorHandler.CaptureAsync(
+                        new InvalidOperationException("Match team 2 players not found"),
+                        "Match team 2 players not found",
+                        nameof(HandleScrimmageGameCreatedAsync)
+                    );
+                    return;
+                }
+
                 // Render the game container
                 var renderResult = await Renderers.GameRenderer.RenderGameContainerAsync(
                     game.Id,
@@ -183,8 +202,8 @@ namespace WabbitBot.DiscBot.App.Handlers
                     game.Map.Name,
                     match.Team1.Name,
                     match.Team2.Name,
-                    match.Team1PlayerIds,
-                    match.Team2PlayerIds,
+                    [.. match.Team1Players.Select(p => p.Id)],
+                    [.. match.Team2Players.Select(p => p.Id)],
                     team1Thread,
                     team2Thread
                 );

@@ -681,28 +681,17 @@ namespace WabbitBot.DiscBot.App.Renderers
                 int loserWins = winnerTeamId == team1.Id ? team2Wins : team1Wins;
 
                 // Fetch player data for both teams
-                var team1Players = new List<Player>();
-                foreach (var playerId in match.Team1PlayerIds)
+                if (match.Team1Players is null)
                 {
-                    var playerResult = await CoreService.Players.GetByIdAsync(playerId, DatabaseComponent.Repository);
-                    if (playerResult.Success && playerResult.Data is not null)
-                    {
-                        team1Players.Add(playerResult.Data);
-                    }
+                    return Result.Failure("Team 1 players not found");
+                }
+                if (match.Team2Players is null)
+                {
+                    return Result.Failure("Team 2 players not found");
                 }
 
-                var team2Players = new List<Player>();
-                foreach (var playerId in match.Team2PlayerIds)
-                {
-                    var playerResult = await CoreService.Players.GetByIdAsync(playerId, DatabaseComponent.Repository);
-                    if (playerResult.Success && playerResult.Data is not null)
-                    {
-                        team2Players.Add(playerResult.Data);
-                    }
-                }
-
-                var winnerPlayers = winnerTeamId == team1.Id ? team1Players : team2Players;
-                var loserPlayers = winnerTeamId == team1.Id ? team2Players : team1Players;
+                var winnerPlayers = winnerTeamId == team1.Id ? match.Team1Players : match.Team2Players;
+                var loserPlayers = winnerTeamId == team1.Id ? match.Team2Players : match.Team1Players;
 
                 // Create player name lists
                 var winnerPlayerNames = string.Join(

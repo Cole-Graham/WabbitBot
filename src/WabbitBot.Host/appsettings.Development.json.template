@@ -1,7 +1,7 @@
 {
     "Bot": {
       "LogLevel": "Debug",
-      "DebugGuildId": "1348467819528065074",
+      "DebugGuildId": "",
       "Activity": {
         "Type": "Playing",
         "Name": "WARNO Actual (DEV)"

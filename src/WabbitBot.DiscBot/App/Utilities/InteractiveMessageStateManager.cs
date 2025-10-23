@@ -8,7 +8,7 @@ namespace WabbitBot.DiscBot.App.Utilities
     /// Tracks user selections and state across component interactions.
     /// </summary>
     /// <typeparam name="TState">The type of state to track for each message</typeparam>
-    public class InteractiveMessageStateManager<TState>
+    public class MessageStateManager<TState>
         where TState : class, new()
     {
         private readonly ConcurrentDictionary<ulong, TState> _messageStates = new();

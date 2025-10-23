@@ -90,7 +90,7 @@ namespace WabbitBot.Core.Scrimmages
                     return Result.Failure("Some selected players not found");
                 }
 
-                var challengeResult = await ScrimmageCore.Factory.CreateChallenge(
+                var challengeResult = await ScrimmageCore.CreateChallengeAsync(
                     ChallengerTeam.Id,
                     OpponentTeam.Id,
                     IssuedByPlayer.Id,

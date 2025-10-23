@@ -34,6 +34,11 @@ namespace WabbitBot.DiscBot.App.Services.DiscBot
         private static ulong? _scrimmageChannelId;
 
         /// <summary>
+        /// Challenge feed channel ID cached from configuration (validated to exist in Discord)
+        /// </summary>
+        private static ulong? _challengeFeedChannelId;
+
+        /// <summary>
         /// Gets the scrimmage channel (throws with helpful message if not configured)
         /// </summary>
         public static DiscordChannel ScrimmageChannel
@@ -63,6 +68,35 @@ namespace WabbitBot.DiscBot.App.Services.DiscBot
         }
 
         /// <summary>
+        /// Gets the challenge feed channel (throws with helpful message if not configured)
+        /// </summary>
+        public static DiscordChannel ChallengeFeedChannel
+        {
+            get
+            {
+                if (_challengeFeedChannelId is null)
+                {
+                    throw new InvalidOperationException(
+                        "Challenge feed channel not configured. Please configure it using the bot setup commands."
+                    );
+                }
+
+                try
+                {
+                    return Client.GetChannelAsync(_challengeFeedChannelId.Value).Result;
+                }
+                catch (Exception ex)
+                {
+                    throw new InvalidOperationException(
+                        $"Failed to access challenge feed channel {_challengeFeedChannelId}. Channel may have been deleted"
+                            + " or bot lacks permissions.",
+                        ex
+                    );
+                }
+            }
+        }
+
+        /// <summary>
         /// Initializes or refreshes the cached channel configuration values
         /// Fails gracefully if configuration is invalid or missing
         /// Call this at startup and whenever channel configuration changes
@@ -74,6 +108,7 @@ namespace WabbitBot.DiscBot.App.Services.DiscBot
                 var configService = ConfigurationProvider.GetConfigurationService();
                 var channelsConfig = configService.GetSection<ChannelsOptions>("Bot:Channels");
                 _scrimmageChannelId = channelsConfig.ScrimmageChannel;
+                _challengeFeedChannelId = channelsConfig.ChallengeFeedChannel;
             }
             catch (InvalidOperationException ex)
                 when (ex.Message.Contains("Configuration service has not been initialized"))

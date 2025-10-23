@@ -59,12 +59,12 @@ namespace WabbitBot.Core.Common.Models.Common
     public class Match : Entity, IMatchEntity
     {
         // Navigation properties
-        public Guid Team1Id { get; set; }
-        public Guid Team2Id { get; set; }
-        public List<Guid> Team1PlayerIds { get; set; } = []; // Selected players for challenger team
-        public List<Guid> Team2PlayerIds { get; set; } = []; // Selected players for opponent team
-        public virtual Team? Team1 { get; set; }
-        public virtual Team? Team2 { get; set; }
+        public required Guid Team1Id { get; set; }
+        public required Guid Team2Id { get; set; }
+        public virtual Team Team1 { get; set; } = null!;
+        public virtual Team Team2 { get; set; } = null!;
+        public virtual ICollection<Player>? Team1Players { get; set; } = []; // Selected players for challenger team
+        public virtual ICollection<Player>? Team2Players { get; set; } = []; // Selected players for opponent team
 
         // Foreign key collections
         public ICollection<Guid> StateHistoryIds { get; set; } = [];
@@ -222,10 +222,10 @@ namespace WabbitBot.Core.Common.Models.Common
     public class Game : Entity, IMatchEntity
     {
         // Navigation properties
-        public Guid MatchId { get; set; }
+        public required Guid MatchId { get; set; }
         public virtual Match Match { get; set; } = null!;
 
-        public Guid MapId { get; set; }
+        public required Guid MapId { get; set; }
         public virtual Map Map { get; set; } = null!;
 
         public Guid? Team1DivisionId { get; set; }

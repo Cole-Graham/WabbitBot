@@ -69,7 +69,12 @@ namespace WabbitBot.Core.Common.Database
             }
         }
 
-        public async Task SaveSnapshotAsync(TEntity entity, Guid archivedBy, string? reason)
+        public async Task SaveSnapshotAsync(
+            TEntity entity,
+            Guid archivedBy,
+            string? reason,
+            System.Threading.CancellationToken cancellationToken = default
+        )
         {
             var archiveType = ResolveArchiveType();
             await using var db = WabbitBotDbContextProvider.CreateDbContext();
@@ -104,10 +109,14 @@ namespace WabbitBot.Core.Common.Database
 
             // Persist
             db.Add(archive);
-            await db.SaveChangesAsync();
+            await db.SaveChangesAsync(cancellationToken);
         }
 
-        public async Task<IEnumerable<TEntity>> GetHistoryAsync(Guid entityId, int? limit = null)
+        public async Task<IEnumerable<TEntity>> GetHistoryAsync(
+            Guid entityId,
+            int? limit = null,
+            System.Threading.CancellationToken cancellationToken = default
+        )
         {
             // Not implemented: archive rows contain archive model, not TEntity; caller should consume archive models.
             // For now, return empty history of live entities.
@@ -115,19 +124,26 @@ namespace WabbitBot.Core.Common.Database
             return Array.Empty<TEntity>();
         }
 
-        public Task<TEntity?> GetLatestAsync(Guid entityId)
+        public Task<TEntity?> GetLatestAsync(
+            Guid entityId,
+            System.Threading.CancellationToken cancellationToken = default
+        )
         {
             // Not implemented: see note in GetHistoryAsync
             return Task.FromResult<TEntity?>(null);
         }
 
-        public Task RestoreAsync(TEntity snapshot)
+        public Task RestoreAsync(TEntity snapshot, System.Threading.CancellationToken cancellationToken = default)
         {
             // To be implemented: map archive back to live entity and upsert
             return Task.CompletedTask;
         }
 
-        public Task PurgeAsync(Guid entityId, DateTime? olderThan = null)
+        public Task PurgeAsync(
+            Guid entityId,
+            DateTime? olderThan = null,
+            System.Threading.CancellationToken cancellationToken = default
+        )
         {
             return CoreService.TryWithDbContext(
                 async db =>
@@ -165,7 +181,7 @@ namespace WabbitBot.Core.Common.Database
                     {
                         db.Remove(r);
                     }
-                    await db.SaveChangesAsync();
+                    await db.SaveChangesAsync(cancellationToken);
                 },
                 "Archive Purge"
             );

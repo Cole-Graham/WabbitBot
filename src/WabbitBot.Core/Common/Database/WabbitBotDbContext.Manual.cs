@@ -90,6 +90,19 @@ namespace WabbitBot.Core.Common.Database
             });
         }
 
+        partial void ConfigureTeamMemberRelationships(ModelBuilder modelBuilder)
+        {
+            modelBuilder.Entity<TeamMember>(entity =>
+            {
+                // Unique active membership per roster+player
+                entity
+                    .HasIndex(e => new { e.TeamRosterId, e.PlayerId })
+                    .HasDatabaseName("ux_team_members_active_roster_player")
+                    .IsUnique()
+                    .HasFilter("valid_to IS NULL"); // partial index on active rows only
+            });
+        }
+
         /// <summary>
         /// Enable lazy loading for all entities.
         /// This allows navigation properties to be loaded automatically when accessed.

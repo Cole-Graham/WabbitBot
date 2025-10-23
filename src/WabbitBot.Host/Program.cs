@@ -69,7 +69,7 @@ public static class Program
             ConfigurationService = new BotConfigurationService(configuration, optionsWrapper);
 
             // Initialize static configuration provider
-            WabbitBot.Common.Configuration.ConfigurationProvider.Initialize(ConfigurationService);
+            Common.Configuration.ConfigurationProvider.Initialize(ConfigurationService);
 
             // Validate configuration
             ConfigurationService.ValidateConfiguration();
@@ -79,6 +79,12 @@ public static class Program
 
             // Initialize DiscBot (Discord client bootstrap)
             await InitializeDiscBotAsync(ConfigurationService, currentEnv);
+
+            // Seed development data after Discord is connected (Development only)
+            if (string.Equals(currentEnv, "Development", StringComparison.OrdinalIgnoreCase))
+            {
+                await SeedDevelopmentDataAsync();
+            }
 
             // Publish startup event (allow startup events to carry configuration references)
             await GlobalEventBus.PublishAsync(new StartupInitiatedEvent(botOptions, ConfigurationService));
@@ -158,22 +164,37 @@ public static class Program
             // Create DbContext and initialize database
             using (var dbContext = WabbitBotDbContextProvider.CreateDbContext())
             {
+                var useEnsureCreated =
+                    configuration.GetValue<bool?>("Bot:Database:UseEnsureCreated")
+                    ?? configuration.GetValue<bool>("Database:UseEnsureCreated");
+                var runMigrationsOnStartup =
+                    configuration.GetValue<bool?>("Bot:Database:RunMigrationsOnStartup")
+                    ?? configuration.GetValue<bool>("Database:RunMigrationsOnStartup");
+
                 if (string.Equals(environment, "Development", StringComparison.OrdinalIgnoreCase))
                 {
-                    // Development: Use EnsureCreated for rapid prototyping
-                    // This creates the database from scratch without migrations
-                    await dbContext.Database.EnsureCreatedAsync();
-
-                    // Seed development data
-                    await DevelopmentDataSeeder.SeedAsync(dbContext);
+                    if (useEnsureCreated)
+                    {
+                        await dbContext.Database.EnsureCreatedAsync();
+                    }
+                    else
+                    {
+                        await dbContext.Database.MigrateAsync();
+                    }
                 }
                 else
                 {
-                    // Production/Staging: Use migrations for proper schema versioning
-                    await dbContext.Database.MigrateAsync();
+                    if (runMigrationsOnStartup)
+                    {
+                        await dbContext.Database.MigrateAsync();
+                    }
+                }
 
-                    // Validate schema version compatibility
-                    var versionTracker = new SchemaVersionTracker(dbContext);
+                // Validate schema version compatibility (after any migration path)
+                var versionTracker = new SchemaVersionTracker(dbContext);
+                var currentSchemaVersion = await versionTracker.GetCurrentSchemaVersionAsync();
+                if (!string.Equals(currentSchemaVersion, "000-0.0", StringComparison.Ordinal))
+                {
                     await versionTracker.ValidateCompatibilityAsync();
                 }
 
@@ -200,10 +221,9 @@ public static class Program
             // Start archive retention on a timer from configuration
             _ = Task.Run(async () =>
             {
-                var retentionOptions =
-                    WabbitBot.Common.Configuration.ConfigurationProvider.GetSection<RetentionOptions>(
-                        RetentionOptions.SectionName
-                    );
+                var retentionOptions = Common.Configuration.ConfigurationProvider.GetSection<RetentionOptions>(
+                    RetentionOptions.SectionName
+                );
                 var retention = TimeSpan.FromDays(Math.Max(1, retentionOptions.ArchiveRetentionDays));
                 var interval = TimeSpan.FromHours(Math.Max(1, retentionOptions.JobIntervalHours));
                 while (true)
@@ -247,18 +267,17 @@ public static class Program
             CoreService.RegisterArchiveProviders();
 
             // Get storage configuration
-            var storageOptions =
-                WabbitBot.Common.Configuration.ConfigurationProvider.GetSection<WabbitBot.Common.Configuration.StorageOptions>(
-                    WabbitBot.Common.Configuration.StorageOptions.SectionName
-                );
+            var storageOptions = Common.Configuration.ConfigurationProvider.GetSection<StorageOptions>(
+                StorageOptions.SectionName
+            );
 
             // Initialize FileSystemService with explicit dependencies
             CoreService.InitializeFileSystemService(storageOptions, CoreEventBus, ErrorService);
 
             // Initialize Core event handlers (subscribe to CoreEventBus)
-            WabbitBot.Core.Scrimmages.ScrimmageHandler.Initialize();
-            WabbitBot.Core.Common.Models.Common.GameHandler.Initialize();
-            WabbitBot.Core.Common.Models.Common.MatchHandler.Initialize();
+            Core.Scrimmages.ScrimmageHandler.Initialize();
+            Core.Common.Models.Common.GameHandler.Initialize();
+            Core.Common.Models.Common.MatchHandler.Initialize();
 
             await Task.CompletedTask;
         }
@@ -278,18 +297,94 @@ public static class Program
         try
         {
             // Create DiscBotEventBus instance
-            var discBotEventBus = new WabbitBot.DiscBot.DiscBotEventBus(GlobalEventBus);
+            var discBotEventBus = new DiscBot.DiscBotEventBus(GlobalEventBus);
 
             // Initialize DiscBot services first
-            await WabbitBot.DiscBot.App.DiscBotBootstrap.InitializeServicesAsync(discBotEventBus, ErrorService);
+            await DiscBot.App.DiscBotBootstrap.InitializeServicesAsync(discBotEventBus, ErrorService);
 
             // Start the Discord client
-            await WabbitBot.DiscBot.App.DiscBotBootstrap.StartDiscordClientAsync(config, environment);
+            await DiscBot.App.DiscBotBootstrap.StartDiscordClientAsync(config, environment);
         }
         catch (Exception ex)
         {
             await ErrorService.CaptureAsync(ex, "Failed to initialize DiscBot", nameof(InitializeDiscBotAsync));
             throw;
+        }
+    }
+
+    /// <summary>
+    /// Seeds development data by fetching actual Discord user information.
+    /// Must be called after Discord client is connected.
+    /// </summary>
+    private static async Task SeedDevelopmentDataAsync()
+    {
+        try
+        {
+            Console.WriteLine("🌱 Preparing to seed development data with Discord user info...");
+
+            // Get Discord client from DiscBot service
+            var client = DiscBot.App.Services.DiscBot.DiscBotService.Client;
+
+            // Define test Discord user IDs (same as before)
+            var alphaTeamUserIds = new List<ulong> { 1348719242882584689, 1348724033306366055 };
+            var bravoTeamUserIds = new List<ulong> { 1348724778906681447, 1348725467422916749 };
+
+            // Fetch Discord user info
+            var alphaResult = await DiscBot.App.Utilities.DiscordUserInfoFetcher.FetchUserInfosPartialAsync(
+                client,
+                alphaTeamUserIds
+            );
+            var bravoResult = await DiscBot.App.Utilities.DiscordUserInfoFetcher.FetchUserInfosPartialAsync(
+                client,
+                bravoTeamUserIds
+            );
+
+            // Check if we got any users
+            if (!alphaResult.Success && !bravoResult.Success)
+            {
+                Console.WriteLine("⚠️  Could not fetch any Discord user info, using placeholder data...");
+                using (var dbContext = WabbitBotDbContextProvider.CreateDbContext())
+                {
+                    await DevelopmentDataSeeder.SeedWithDefaultDataAsync(dbContext);
+                }
+                return;
+            }
+
+            // Seed with actual Discord data (or empty list for failed fetches)
+            using (var dbContext = WabbitBotDbContextProvider.CreateDbContext())
+            {
+                await DevelopmentDataSeeder.SeedAsync(
+                    dbContext,
+                    alphaResult.Data ?? new List<Common.Models.DiscordUserInfo>(),
+                    bravoResult.Data ?? new List<Common.Models.DiscordUserInfo>()
+                );
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"⚠️  Failed to seed with Discord data, falling back to placeholder data: {ex.Message}");
+            await ErrorService.CaptureAsync(
+                ex,
+                "Failed to seed development data with Discord info",
+                nameof(SeedDevelopmentDataAsync)
+            );
+
+            // Fallback to placeholder seeding
+            try
+            {
+                using (var dbContext = WabbitBotDbContextProvider.CreateDbContext())
+                {
+                    await DevelopmentDataSeeder.SeedWithDefaultDataAsync(dbContext);
+                }
+            }
+            catch (Exception fallbackEx)
+            {
+                await ErrorService.CaptureAsync(
+                    fallbackEx,
+                    "Failed to seed development data with placeholder data",
+                    nameof(SeedDevelopmentDataAsync)
+                );
+            }
         }
     }
 }

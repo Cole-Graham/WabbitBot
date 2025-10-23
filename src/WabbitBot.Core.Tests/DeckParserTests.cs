@@ -44,7 +44,9 @@ namespace WabbitBot.Core.Tests
             // Verify second card
             Assert.Equal(20, decodedDeck.Cards[1].Unit.Id);
             Assert.NotNull(decodedDeck.Cards[1].Transport);
-            Assert.Equal(30, decodedDeck.Cards[1].Transport.Id);
+            var transport = decodedDeck.Cards[1].Transport;
+            Assert.NotNull(transport);
+            Assert.Equal(30, transport.Id);
             Assert.Equal(1, decodedDeck.Cards[1].Veterancy);
         }
 

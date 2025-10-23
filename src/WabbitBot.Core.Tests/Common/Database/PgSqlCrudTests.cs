@@ -40,6 +40,7 @@ namespace WabbitBot.Core.Common.Database.Tests
             {
                 Name = "TC_User",
                 TeamIds = new List<Guid> { Guid.NewGuid(), Guid.NewGuid() },
+                CurrentPlatformIds = new Dictionary<string, string> { ["Steam"] = "76561198012345678" },
                 PreviousPlatformIds = new Dictionary<string, List<string>>
                 {
                     ["Discord"] = new() { "u1", "u2" },
@@ -54,6 +55,8 @@ namespace WabbitBot.Core.Common.Database.Tests
             Assert.NotNull(found);
             Assert.Equal("TC_User", found!.Name);
             Assert.Equal(2, found.TeamIds.Count);
+            Assert.True(found.CurrentPlatformIds.ContainsKey("Steam"));
+            Assert.Equal("76561198012345678", found.CurrentPlatformIds["Steam"]);
             Assert.True(found.PreviousPlatformIds.ContainsKey("Discord"));
         }
     }

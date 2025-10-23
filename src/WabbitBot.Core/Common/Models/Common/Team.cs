@@ -25,17 +25,12 @@ namespace WabbitBot.Core.Common.Models.Common
         public Dictionary<TeamSize, ScrimmageTeamStats> ScrimmageTeamStats { get; set; } = [];
         public Dictionary<TeamSize, TournamentTeamStats> TournamentTeamStats { get; set; } = [];
 
-        // Foreign key collections
-        public ICollection<Guid> MatchIds { get; set; } = [];
-        public ICollection<Guid> RosterIds { get; set; } = [];
-        public ICollection<Guid> VarietyStatsIds { get; set; } = [];
-
         // Navigation properties
         public virtual ICollection<Match> Matches { get; set; } = [];
 
         // Core team data (no roster-specific properties here)
         public string Name { get; set; } = string.Empty;
-        public Guid TeamCaptainId { get; set; }
+        public Guid TeamMajorId { get; set; }
         public DateTime LastActive { get; set; }
         public string? Tag { get; set; }
 
@@ -51,12 +46,11 @@ namespace WabbitBot.Core.Common.Models.Common
         public override Domain Domain => Domain.Common;
     }
 
-    #region TeamRole
-    public enum TeamRole
+    #region RosterRole
+    public enum RosterRole
     {
         Captain,
         Core,
-        Substitute,
     }
     #endregion
 
@@ -81,17 +75,15 @@ namespace WabbitBot.Core.Common.Models.Common
     public class TeamRoster : Entity, ITeamEntity
     {
         // Navigation properties
-        public Guid TeamId { get; set; }
+        public required Guid TeamId { get; set; }
         public virtual Team Team { get; set; } = null!;
 
         // Roster-specific properties
         public TeamSizeRosterGroup RosterGroup { get; set; }
         public int MaxRosterSize { get; set; }
         public DateTime LastActive { get; set; }
-        public Guid? RosterCaptainId { get; set; } // Roster-specific captain (optional)
-
-        // Foreign key collection for members
-        public ICollection<Guid> RosterMemberIds { get; set; } = [];
+        public DateTime? CoreRoleChangedAt { get; set; }
+        public DateTime? CaptainChangedAt { get; set; }
 
         // Navigation to members
         public virtual ICollection<TeamMember> RosterMembers { get; set; } = [];
@@ -99,7 +91,13 @@ namespace WabbitBot.Core.Common.Models.Common
         public override Domain Domain => Domain.Common;
     }
     #endregion
-
+    // Example of how the relationships work:
+    // TeamRoster ─────┐
+    //                 │  EF manages
+    // RosterMembers ──┘
+    //      │
+    //      ▼
+    // TeamMember ── TeamRosterId (FK STORED HERE)
     #region TeamMember
     [EntityMetadata(
         tableName: "team_members",
@@ -114,17 +112,17 @@ namespace WabbitBot.Core.Common.Models.Common
     {
         // Navigation properties
         public Guid TeamRosterId { get; set; }
-        public virtual TeamRoster? TeamRoster { get; set; } = null;
+        public virtual TeamRoster TeamRoster { get; set; } = null!;
         public Guid MashinaUserId { get; set; }
         public virtual MashinaUser? MashinaUser { get; set; }
         public Guid PlayerId { get; set; }
         public string DiscordUserId { get; set; } = string.Empty;
 
         // Member-specific properties
-        public TeamRole Role { get; set; }
-        public DateTime JoinedAt { get; set; }
-        public bool IsActive { get; set; }
-        public bool IsTeamManager { get; set; }
+        public RosterRole? Role { get; set; } = null; // Null is a standard team member
+        public DateTime ValidFrom { get; set; } = DateTime.UtcNow;
+        public DateTime? ValidTo { get; set; }
+        public bool IsRosterManager { get; set; }
         public bool ReceiveScrimmagePings { get; set; } = false;
 
         public override Domain Domain => Domain.Common;

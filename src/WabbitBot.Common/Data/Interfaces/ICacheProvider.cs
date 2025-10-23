@@ -10,9 +10,13 @@ namespace WabbitBot.Common.Data.Interfaces
     public interface ICacheProvider<TEntity>
         where TEntity : Entity
     {
-        Task<bool> TryGetAsync(object id, out TEntity? entity);
-        Task SetAsync(object id, TEntity entity);
-        Task RemoveAsync(object id);
-        Task<IEnumerable<TEntity>> GetAllAsync();
+        Task<bool> TryGetAsync(
+            object id,
+            out TEntity? entity,
+            System.Threading.CancellationToken cancellationToken = default
+        );
+        Task SetAsync(object id, TEntity entity, System.Threading.CancellationToken cancellationToken = default);
+        Task RemoveAsync(object id, System.Threading.CancellationToken cancellationToken = default);
+        Task<IEnumerable<TEntity>> GetAllAsync(System.Threading.CancellationToken cancellationToken = default);
     }
 }

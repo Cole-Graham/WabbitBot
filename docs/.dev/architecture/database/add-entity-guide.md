@@ -58,6 +58,33 @@ Run a migration after adding or changing properties:
 - Review the SQL, ensure JSONB and indexes meet expectations.
 - Apply to dev database.
 
+#### Schema versioning (SchemaMetadata)
+- WabbitBot tracks schema versions in a dedicated `schema_metadata` table. Use version strings like
+  `SCHEMA-MAJOR.MINOR` (example: `001-1.0`).
+- Each migration that changes the schema should write an entry in `Up` and remove it in `Down`.
+- Sample insert in a migration:
+```csharp
+migrationBuilder.Sql(
+    "INSERT INTO schema_metadata (schema_version, applied_at, applied_by, description, is_breaking_change, migration_name) " +
+    "VALUES ('001-1.1', NOW(), 'EFCore', 'Add X', FALSE, 'AddX');"
+);
+```
+
+#### Startup migration flags
+- Configure per environment under `Bot:Database`:
+```json
+{
+  "Bot": {
+    "Database": {
+      "RunMigrationsOnStartup": true,
+      "UseEnsureCreated": false
+    }
+  }
+}
+```
+- Development: set `RunMigrationsOnStartup=true`.
+- Production: keep `RunMigrationsOnStartup=false` and apply migrations via a deployment step.
+
 ### 5) Use DatabaseService in Core logic
 Access data via `DatabaseService<TEntity>`; no DI container.
 
@@ -95,5 +122,40 @@ public class TournamentCore
 - DatabaseService-based access in Core logic.
 - Tests updated: config assertions, CRUD/JSONB roundtrip.
 - Docs reflect Option A and PostgreSQL-only policy.
+
+### PostgreSQL temporal constraints and filtered indexes (example)
+- For temporal membership models like `TeamMember (ValidFrom, ValidTo)`, add:
+  - A filtered unique index to enforce a single active row per key:
+```csharp
+entity
+    .HasIndex(e => new { e.TeamRosterId, e.PlayerId })
+    .IsUnique()
+    .HasFilter("valid_to IS NULL");
+```
+  - A PostgreSQL exclusion constraint to prevent overlapping periods (requires `btree_gist`):
+```csharp
+migrationBuilder.Sql("CREATE EXTENSION IF NOT EXISTS btree_gist;");
+migrationBuilder.Sql(@"ALTER TABLE team_members
+ADD CONSTRAINT team_members_no_overlap
+EXCLUDE USING gist (
+  team_roster_id WITH =,
+  player_id WITH =,
+  tstzrange(valid_from, COALESCE(valid_to, 'infinity')) WITH &&
+);");
+```
+
+### Migration runbook (quick reference)
+#### Development
+1. Update entity, build to generate code.
+2. `dotnet ef migrations add MeaningfulName -p src/WabbitBot.Core -s src/WabbitBot.Host`
+3. `dotnet ef database update -p src/WabbitBot.Core -s src/WabbitBot.Host`
+4. Verify constraints and indexes; tests pass.
+
+#### Production
+1. Ensure appsettings.json has `Bot:Database:RunMigrationsOnStartup=false`.
+2. Take a DB backup.
+3. Apply migrations out-of-band (preferred):
+   `dotnet ef database update -p src/WabbitBot.Core -s src/WabbitBot.Host`
+4. Deploy app; startup validates schema via `SchemaVersionTracker` against `schema_metadata`.
 
 

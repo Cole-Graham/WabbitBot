@@ -224,7 +224,20 @@ namespace WabbitBot.DiscBot.App.Renderers
         /// <summary>
         /// Refreshes the game container to show the latest opponent status (deck submission, confirmations, etc.)
         /// </summary>
-        public static async Task<Result> RefreshGameContainerAsync(Guid gameId)
+        public static Task<Result> RefreshGameContainerAsync(Guid gameId) =>
+            UpdateGameContainerInternalAsync(gameId, "Game container refreshed");
+
+        /// <summary>
+        /// Updates the replay status in the game container messages for both teams.
+        /// </summary>
+        public static Task<Result> UpdateGameContainerReplayStatusAsync(Guid gameId, Guid submitterPlayerId) =>
+            UpdateGameContainerInternalAsync(gameId, "Game container updated");
+
+        /// <summary>
+        /// Internal method that handles all game container updates efficiently.
+        /// Optimized with O(n) replay matching and parallel message updates.
+        /// </summary>
+        private static async Task<Result> UpdateGameContainerInternalAsync(Guid gameId, string successMessage)
         {
             try
             {
@@ -244,7 +257,7 @@ namespace WabbitBot.DiscBot.App.Renderers
                     return Result.Failure("Discord client not available");
                 }
 
-                // Get players, deck status, and replay data
+                // Get players, deck status, replay data, and game completion status in a single DB context
                 var (
                     team1Players,
                     team2Players,
@@ -252,18 +265,21 @@ namespace WabbitBot.DiscBot.App.Renderers
                     replayFilenames,
                     playerDeckCodes,
                     playerDeckConfirmed,
-                    replays
+                    isGameCompleted,
+                    winnerTeamId
                 ) = await Core.Common.Services.CoreService.WithDbContext(async db =>
                 {
-                    // Load players for both teams
-                    var allPlayerIds = game.Match.Team1PlayerIds.Concat(game.Match.Team2PlayerIds).ToList();
-                    var players = await db
-                        .Players.Where(p => allPlayerIds.Contains(p.Id))
-                        .Include(p => p.MashinaUser)
-                        .ToListAsync();
+                    if (game.Match.Team1Players is null || game.Match.Team2Players is null)
+                    {
+                        throw new InvalidOperationException($"Team 1 or team 2 players not found for game {gameId}");
+                    }
 
-                    var team1 = players.Where(p => game.Match.Team1PlayerIds.Contains(p.Id)).ToList();
-                    var team2 = players.Where(p => game.Match.Team2PlayerIds.Contains(p.Id)).ToList();
+                    // Load players for both teams
+                    var allPlayerIds = game.Match.Team1Players.Concat(game.Match.Team2Players).ToList();
+                    var players = await db.Players.Where(p => allPlayerIds.Contains(p)).ToListAsync();
+
+                    var team1 = players.Where(p => game.Match.Team1Players.Any(tp => tp.Id == p.Id)).ToList();
+                    var team2 = players.Where(p => game.Match.Team2Players.Any(tp => tp.Id == p.Id)).ToList();
 
                     // Get latest game state snapshot for deck status
                     var latestSnapshot = await db
@@ -274,54 +290,35 @@ namespace WabbitBot.DiscBot.App.Renderers
                     var deckCodes = latestSnapshot?.PlayerDeckCodes ?? new Dictionary<Guid, string>();
                     var deckConfirmed = latestSnapshot?.PlayerDeckConfirmed ?? new HashSet<Guid>();
 
-                    // Get replay data and determine who submitted, including filenames
+                    // Get replay data and determine who submitted (optimized O(n) algorithm)
                     var allReplays = await db
                         .Replays.Where(r => r.GameId == gameId)
                         .Include(r => r.Players)
                         .ToListAsync();
 
-                    var submitted = new HashSet<Guid>();
-                    var filenames = new Dictionary<Guid, string>();
+                    var (submitted, filenames) = MatchPlayersToReplays(players, allReplays);
 
-                    foreach (var player in players)
+                    // Get game completion status in the same DB context
+                    var gameWithState = await db
+                        .Games.Include(g => g.StateHistory)
+                        .Where(g => g.Id == gameId)
+                        .FirstOrDefaultAsync();
+
+                    var completed = false;
+                    Guid? winnerId = null;
+                    if (gameWithState is not null)
                     {
-                        foreach (var replay in allReplays)
-                        {
-                            foreach (var rp in replay.Players)
-                            {
-                                if (
-                                    (
-                                        !string.IsNullOrEmpty(rp.PlayerUserId)
-                                        && player
-                                            .PreviousPlatformIds.GetValueOrDefault("EugenSystems")
-                                            ?.Contains(rp.PlayerUserId) == true
-                                    )
-                                    || (
-                                        ExtractSteamId(rp.PlayerAvatar) is string steamId
-                                        && player.PreviousPlatformIds.GetValueOrDefault("Steam")?.Contains(steamId)
-                                            == true
-                                    )
-                                    || (
-                                        !string.IsNullOrEmpty(rp.PlayerName)
-                                        && (
-                                            player.GameUsername == rp.PlayerName
-                                            || player.PreviousGameUsernames.Contains(rp.PlayerName)
-                                        )
-                                    )
-                                )
-                                {
-                                    submitted.Add(player.Id);
-                                    filenames[player.Id] = replay.OriginalFilename ?? "replay.rpl3";
-                                    break;
-                                }
-                            }
-                        }
+                        var currentSnapshot = Core.Common.Models.Common.MatchCore.Accessors.GetCurrentSnapshot(
+                            gameWithState
+                        );
+                        completed = currentSnapshot.CompletedAt.HasValue;
+                        winnerId = currentSnapshot.WinnerId;
                     }
 
-                    return (team1, team2, submitted, filenames, deckCodes, deckConfirmed, allReplays);
+                    return (team1, team2, submitted, filenames, deckCodes, deckConfirmed, completed, winnerId);
                 });
 
-                // verify that teams are loaded
+                // Verify that teams are loaded
                 if (game.Match.Team1 is null)
                 {
                     return Result.Failure("Team 1 not found");
@@ -350,245 +347,170 @@ namespace WabbitBot.DiscBot.App.Renderers
                     ? (int)team2Stats.CurrentRating
                     : 0;
 
-                // Update both messages - each showing only their own team with deck status
-                await UpdateMessageWithPlayerSectionsAsync(
-                    client,
-                    game.Match.Team1ThreadId,
-                    game.Team1GameContainerMsgId,
-                    game.GameNumber,
-                    game.Map.Name,
-                    game.Match.Team1.Name,
-                    team1Players,
-                    replaySubmittedPlayerIds,
-                    replayFilenames,
-                    gameId,
-                    team1DeckCodes,
-                    playerDeckConfirmed,
-                    replays,
-                    team2Players,
-                    game.Match.Team2.Name,
-                    team2Rating,
-                    playerDeckCodes
-                );
-                await UpdateMessageWithPlayerSectionsAsync(
-                    client,
-                    game.Match.Team2ThreadId,
-                    game.Team2GameContainerMsgId,
-                    game.GameNumber,
-                    game.Map.Name,
-                    game.Match.Team2.Name,
-                    team2Players,
-                    replaySubmittedPlayerIds,
-                    replayFilenames,
-                    gameId,
-                    team2DeckCodes,
-                    playerDeckConfirmed,
-                    replays,
-                    team1Players,
-                    game.Match.Team1.Name,
-                    team1Rating,
-                    playerDeckCodes
+                // Update both messages in parallel for better performance
+                await Task.WhenAll(
+                    UpdateMessageWithPlayerSectionsAsync(
+                        client,
+                        game.Match.Team1ThreadId,
+                        game.Team1GameContainerMsgId,
+                        game.GameNumber,
+                        game.Map.Name,
+                        game.Match.Team1.Name,
+                        team1Players,
+                        replaySubmittedPlayerIds,
+                        replayFilenames,
+                        team1DeckCodes,
+                        playerDeckConfirmed,
+                        team2Players,
+                        game.Match.Team2.Name,
+                        team2Rating,
+                        playerDeckCodes,
+                        isGameCompleted,
+                        winnerTeamId,
+                        game.Match.Team1Id
+                    ),
+                    UpdateMessageWithPlayerSectionsAsync(
+                        client,
+                        game.Match.Team2ThreadId,
+                        game.Team2GameContainerMsgId,
+                        game.GameNumber,
+                        game.Map.Name,
+                        game.Match.Team2.Name,
+                        team2Players,
+                        replaySubmittedPlayerIds,
+                        replayFilenames,
+                        team2DeckCodes,
+                        playerDeckConfirmed,
+                        team1Players,
+                        game.Match.Team1.Name,
+                        team1Rating,
+                        playerDeckCodes,
+                        isGameCompleted,
+                        winnerTeamId,
+                        game.Match.Team2Id
+                    )
                 );
 
-                return Result.CreateSuccess("Game container refreshed");
+                return Result.CreateSuccess(successMessage);
             }
             catch (Exception ex)
             {
                 await DiscBotService.ErrorHandler.CaptureAsync(
                     ex,
-                    $"Failed to refresh game container for game {gameId}",
-                    nameof(RefreshGameContainerAsync)
+                    $"Failed to update game container for game {gameId}",
+                    nameof(UpdateGameContainerInternalAsync)
                 );
-                return Result.Failure($"Failed to refresh game container: {ex.Message}");
+                return Result.Failure($"Failed to update game container: {ex.Message}");
             }
         }
 
         /// <summary>
-        /// Updates the replay status in the game container messages for both teams.
+        /// Optimized O(n) algorithm to match players to replays using lookup dictionaries.
+        /// Previous implementation was O(n³) with nested loops.
         /// </summary>
-        public static async Task<Result> UpdateGameContainerReplayStatusAsync(Guid gameId, Guid submitterPlayerId)
+        private static (HashSet<Guid> submitted, Dictionary<Guid, string> filenames) MatchPlayersToReplays(
+            List<Core.Common.Models.Common.Player> players,
+            List<Core.Common.Models.Common.Replay> replays
+        )
         {
-            try
+            var submitted = new HashSet<Guid>();
+            var filenames = new Dictionary<Guid, string>();
+
+            // Build lookup dictionaries for O(1) access
+            var playersByEugenId = new Dictionary<string, Core.Common.Models.Common.Player>();
+            var playersBySteamId = new Dictionary<string, Core.Common.Models.Common.Player>();
+            var playersByUsername = new Dictionary<string, Core.Common.Models.Common.Player>(
+                StringComparer.OrdinalIgnoreCase
+            );
+
+            foreach (var player in players)
             {
-                var gameResult = await Core.Common.Services.CoreService.Games.GetByIdAsync(
-                    gameId,
-                    Common.Data.Interfaces.DatabaseComponent.Repository
-                );
-                if (!gameResult.Success || gameResult.Data is null)
+                // Index by current Eugen System ID
+                var currentEugenId = player.CurrentPlatformIds.GetValueOrDefault("EugenSystems");
+                if (!string.IsNullOrEmpty(currentEugenId))
                 {
-                    return Result.Failure($"Game not found: {gameId}");
+                    playersByEugenId.TryAdd(currentEugenId, player);
                 }
 
-                var game = gameResult.Data;
-                var client = DiscBotService.Client;
-                if (client is null)
+                // Index by previous Eugen System IDs
+                var eugenIds = player.PreviousPlatformIds.GetValueOrDefault("EugenSystems");
+                if (eugenIds is not null)
                 {
-                    return Result.Failure("Discord client not available");
-                }
-
-                // Get players, deck status, and replay data
-                var (
-                    team1Players,
-                    team2Players,
-                    replaySubmittedPlayerIds,
-                    replayFilenames,
-                    playerDeckCodes,
-                    playerDeckConfirmed,
-                    replays
-                ) = await Core.Common.Services.CoreService.WithDbContext(async db =>
-                {
-                    // Load players for both teams
-                    var allPlayerIds = game.Match.Team1PlayerIds.Concat(game.Match.Team2PlayerIds).ToList();
-                    var players = await db
-                        .Players.Where(p => allPlayerIds.Contains(p.Id))
-                        .Include(p => p.MashinaUser)
-                        .ToListAsync();
-
-                    var team1 = players.Where(p => game.Match.Team1PlayerIds.Contains(p.Id)).ToList();
-                    var team2 = players.Where(p => game.Match.Team2PlayerIds.Contains(p.Id)).ToList();
-
-                    // Get latest game state snapshot for deck status
-                    var latestSnapshot = await db
-                        .GameStateSnapshots.Where(gs => gs.GameId == gameId)
-                        .OrderByDescending(gs => gs.Timestamp)
-                        .FirstOrDefaultAsync();
-
-                    var deckCodes = latestSnapshot?.PlayerDeckCodes ?? new Dictionary<Guid, string>();
-                    var deckConfirmed = latestSnapshot?.PlayerDeckConfirmed ?? new HashSet<Guid>();
-
-                    // Get replay data and determine who submitted, including filenames
-                    var allReplays = await db
-                        .Replays.Where(r => r.GameId == gameId)
-                        .Include(r => r.Players)
-                        .ToListAsync();
-
-                    var submitted = new HashSet<Guid>();
-                    var filenames = new Dictionary<Guid, string>();
-
-                    foreach (var player in players)
+                    foreach (var id in eugenIds)
                     {
-                        foreach (var replay in allReplays)
-                        {
-                            foreach (var rp in replay.Players)
-                            {
-                                if (
-                                    (
-                                        !string.IsNullOrEmpty(rp.PlayerUserId)
-                                        && player
-                                            .PreviousPlatformIds.GetValueOrDefault("EugenSystems")
-                                            ?.Contains(rp.PlayerUserId) == true
-                                    )
-                                    || (
-                                        ExtractSteamId(rp.PlayerAvatar) is string steamId
-                                        && player.PreviousPlatformIds.GetValueOrDefault("Steam")?.Contains(steamId)
-                                            == true
-                                    )
-                                    || (
-                                        !string.IsNullOrEmpty(rp.PlayerName)
-                                        && (
-                                            player.GameUsername == rp.PlayerName
-                                            || player.PreviousGameUsernames.Contains(rp.PlayerName)
-                                        )
-                                    )
-                                )
-                                {
-                                    submitted.Add(player.Id);
-                                    filenames[player.Id] = replay.OriginalFilename ?? "replay.rpl3";
-                                    break;
-                                }
-                            }
-                        }
+                        playersByEugenId.TryAdd(id, player);
+                    }
+                }
+
+                // Index by current Steam ID
+                var currentSteamId = player.CurrentPlatformIds.GetValueOrDefault("Steam");
+                if (!string.IsNullOrEmpty(currentSteamId))
+                {
+                    playersBySteamId.TryAdd(currentSteamId, player);
+                }
+
+                // Index by previous Steam IDs
+                var steamIds = player.PreviousPlatformIds.GetValueOrDefault("Steam");
+                if (steamIds is not null)
+                {
+                    foreach (var id in steamIds)
+                    {
+                        playersBySteamId.TryAdd(id, player);
+                    }
+                }
+
+                // Index by current and previous usernames
+                if (!string.IsNullOrEmpty(player.CurrentSteamUsername))
+                {
+                    playersByUsername.TryAdd(player.CurrentSteamUsername, player);
+                }
+                foreach (var username in player.PreviousSteamUsernames)
+                {
+                    playersByUsername.TryAdd(username, player);
+                }
+            }
+
+            // Single pass through replays - O(n) instead of O(n³)
+            foreach (var replay in replays)
+            {
+                foreach (var rp in replay.Players)
+                {
+                    Core.Common.Models.Common.Player? matchedPlayer = null;
+
+                    // Try matching by Eugen ID
+                    if (
+                        !string.IsNullOrEmpty(rp.PlayerUserId)
+                        && playersByEugenId.TryGetValue(rp.PlayerUserId, out matchedPlayer)
+                    )
+                    {
+                        // Matched
+                    }
+                    // Try matching by Steam ID
+                    else if (
+                        ExtractSteamId(rp.PlayerAvatar) is string steamId
+                        && playersBySteamId.TryGetValue(steamId, out matchedPlayer)
+                    )
+                    {
+                        // Matched
+                    }
+                    // Try matching by username
+                    else if (
+                        !string.IsNullOrEmpty(rp.PlayerName)
+                        && playersByUsername.TryGetValue(rp.PlayerName, out matchedPlayer)
+                    )
+                    {
+                        // Matched
                     }
 
-                    return (team1, team2, submitted, filenames, deckCodes, deckConfirmed, allReplays);
-                });
-
-                // verify that teams are loaded
-                if (game.Match.Team1 is null)
-                {
-                    return Result.Failure("Team 1 not found");
+                    if (matchedPlayer is not null)
+                    {
+                        submitted.Add(matchedPlayer.Id);
+                        filenames[matchedPlayer.Id] = replay.OriginalFilename ?? "replay.rpl3";
+                    }
                 }
-                if (game.Match.Team2 is null)
-                {
-                    return Result.Failure("Team 2 not found");
-                }
-
-                // Filter deck codes to only include players on each team (security: teams should not see opponent's deck codes)
-                var team1PlayerIds = team1Players.Select(p => p.Id).ToHashSet();
-                var team2PlayerIds = team2Players.Select(p => p.Id).ToHashSet();
-
-                var team1DeckCodes = playerDeckCodes
-                    .Where(kvp => team1PlayerIds.Contains(kvp.Key))
-                    .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
-                var team2DeckCodes = playerDeckCodes
-                    .Where(kvp => team2PlayerIds.Contains(kvp.Key))
-                    .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
-
-                // Get team ratings for this team size
-                var team1Rating = game.Match.Team1.ScrimmageTeamStats.TryGetValue(
-                    game.TeamSize,
-                    out var team1StatsReplay
-                )
-                    ? (int)team1StatsReplay.CurrentRating
-                    : 0;
-                var team2Rating = game.Match.Team2.ScrimmageTeamStats.TryGetValue(
-                    game.TeamSize,
-                    out var team2StatsReplay
-                )
-                    ? (int)team2StatsReplay.CurrentRating
-                    : 0;
-
-                // Update both messages - each showing only their own team with deck status
-                await UpdateMessageWithPlayerSectionsAsync(
-                    client,
-                    game.Match.Team1ThreadId,
-                    game.Team1GameContainerMsgId,
-                    game.GameNumber,
-                    game.Map.Name,
-                    game.Match.Team1.Name,
-                    team1Players,
-                    replaySubmittedPlayerIds,
-                    replayFilenames,
-                    gameId,
-                    team1DeckCodes,
-                    playerDeckConfirmed,
-                    replays,
-                    team2Players,
-                    game.Match.Team2.Name,
-                    team2Rating,
-                    playerDeckCodes
-                );
-                await UpdateMessageWithPlayerSectionsAsync(
-                    client,
-                    game.Match.Team2ThreadId,
-                    game.Team2GameContainerMsgId,
-                    game.GameNumber,
-                    game.Map.Name,
-                    game.Match.Team2.Name,
-                    team2Players,
-                    replaySubmittedPlayerIds,
-                    replayFilenames,
-                    gameId,
-                    team2DeckCodes,
-                    playerDeckConfirmed,
-                    replays,
-                    team1Players,
-                    game.Match.Team1.Name,
-                    team1Rating,
-                    playerDeckCodes
-                );
-
-                return Result.CreateSuccess("Game container updated");
             }
-            catch (Exception ex)
-            {
-                await DiscBotService.ErrorHandler.CaptureAsync(
-                    ex,
-                    $"Failed to update game container replay status for game {gameId}",
-                    nameof(UpdateGameContainerReplayStatusAsync)
-                );
-                return Result.Failure($"Failed to update game container: {ex.Message}");
-            }
+
+            return (submitted, filenames);
         }
 
         private static async Task UpdateMessageWithPlayerSectionsAsync(
@@ -601,14 +523,15 @@ namespace WabbitBot.DiscBot.App.Renderers
             List<Core.Common.Models.Common.Player> teamPlayers,
             HashSet<Guid> replaySubmittedPlayerIds,
             Dictionary<Guid, string> replayFilenames,
-            Guid gameId,
             Dictionary<Guid, string> playerDeckCodes,
             HashSet<Guid> playerDeckConfirmed,
-            List<Core.Common.Models.Common.Replay> replays,
             List<Core.Common.Models.Common.Player> opponentPlayers,
             string opponentTeamName,
             int opponentTeamRating,
-            Dictionary<Guid, string> allPlayerDeckCodes
+            Dictionary<Guid, string> allPlayerDeckCodes,
+            bool isGameCompleted,
+            Guid? winnerTeamId,
+            Guid currentTeamId
         )
         {
             if (!threadId.HasValue || !messageId.HasValue)
@@ -646,15 +569,13 @@ namespace WabbitBot.DiscBot.App.Renderers
                 }
                 components.Add(new DiscordSeparatorComponent());
 
-                // Add match info section - need to get team ratings from database
-                // TODO: Get actual team ratings from game/match data
+                // Add match info section
                 var matchInfoText = $"**{teamName}** - Game {gameNumber} - **{mapName}**";
                 components.Add(new DiscordSectionComponent(new DiscordTextDisplayComponent(matchInfoText), null!));
 
                 components.Add(new DiscordSeparatorComponent());
 
                 // Add player section components with updated status - only for this team
-                // Build HashSet of players who submitted decks (have deck codes in snapshot)
                 var deckSubmittedPlayerIds = teamPlayers
                     .Where(p => playerDeckCodes.ContainsKey(p.Id))
                     .Select(p => p.Id)
@@ -689,54 +610,10 @@ namespace WabbitBot.DiscBot.App.Renderers
                 // Add separator after opponent status section
                 components.Add(new DiscordSeparatorComponent());
 
-                // Check if game is completed and get winner
-                var isGameCompleted = false;
-                Guid? winnerTeamId = null;
-                Guid? currentTeamId = null;
-
-                // Fetch game state to check if completed
-                var gameStateResult = await Core.Common.Services.CoreService.WithDbContext(async db =>
-                {
-                    var game = await db
-                        .Games.Include(g => g.StateHistory)
-                        .Include(g => g.Match)
-                        .Where(g => g.Id == gameId)
-                        .FirstOrDefaultAsync();
-
-                    if (game is not null)
-                    {
-                        var currentSnapshot = Core.Common.Models.Common.MatchCore.Accessors.GetCurrentSnapshot(game);
-                        var completed = currentSnapshot.CompletedAt.HasValue;
-                        var winner = currentSnapshot.WinnerId;
-
-                        // Determine current team ID based on which team the players belong to
-                        Guid? teamId = null;
-                        if (teamPlayers.Count > 0 && game.Match is not null)
-                        {
-                            if (game.Match.Team1PlayerIds.Contains(teamPlayers[0].Id))
-                            {
-                                teamId = game.Match.Team1Id;
-                            }
-                            else if (game.Match.Team2PlayerIds.Contains(teamPlayers[0].Id))
-                            {
-                                teamId = game.Match.Team2Id;
-                            }
-                        }
-
-                        return (completed, winner, teamId);
-                    }
-
-                    return (false, null, null);
-                });
-
-                isGameCompleted = gameStateResult.completed;
-                winnerTeamId = gameStateResult.winner;
-                currentTeamId = gameStateResult.teamId;
-
-                // Add final action component based on game state
+                // Add final action component based on game state (now passed as parameters - no extra DB query)
                 await AddFinalActionComponentAsync(
                     components,
-                    gameId,
+                    default,
                     teamPlayers,
                     deckSubmittedPlayerIds,
                     playerDeckConfirmed,
@@ -898,7 +775,7 @@ namespace WabbitBot.DiscBot.App.Renderers
             foreach (var player in players)
             {
                 var playerName =
-                    player.GameUsername
+                    player.CurrentSteamUsername
                     ?? player.MashinaUser?.DiscordUsername
                     ?? player.MashinaUser?.DiscordGlobalname
                     ?? "Unknown";
@@ -985,7 +862,7 @@ namespace WabbitBot.DiscBot.App.Renderers
             foreach (var player in opponentPlayers)
             {
                 var playerName =
-                    player.GameUsername
+                    player.CurrentSteamUsername
                     ?? player.MashinaUser?.DiscordUsername
                     ?? player.MashinaUser?.DiscordGlobalname
                     ?? "Unknown";
