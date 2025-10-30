@@ -10,6 +10,7 @@ using WabbitBot.Core.Common.Models.Common;
 using WabbitBot.Core.Common.Services;
 using WabbitBot.DiscBot.App.Providers;
 using WabbitBot.DiscBot.App.Renderers;
+using WabbitBot.DiscBot.App.Services.DiscBot;
 
 namespace WabbitBot.DiscBot.App.Commands
 {
@@ -20,11 +21,13 @@ namespace WabbitBot.DiscBot.App.Commands
     {
         private static bool IsCaptainOrManager(Team team, Guid playerId)
         {
-            return team
-                .Rosters.SelectMany(r => r.RosterMembers)
-                .Any(m =>
-                    m.PlayerId == playerId && m.ValidTo == null && (m.Role == RosterRole.Captain || m.IsRosterManager)
-                );
+            return team.Rosters.SelectMany(r => r.RosterMembers)
+                    .Any(m =>
+                        m.PlayerId == playerId
+                        && m.ValidTo == null
+                        && (m.Role == RosterRole.Captain || m.IsRosterManager)
+                    )
+                || team.TeamMajorId == playerId;
         }
 
         private static async Task<(bool ok, string? message)> CheckMembershipLimitAsync(
@@ -73,6 +76,14 @@ namespace WabbitBot.DiscBot.App.Commands
                 await ctx.EditResponseAsync(
                     limitCheck.message ?? "You have reached the maximum number of teams for this roster group."
                 );
+                return;
+            }
+
+            // Validate unique name/tag
+            var uniqueness = await TeamCore.Validation.ValidateTeamUniqueness(name, tag);
+            if (!uniqueness.Success)
+            {
+                await ctx.EditResponseAsync(uniqueness.ErrorMessage ?? "Team name/tag already in use.");
                 return;
             }
 
@@ -286,7 +297,7 @@ namespace WabbitBot.DiscBot.App.Commands
         [Description("Open the team role editor for a team you manage")]
         public async Task EditRolesAsync(
             CommandContext ctx,
-            [SlashAutoCompleteProvider(typeof(WabbitBot.DiscBot.App.Providers.TeamRolesTeamAutoComplete))] string team
+            [SlashAutoCompleteProvider(typeof(TeamRolesTeamAutoComplete))] string team
         )
         {
             await ctx.DeferResponseAsync();
@@ -297,9 +308,27 @@ namespace WabbitBot.DiscBot.App.Commands
                 return;
             }
 
-            var container = await TeamRenderer.RenderTeamRoleEditorAsync(ctx.User.Id, teamId);
-            await ctx.EditResponseAsync(
-                new DiscordWebhookBuilder().EnableV2Components().AddContainerComponent(container)
+            var container = await TeamRenderer.RenderTeamEditorAsync(ctx.User.Id, teamId);
+
+            // Delete the deferred response; we'll post the container in a private thread
+            await ctx.DeleteResponseAsync();
+
+            // Create a private thread in MashinaChannel and send the container there
+            var threadName = $"Team Role Editor - {ctx.User.GlobalName}";
+            var (thread, message) = await DiscBotService.ThreadContainers.CreateThreadAndSendAsync(
+                threadName,
+                container,
+                ctx.Guild,
+                ctx.User.Id,
+                DiscBotService.MashinaChannel,
+                enableInactivityCleanup: true
+            );
+
+            // Ephemeral followup with a link to the thread
+            await ctx.FollowupAsync(
+                new DiscordFollowupMessageBuilder()
+                    .WithContent($"Your team role editor is ready in {thread.Mention}")
+                    .AsEphemeral()
             );
         }
 

@@ -21,18 +21,34 @@ namespace WabbitBot.DiscBot.App.Providers
             var teams = await CoreService.WithDbContext(async db =>
             {
                 return await db
-                    .Teams.Where(t =>
+                    .Teams.Include(t => t.TeamMajor)
+                    .ThenInclude(p => p.MashinaUser)
+                    .Where(t =>
                         t.Rosters.Any(r => r.RosterMembers.Any(m => m.DiscordUserId == userId && m.IsRosterManager))
+                        || t.TeamMajor.MashinaUser.DiscordUserId == context.User.Id
                     )
                     .Where(t => t.TeamType == TeamType.Team) // exclude Solo teams from management UI
                     .Where(t => EF.Functions.ILike(t.Name, $"%{term}%"))
                     .OrderBy(t => t.Name)
-                    .Select(t => new { t.Id, t.Name })
+                    .Select(t => new
+                    {
+                        t.Id,
+                        t.Name,
+                        MajorDiscordGlobalName = t.TeamMajor.MashinaUser.DiscordGlobalname,
+                    })
                     .Take(25)
                     .ToListAsync();
             });
 
-            return teams.Select(t => new DiscordAutoCompleteChoice(t.Name, t.Id.ToString()));
+            return teams.Select(t =>
+            {
+                var label = t.Name;
+                if (!string.IsNullOrWhiteSpace(t.MajorDiscordGlobalName))
+                {
+                    label += $" ({t.MajorDiscordGlobalName})";
+                }
+                return new DiscordAutoCompleteChoice(label, t.Id.ToString());
+            });
         }
     }
 
@@ -69,24 +85,23 @@ namespace WabbitBot.DiscBot.App.Providers
         public async ValueTask<IEnumerable<DiscordAutoCompleteChoice>> AutoCompleteAsync(AutoCompleteContext context)
         {
             var term = context.UserInput ?? string.Empty;
-            var userId = context.User.Id.ToString();
 
             var teamRosters = await CoreService.WithDbContext(async db =>
             {
                 return await db
-                    .Teams.Where(t =>
-                        t.TeamType == TeamType.Team // exclude Solo teams from selection
-                        && t.Rosters.Any(r => r.RosterMembers.Any(m => m.DiscordUserId == userId && m.IsRosterManager))
-                    )
+                    .Teams.Where(t => t.TeamType == TeamType.Team) // exclude Solo teams from selection
                     .Include(t => t.Rosters)
+                    .Include(t => t.TeamMajor)
+                    .ThenInclude(p => p.MashinaUser)
                     .OrderBy(t => t.Name)
                     .Select(t => new
                     {
                         t.Id,
                         t.Name,
                         Rosters = t.Rosters,
+                        MajorDiscordGlobalName = t.TeamMajor.MashinaUser.DiscordGlobalname,
                     })
-                    .Take(50)
+                    .Take(10)
                     .ToListAsync();
             });
 
@@ -103,7 +118,12 @@ namespace WabbitBot.DiscBot.App.Providers
             {
                 foreach (var r in t.Rosters.Where(r => r.RosterGroup != TeamSizeRosterGroup.Solo))
                 {
-                    var label = $"{t.Name} - {RosterLabel(r.RosterGroup)}";
+                    var teamLabel = t.Name;
+                    if (!string.IsNullOrWhiteSpace(t.MajorDiscordGlobalName))
+                    {
+                        teamLabel += $" ({t.MajorDiscordGlobalName})";
+                    }
+                    var label = $"{teamLabel} - {RosterLabel(r.RosterGroup)}";
                     if (string.IsNullOrEmpty(term) || label.Contains(term, StringComparison.OrdinalIgnoreCase))
                     {
                         choices.Add(new DiscordAutoCompleteChoice(label, $"{t.Id}:{r.RosterGroup}"));
@@ -126,10 +146,46 @@ namespace WabbitBot.DiscBot.App.Providers
         {
             var items = new List<DiscordAutoCompleteChoice>
             {
-                new DiscordAutoCompleteChoice("Duo - 2v2", TeamSizeRosterGroup.Duo),
-                new DiscordAutoCompleteChoice("Squad - 3v3/4v4", TeamSizeRosterGroup.Squad),
+                new DiscordAutoCompleteChoice("Duo - 2v2", (long)TeamSizeRosterGroup.Duo),
+                new DiscordAutoCompleteChoice("Squad - 3v3/4v4", (long)TeamSizeRosterGroup.Squad),
             };
             return ValueTask.FromResult<IEnumerable<DiscordAutoCompleteChoice>>(items);
+        }
+    }
+
+    // All teams in the guild (no management restriction), by name match
+    public sealed class AllTeamsAutoComplete : IAutoCompleteProvider
+    {
+        public async ValueTask<IEnumerable<DiscordAutoCompleteChoice>> AutoCompleteAsync(AutoCompleteContext context)
+        {
+            var term = context.UserInput ?? string.Empty;
+
+            var teams = await CoreService.WithDbContext(async db =>
+            {
+                return await db
+                    .Teams.Include(t => t.TeamMajor)
+                    .ThenInclude(p => p.MashinaUser)
+                    .Where(t => EF.Functions.ILike(t.Name, $"%{term}%"))
+                    .OrderBy(t => t.Name)
+                    .Select(t => new
+                    {
+                        t.Id,
+                        t.Name,
+                        MajorDiscordGlobalName = t.TeamMajor.MashinaUser.DiscordGlobalname,
+                    })
+                    .Take(25)
+                    .ToListAsync();
+            });
+
+            return teams.Select(t =>
+            {
+                var label = t.Name;
+                if (!string.IsNullOrWhiteSpace(t.MajorDiscordGlobalName))
+                {
+                    label += $" ({t.MajorDiscordGlobalName})";
+                }
+                return new DiscordAutoCompleteChoice(label, t.Id.ToString());
+            });
         }
     }
 
@@ -144,21 +200,37 @@ namespace WabbitBot.DiscBot.App.Providers
             var teams = await CoreService.WithDbContext(async db =>
             {
                 return await db
-                    .Teams.Where(t =>
+                    .Teams.Include(t => t.TeamMajor)
+                    .ThenInclude(p => p.MashinaUser)
+                    .Where(t =>
                         t.Rosters.Any(r =>
                             r.RosterMembers.Any(m =>
                                 m.DiscordUserId == userId && (m.IsRosterManager || m.Role == RosterRole.Captain)
                             )
                         )
+                        || t.TeamMajor.MashinaUser.DiscordUserId == context.User.Id
                     )
                     .Where(t => EF.Functions.ILike(t.Name, $"%{term}%"))
                     .OrderBy(t => t.Name)
-                    .Select(t => new { t.Id, t.Name })
+                    .Select(t => new
+                    {
+                        t.Id,
+                        t.Name,
+                        MajorDiscordGlobalName = t.TeamMajor.MashinaUser.DiscordGlobalname,
+                    })
                     .Take(25)
                     .ToListAsync();
             });
 
-            return teams.Select(t => new DiscordAutoCompleteChoice(t.Name, t.Id.ToString()));
+            return teams.Select(t =>
+            {
+                var label = t.Name;
+                if (!string.IsNullOrWhiteSpace(t.MajorDiscordGlobalName))
+                {
+                    label += $" ({t.MajorDiscordGlobalName})";
+                }
+                return new DiscordAutoCompleteChoice(label, t.Id.ToString());
+            });
         }
     }
 }

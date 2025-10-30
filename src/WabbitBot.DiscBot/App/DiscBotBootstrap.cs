@@ -50,6 +50,12 @@ namespace WabbitBot.DiscBot.App
                 maxAge: TimeSpan.FromHours(1)
             );
 
+            // Start private-thread container cleanup (1 min sweep, 5 min inactivity)
+            _ = DiscBotService.ThreadContainers.StartCleanupLoop(
+                sweepInterval: TimeSpan.FromMinutes(1),
+                inactivity: TimeSpan.FromMinutes(5)
+            );
+
             // Initialize the event bus
             await discBotEventBus.InitializeAsync();
         }
@@ -105,6 +111,7 @@ namespace WabbitBot.DiscBot.App
                                 commands.AddCommands<UserCommands>(debugGuildId.Value);
                                 commands.AddCommands<TeamCommands>(debugGuildId.Value);
                                 commands.AddCommands<ConfigCommands>(debugGuildId.Value);
+                                commands.AddCommands<AdminCommands>(debugGuildId.Value);
                                 Console.WriteLine(
                                     $"🔧 [{environment.ToUpperInvariant()}] Commands registered to guild"
                                         + $" {debugGuildId.Value} for instant updates"
@@ -117,6 +124,7 @@ namespace WabbitBot.DiscBot.App
                                 commands.AddCommands<UserCommands>();
                                 commands.AddCommands<TeamCommands>();
                                 commands.AddCommands<ConfigCommands>();
+                                commands.AddCommands<AdminCommands>();
                                 if (isDevelopment)
                                 {
                                     Console.WriteLine(
@@ -178,6 +186,69 @@ namespace WabbitBot.DiscBot.App
                                 await HandleModalSubmitAsync(client, args);
                             }
                         );
+
+                        // Handle message creation for reply-based add flow
+                        b.HandleMessageCreated(
+                            async (client, args) =>
+                            {
+                                try
+                                {
+                                    if (args.Message.ReferencedMessage is null)
+                                    {
+                                        return;
+                                    }
+                                    var replied = args.Message.ReferencedMessage;
+
+                                    // Retrieve TeamApp state via reflection to avoid direct dependency
+                                    var state = TeamApp.TeamApp_GetStateSafe(replied.Id);
+                                    if (
+                                        state is null
+                                        || !state.AwaitingAddInput
+                                        || state.SelectedTeamId is null
+                                        || state.SelectedRosterGroup is null
+                                    )
+                                    {
+                                        return;
+                                    }
+
+                                    // Parse mention/ID
+                                    var text = args.Message.Content?.Trim() ?? string.Empty;
+                                    if (string.IsNullOrWhiteSpace(text))
+                                    {
+                                        return;
+                                    }
+                                    if (!TeamApp.TeamApp_TryParseDiscordId(text, out var discordUserId))
+                                    {
+                                        await args.Message.RespondAsync(
+                                            "Provide a valid mention (<@...>) or numeric ID."
+                                        );
+                                        return;
+                                    }
+
+                                    // Delegate to TeamApp helper to add
+                                    var result = await TeamApp.TeamApp_TryAddPlayerFromDiscordIdAsync(
+                                        replied,
+                                        state,
+                                        discordUserId
+                                    );
+                                    if (!result.Success)
+                                    {
+                                        await args.Message.RespondAsync(result.ErrorMessage ?? "Failed to add player.");
+                                        return;
+                                    }
+
+                                    await args.Message.RespondAsync("✅ Player added.");
+                                }
+                                catch (Exception ex)
+                                {
+                                    await DiscBotService.ErrorHandler.CaptureAsync(
+                                        ex,
+                                        "Failed to handle add-player reply",
+                                        nameof(DiscBotBootstrap)
+                                    );
+                                }
+                            }
+                        );
                     })
                     .Build();
 
@@ -186,6 +257,9 @@ namespace WabbitBot.DiscBot.App
 
                 // Connect to Discord
                 await _client.ConnectAsync();
+
+                // Load persisted thread tracking into memory
+                await DiscBotService.ThreadContainers.LoadPersistedAsync();
 
                 _isInitialized = true;
             }
@@ -247,7 +321,12 @@ namespace WabbitBot.DiscBot.App
                 {
                     result = await TeamApp.ProcessSelectMenuInteractionAsync(client, args);
                 }
-                else if (customId.StartsWith("team_roles_", StringComparison.Ordinal))
+                else if (
+                    customId.StartsWith("team_roles_", StringComparison.Ordinal)
+                    || customId.StartsWith("confirm_delete_team_", StringComparison.Ordinal)
+                    || customId.StartsWith("confirm_delete_roster_", StringComparison.Ordinal)
+                    || customId.Equals("cancel_destructive", StringComparison.Ordinal)
+                )
                 {
                     result = await TeamApp.ProcessButtonInteractionAsync(client, args);
                 }
@@ -302,6 +381,10 @@ namespace WabbitBot.DiscBot.App
                 )
                 {
                     result = await GameApp.ProcessModalSubmitAsync(client, args);
+                }
+                else if (customId.StartsWith("team_roles_admin_add_modal", StringComparison.Ordinal))
+                {
+                    result = await TeamApp.ProcessModalSubmitAsync(client, args);
                 }
 
                 // Log failures (success is typically logged by the handler itself)

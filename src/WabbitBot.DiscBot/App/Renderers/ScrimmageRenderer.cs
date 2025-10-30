@@ -373,8 +373,8 @@ namespace WabbitBot.DiscBot.App.Renderers
         public static async Task<Result<DiscordContainerComponent>> RenderChallengeConfigurationAsync(
             ulong discordUserId,
             TeamSize teamSize,
-            Team challengerTeam,
-            TeamRoster challengerRoster,
+            Guid challengerTeamId,
+            TeamSizeRosterGroup challengerRosterGroup,
             Guid? selectedOpponentTeamId = null,
             List<Guid>? selectedPlayerIds = null,
             int? bestOf = null
@@ -384,6 +384,28 @@ namespace WabbitBot.DiscBot.App.Renderers
             {
                 var components = new List<DiscordComponent>();
                 var rosterGroup = TeamCore.TeamSizeRosterGrouping.GetRosterGroup(teamSize);
+
+                // Load team and roster fresh to avoid lazy-loading after context disposal
+                var loadResult = await CoreService.WithDbContext(async db =>
+                {
+                    var team = await db
+                        .Teams.AsNoTracking()
+                        .Include(t => t.Rosters)
+                        .ThenInclude(r => r.RosterMembers)
+                        .ThenInclude(rm => rm.MashinaUser)
+                        .FirstOrDefaultAsync(t => t.Id == challengerTeamId);
+
+                    var roster = team?.Rosters.FirstOrDefault(r => r.RosterGroup == challengerRosterGroup);
+                    return new { team, roster };
+                });
+
+                var challengerTeam = loadResult.team;
+                var challengerRoster = loadResult.roster;
+
+                if (challengerTeam is null || challengerRoster is null)
+                {
+                    return Result<DiscordContainerComponent>.Failure("Failed to load team/roster for configuration");
+                }
 
                 // Header text
                 var headerText =

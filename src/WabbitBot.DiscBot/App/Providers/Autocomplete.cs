@@ -45,14 +45,21 @@ namespace WabbitBot.DiscBot.App.Providers
             var teams = await CoreService.WithDbContext(async db =>
             {
                 var result = await db
-                    .Teams.Where(t =>
+                    .Teams.Include(t => t.TeamMajor)
+                    .ThenInclude(p => p.MashinaUser)
+                    .Where(t =>
                         t.Rosters.Any(r =>
                             r.RosterGroup == rosterGroup && r.RosterMembers.Any(m => m.DiscordUserId == userIdString)
                         )
                     )
                     .Where(t => EF.Functions.ILike(t.Name, $"%{term}%"))
                     .OrderBy(t => t.Name)
-                    .Select(t => new { t.Name, t.Id })
+                    .Select(t => new
+                    {
+                        t.Name,
+                        t.Id,
+                        MajorDiscordGlobalName = t.TeamMajor.MashinaUser.DiscordGlobalname,
+                    })
                     .Take(25)
                     .ToListAsync();
 
@@ -60,7 +67,15 @@ namespace WabbitBot.DiscBot.App.Providers
                 return result;
             });
 
-            return teams.Select(t => new DiscordAutoCompleteChoice(t.Name, t.Name));
+            return teams.Select(t =>
+            {
+                var label = t.Name;
+                if (!string.IsNullOrWhiteSpace(t.MajorDiscordGlobalName))
+                {
+                    label += $" ({t.MajorDiscordGlobalName})";
+                }
+                return new DiscordAutoCompleteChoice(label, t.Name);
+            });
         }
     }
 
@@ -100,17 +115,32 @@ namespace WabbitBot.DiscBot.App.Providers
                 var userTeamIds = player?.TeamIds ?? [];
 
                 return await db
-                    .Teams.Where(t => t.Rosters.Any(r => r.RosterGroup == rosterGroup)) // Must have roster for this game size
+                    .Teams.Include(t => t.TeamMajor)
+                    .ThenInclude(p => p.MashinaUser)
+                    .Where(t => t.Rosters.Any(r => r.RosterGroup == rosterGroup)) // Must have roster for this game size
                     .Where(t => EF.Functions.ILike(t.Name, $"%{term}%"))
                     .Where(t => !userTeamIds.Contains(t.Id)) // Exclude all user's teams
                     .Where(t => !t.Matches.Any(m => m.CompletedAt == null)) // Exclude teams in active matches
                     .OrderBy(t => t.Name)
-                    .Select(t => new { t.Name, t.Id })
+                    .Select(t => new
+                    {
+                        t.Name,
+                        t.Id,
+                        MajorDiscordGlobalName = t.TeamMajor.MashinaUser.DiscordGlobalname,
+                    })
                     .Take(25)
                     .ToListAsync();
             });
 
-            return teams.Select(t => new DiscordAutoCompleteChoice(t.Name, t.Name));
+            return teams.Select(t =>
+            {
+                var label = t.Name;
+                if (!string.IsNullOrWhiteSpace(t.MajorDiscordGlobalName))
+                {
+                    label += $" ({t.MajorDiscordGlobalName})";
+                }
+                return new DiscordAutoCompleteChoice(label, t.Name);
+            });
         }
     }
 

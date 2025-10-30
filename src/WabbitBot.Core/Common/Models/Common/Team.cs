@@ -31,6 +31,7 @@ namespace WabbitBot.Core.Common.Models.Common
         // Core team data (no roster-specific properties here)
         public string Name { get; set; } = string.Empty;
         public Guid TeamMajorId { get; set; }
+        public virtual Player TeamMajor { get; set; } = null!;
         public DateTime LastActive { get; set; }
         public string? Tag { get; set; }
 

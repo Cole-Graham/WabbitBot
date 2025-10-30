@@ -36,6 +36,10 @@ namespace WabbitBot.DiscBot.App
         )
         {
             var interaction = args.Interaction;
+            if (interaction.Message is not null)
+            {
+                DiscBotService.ThreadContainers.MarkActivity(interaction.Message.Id);
+            }
             var customId = interaction.Data.CustomId;
 
             try
@@ -119,6 +123,12 @@ namespace WabbitBot.DiscBot.App
 
             try
             {
+                // Mark activity for thread cleanup tracking
+                if (interaction.Message is not null)
+                {
+                    DiscBotService.ThreadContainers.MarkActivity(interaction.Message.Id);
+                }
+
                 // Opponent team selection
                 if (customId.StartsWith("challenge_opponent_", StringComparison.Ordinal))
                 {
@@ -764,12 +774,14 @@ namespace WabbitBot.DiscBot.App
                     var rosterGroup = TeamCore.TeamSizeRosterGrouping.GetRosterGroup(scrimmage.TeamSize);
 
                     // Check permissions and roster membership in single query
-                    var IsRosterManager = await db.TeamMembers.AnyAsync(tm =>
-                        tm.TeamRoster.TeamId == teamId
-                        && tm.TeamRoster.RosterGroup == rosterGroup
-                        && tm.PlayerId == requestingPlayer.Id
-                        && tm.IsRosterManager
-                    );
+                    var IsRosterManager =
+                        await db.TeamMembers.AnyAsync(tm =>
+                            tm.TeamRoster.TeamId == teamId
+                            && tm.TeamRoster.RosterGroup == rosterGroup
+                            && tm.PlayerId == requestingPlayer.Id
+                            && tm.IsRosterManager
+                        )
+                        || team.TeamMajorId == requestingPlayer.Id;
 
                     var isOnRoster = await db.TeamMembers.AnyAsync(tm =>
                         tm.TeamRoster.TeamId == teamId
@@ -1390,8 +1402,8 @@ namespace WabbitBot.DiscBot.App
                 var containerResult = await ScrimmageRenderer.RenderChallengeConfigurationAsync(
                     configState.Data.DiscordUserId,
                     configState.Data.TeamSize,
-                    configState.Data.ChallengerTeam,
-                    configState.Data.ChallengerRoster,
+                    configState.Data.ChallengerTeamId,
+                    configState.Data.ChallengerRoster!.RosterGroup,
                     selections.OpponentTeamId,
                     selections.PlayerIds,
                     selections.BestOf ?? 1

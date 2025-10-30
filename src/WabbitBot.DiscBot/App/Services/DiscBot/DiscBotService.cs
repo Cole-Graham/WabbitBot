@@ -39,6 +39,12 @@ namespace WabbitBot.DiscBot.App.Services.DiscBot
         private static ulong? _challengeFeedChannelId;
 
         /// <summary>
+        /// Mashina channel ID cached from configuration (validated to exist in Discord)
+        /// Used as the parent for private threads hosting interactive containers.
+        /// </summary>
+        private static ulong? _mashinaChannelId;
+
+        /// <summary>
         /// Gets the scrimmage channel (throws with helpful message if not configured)
         /// </summary>
         public static DiscordChannel ScrimmageChannel
@@ -97,6 +103,35 @@ namespace WabbitBot.DiscBot.App.Services.DiscBot
         }
 
         /// <summary>
+        /// Gets the Mashina channel (throws with helpful message if not configured)
+        /// </summary>
+        public static DiscordChannel MashinaChannel
+        {
+            get
+            {
+                if (_mashinaChannelId is null)
+                {
+                    throw new InvalidOperationException(
+                        "Mashina channel not configured. Please set Bot:Channels:MashinaChannel."
+                    );
+                }
+
+                try
+                {
+                    return Client.GetChannelAsync(_mashinaChannelId.Value).Result;
+                }
+                catch (Exception ex)
+                {
+                    throw new InvalidOperationException(
+                        $"Failed to access Mashina channel {_mashinaChannelId}. Channel may have been deleted"
+                            + " or bot lacks permissions.",
+                        ex
+                    );
+                }
+            }
+        }
+
+        /// <summary>
         /// Initializes or refreshes the cached channel configuration values
         /// Fails gracefully if configuration is invalid or missing
         /// Call this at startup and whenever channel configuration changes
@@ -109,6 +144,7 @@ namespace WabbitBot.DiscBot.App.Services.DiscBot
                 var channelsConfig = configService.GetSection<ChannelsOptions>("Bot:Channels");
                 _scrimmageChannelId = channelsConfig.ScrimmageChannel;
                 _challengeFeedChannelId = channelsConfig.ChallengeFeedChannel;
+                _mashinaChannelId = channelsConfig.MashinaChannel;
             }
             catch (InvalidOperationException ex)
                 when (ex.Message.Contains("Configuration service has not been initialized"))

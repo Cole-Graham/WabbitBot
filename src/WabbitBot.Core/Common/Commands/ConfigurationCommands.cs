@@ -25,7 +25,6 @@ public partial class ConfigurationCommands
         WriteIndented = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
     };
-    private static readonly ICoreEventBus _eventBus = CoreEventBus.Instance;
 
     #region Business Logic Methods
 
@@ -72,7 +71,7 @@ public partial class ConfigurationCommands
         if (saveResult.Success)
         {
             // Publish specific server ID set event (primitive-only payloads)
-            await _eventBus.PublishAsync(new ServerIdSetEvent(serverId, previousServerId?.ToString()));
+            await PublishServerIdSetAsync(serverId, previousServerId?.ToString() ?? "null");
         }
 
         return saveResult;
@@ -91,9 +90,9 @@ public partial class ConfigurationCommands
 
         switch (channelType.ToLowerInvariant())
         {
-            case "bot":
-                previousChannelId = config.Channels.BotChannel;
-                config.Channels.BotChannel = channelId;
+            case "mashina":
+                previousChannelId = config.Channels.MashinaChannel;
+                config.Channels.MashinaChannel = channelId;
                 break;
             case "replay":
                 previousChannelId = config.Channels.ReplayChannel;
@@ -115,6 +114,10 @@ public partial class ConfigurationCommands
                 previousChannelId = config.Channels.ScrimmageChannel;
                 config.Channels.ScrimmageChannel = channelId;
                 break;
+            case "challengefeed":
+                previousChannelId = config.Channels.ChallengeFeedChannel;
+                config.Channels.ChallengeFeedChannel = channelId;
+                break;
             default:
                 return Result<BotOptions>.Failure(
                     $"Unknown channel type: {channelType}. Valid types: bot, replay, deck, signup, standings, scrimmage"
@@ -126,7 +129,7 @@ public partial class ConfigurationCommands
         if (saveResult.Success)
         {
             // Publish specific channel configured event (primitive-only payloads)
-            await _eventBus.PublishAsync(new ChannelConfiguredEvent(channelType, channelId, previousChannelId));
+            await PublishChannelConfiguredAsync(channelType, channelId, previousChannelId);
         }
 
         return saveResult;
@@ -168,7 +171,37 @@ public partial class ConfigurationCommands
         if (saveResult.Success)
         {
             // Publish specific role configured event (primitive-only payloads)
-            await _eventBus.PublishAsync(new RoleConfiguredEvent(roleType, roleId, previousRoleId));
+            await PublishRoleConfiguredAsync(roleType, roleId, previousRoleId);
+        }
+
+        return saveResult;
+    }
+
+    public async Task<Result<BotOptions>> SetThreadInactivityThresholdAsync(int minutes)
+    {
+        if (minutes < 1 || minutes > 1440) // 1 minute to 24 hours
+        {
+            return Result<BotOptions>.Failure(
+                "Thread inactivity threshold must be between 1 and 1440 minutes (24 hours)"
+            );
+        }
+
+        var result = GetConfiguration();
+        if (!result.Success)
+        {
+            return result;
+        }
+
+        var config = result.Data!;
+        var previousThreshold = config.Threads.InactivityThresholdMinutes;
+        config.Threads.InactivityThresholdMinutes = minutes;
+
+        var saveResult = await SaveConfigurationAsync(config);
+
+        if (saveResult.Success)
+        {
+            // Publish thread inactivity threshold configured event
+            await PublishThreadInactivityThresholdConfiguredAsync(minutes, previousThreshold);
         }
 
         return saveResult;
@@ -241,7 +274,7 @@ public partial class ConfigurationCommands
             }
 
             // Publish configuration changed event (primitive + simple types)
-            await _eventBus.PublishAsync(new ConfigurationChangedEvent(config, "Save"));
+            await PublishConfigurationChangedAsync("Configuration saved");
 
             return Result<BotOptions>.CreateSuccess(config, "Configuration saved successfully");
         }

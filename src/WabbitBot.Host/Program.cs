@@ -278,6 +278,7 @@ public static class Program
             Core.Scrimmages.ScrimmageHandler.Initialize();
             Core.Common.Models.Common.GameHandler.Initialize();
             Core.Common.Models.Common.MatchHandler.Initialize();
+            Core.Common.Handlers.ConfigurationHandler.Initialize();
 
             await Task.CompletedTask;
         }

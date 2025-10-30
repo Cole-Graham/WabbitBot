@@ -126,8 +126,8 @@ namespace WabbitBot.DiscBot.App.Commands
                 var containerResult = await Renderers.ScrimmageRenderer.RenderChallengeConfigurationAsync(
                     ctx.User.Id,
                     TeamSize,
-                    challengerTeam,
-                    roster
+                    challengerTeam.Id,
+                    roster.RosterGroup
                 );
 
                 if (!containerResult.Success || containerResult.Data is null)
@@ -138,48 +138,24 @@ namespace WabbitBot.DiscBot.App.Commands
                     return;
                 }
 
-                // Delete the deferred response since we're sending a new message with the container
+                // Delete the deferred response; we'll post the container in a private thread under MashinaChannel
                 await ctx.DeleteResponseAsync();
 
-                // Get the challenge-feed channel
-                var configService = ConfigurationProvider.GetConfigurationService();
-                var channelsConfig = configService.GetSection<ChannelsOptions>("Bot:Channels");
-                var challengeFeedChannel = await ctx.Client.GetChannelAsync(channelsConfig.ChallengeFeedChannel!.Value);
-
-                if (challengeFeedChannel is null)
-                {
-                    await ctx.EditResponseAsync("Challenge feed channel not found. Please contact an administrator.");
-                    return;
-                }
-
-                // Clean up any existing challenge setup threads for this user
-                await CleanupExistingChallengeThreadsAsync(challengeFeedChannel, ctx.User.GlobalName);
-
-                // Create a temporary private thread for challenge configuration
                 var threadName = $"Challenge Setup - {ctx.User.GlobalName}";
-                var thread = await challengeFeedChannel.CreateThreadAsync(
+                var (thread, message) = await DiscBotService.ThreadContainers.CreateThreadAndSendAsync(
                     threadName,
-                    DiscordAutoArchiveDuration.Hour,
-                    DiscordChannelType.PrivateThread
+                    containerResult.Data,
+                    ctx.Guild,
+                    ctx.User.Id,
+                    DiscBotService.ScrimmageChannel,
+                    enableInactivityCleanup: true
                 );
 
-                // Add the challenge issuer to the private thread
-                if (ctx.Guild is not null)
-                {
-                    var member = await ctx.Guild.GetMemberAsync(ctx.User.Id);
-                    await thread.AddThreadMemberAsync(member);
-                }
-
-                // Send a confirmation message as an ephemeral followup
+                // Ephemeral followup with a link to the thread
                 await ctx.FollowupAsync(
                     new DiscordFollowupMessageBuilder()
-                        .WithContent($"Your challenge configuration will be sent to {thread.Mention}")
+                        .WithContent($"Your challenge configuration is ready in {thread.Mention}")
                         .AsEphemeral()
-                );
-
-                // Send container to the private thread
-                await thread.SendMessageAsync(
-                    new DiscordMessageBuilder().EnableV2Components().AddContainerComponent(containerResult.Data)
                 );
             }
             catch (Exception ex)
@@ -190,59 +166,6 @@ namespace WabbitBot.DiscBot.App.Commands
                     nameof(ChallengeAsync)
                 );
                 await ctx.EditResponseAsync("An error occurred while creating your challenge. Please try again.");
-            }
-        }
-
-        /// <summary>
-        /// Cleans up any existing challenge setup threads for a user.
-        /// </summary>
-        private static async Task CleanupExistingChallengeThreadsAsync(
-            DiscordChannel challengeFeedChannel,
-            string username
-        )
-        {
-            try
-            {
-                // Get all active threads in the guild
-                var threadQueryResult = await challengeFeedChannel.Guild.ListActiveThreadsAsync();
-
-                // Find threads that match the pattern "Challenge Setup - {username}" in the challenge feed channel
-                var userThreads = threadQueryResult
-                    .Threads.Where(t =>
-                        t.Parent?.Id == challengeFeedChannel.Id
-                        && t.Name.StartsWith("Challenge Setup - ", StringComparison.Ordinal)
-                        && t.Name.EndsWith(username, StringComparison.Ordinal)
-                    )
-                    .ToList();
-
-                // Delete each found thread
-                foreach (var thread in userThreads)
-                {
-                    try
-                    {
-                        Console.WriteLine($"[DEBUG] Deleting existing challenge setup thread: {thread.Name}");
-                        await thread.DeleteAsync();
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"[WARN] Failed to delete thread {thread.Name}: {ex.Message}");
-                        // Continue with other threads
-                    }
-                }
-
-                if (userThreads.Count > 0)
-                {
-                    Console.WriteLine(
-                        $"[DEBUG] Cleaned up {userThreads.Count} existing challenge setup threads for user {username}"
-                    );
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(
-                    $"[ERROR] Failed to cleanup existing challenge threads for user {username}: {ex.Message}"
-                );
-                // Don't throw - this is cleanup, not critical functionality
             }
         }
 

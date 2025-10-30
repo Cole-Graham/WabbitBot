@@ -24,21 +24,14 @@ public partial class ConfigurationHandler
         _errorService = CoreService.ErrorHandler;
     }
 
-    public Task InitializeAsync()
-    {
-        // Register auto-generated event subscriptions
-        // RegisterEventSubscriptions();
-        return Task.CompletedTask;
-    }
-
     /// <summary>
     /// Handles configuration change events
     /// </summary>
-    public async Task HandleConfigurationChangedAsync(ConfigurationChangedEvent evt)
+    public static async Task HandleConfigurationChangedAsync(ConfigurationChanged evt)
     {
         await CoreService.ErrorHandler.HandleAsync(
             new ErrorContext(
-                $"Configuration changed: {evt.ChangeType}",
+                $"Configuration changed: {evt.ChangeDescription}",
                 ErrorSeverity.Information,
                 nameof(HandleConfigurationChangedAsync)
             ),
@@ -53,7 +46,7 @@ public partial class ConfigurationHandler
     /// <summary>
     /// Handles server ID set events
     /// </summary>
-    public async Task HandleServerIdSetAsync(ServerIdSetEvent evt)
+    public static async Task HandleServerIdSetAsync(ServerIdSet evt)
     {
         await CoreService.ErrorHandler.HandleAsync(
             new ErrorContext(
@@ -72,7 +65,7 @@ public partial class ConfigurationHandler
     /// <summary>
     /// Handles channel configuration events
     /// </summary>
-    public async Task HandleChannelConfiguredAsync(ChannelConfiguredEvent evt)
+    public static async Task HandleChannelConfiguredAsync(ChannelConfigured evt)
     {
         await CoreService.ErrorHandler.HandleAsync(
             new ErrorContext(
@@ -91,7 +84,7 @@ public partial class ConfigurationHandler
     /// <summary>
     /// Handles role configuration events
     /// </summary>
-    public async Task HandleRoleConfiguredAsync(RoleConfiguredEvent evt)
+    public static async Task HandleRoleConfiguredAsync(RoleConfigured evt)
     {
         await CoreService.ErrorHandler.HandleAsync(
             new ErrorContext(
@@ -103,6 +96,26 @@ public partial class ConfigurationHandler
         );
 
         // Additional role configuration logic can be added here
+        // e.g., validation, notifications, etc.
+        await Task.CompletedTask; // Placeholder to prevent async warning
+    }
+
+    /// <summary>
+    /// Handles thread inactivity threshold configuration events
+    /// </summary>
+    public static async Task HandleThreadInactivityThresholdConfiguredAsync(ThreadInactivityThresholdConfigured evt)
+    {
+        await CoreService.ErrorHandler.HandleAsync(
+            new ErrorContext(
+                $"Thread inactivity threshold configured: {evt.ThresholdMinutes} minutes "
+                    + $"(Previous: {evt.PreviousThresholdMinutes})",
+                ErrorSeverity.Information,
+                nameof(HandleThreadInactivityThresholdConfiguredAsync)
+            ),
+            ErrorComponent.Logging
+        );
+
+        // Additional thread inactivity threshold logic can be added here
         // e.g., validation, notifications, etc.
         await Task.CompletedTask; // Placeholder to prevent async warning
     }

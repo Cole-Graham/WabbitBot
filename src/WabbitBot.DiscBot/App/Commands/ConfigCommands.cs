@@ -15,25 +15,17 @@ namespace WabbitBot.DiscBot.App.Commands
     [RequirePermissions(DiscordPermission.ModerateMembers)]
     public sealed class ConfigCommands
     {
-        private static bool IsModerator(DiscordMember member)
+        private static List<ulong> GetRoleIds(DiscordMember member)
         {
-            if (member is null)
-            {
-                return false;
-            }
-
-            if (member.Permissions.HasPermission(DiscordPermission.Administrator))
-            {
-                return true;
-            }
-
             var roles = ConfigurationProvider.GetSection<RolesOptions>(RolesOptions.SectionName);
-            if (roles.Moderator.HasValue)
-            {
-                return member.Roles.Any(r => r.Id == roles.Moderator.Value);
-            }
-
-            return false;
+            return member
+                .Roles.Where(r =>
+                    roles.Moderator.HasValue && r.Id == roles.Moderator.Value
+                    || roles.Admin.HasValue && r.Id == roles.Admin.Value
+                    || roles.Whitelisted.HasValue && r.Id == roles.Whitelisted.Value
+                )
+                .Select(r => r.Id)
+                .ToList();
         }
 
         [Command("teamrules-view")]
@@ -41,12 +33,6 @@ namespace WabbitBot.DiscBot.App.Commands
         public async Task ViewTeamRulesAsync(CommandContext ctx)
         {
             await ctx.DeferResponseAsync();
-
-            if (ctx.User is not DiscordMember member || !IsModerator(member))
-            {
-                await ctx.EditResponseAsync("You do not have permission to run this command.");
-                return;
-            }
 
             var scrim = ConfigurationProvider.GetSection<ScrimmageOptions>(ScrimmageOptions.SectionName);
             var tr = scrim.TeamRules;
@@ -69,12 +55,6 @@ namespace WabbitBot.DiscBot.App.Commands
         public async Task SetBaseCaptainsAsync(CommandContext ctx, [Description("Captains required")] int count)
         {
             await ctx.DeferResponseAsync();
-
-            if (ctx.User is not DiscordMember member || !IsModerator(member))
-            {
-                await ctx.EditResponseAsync("You do not have permission to run this command.");
-                return;
-            }
 
             var config = await ConfigurationService.Persistence.LoadConfigurationAsync();
             if (config is null)
@@ -105,12 +85,6 @@ namespace WabbitBot.DiscBot.App.Commands
         )
         {
             await ctx.DeferResponseAsync();
-
-            if (ctx.User is not DiscordMember member || !IsModerator(member))
-            {
-                await ctx.EditResponseAsync("You do not have permission to run this command.");
-                return;
-            }
 
             var config = await ConfigurationService.Persistence.LoadConfigurationAsync();
             if (config is null)
@@ -158,12 +132,6 @@ namespace WabbitBot.DiscBot.App.Commands
         {
             await ctx.DeferResponseAsync();
 
-            if (ctx.User is not DiscordMember member || !IsModerator(member))
-            {
-                await ctx.EditResponseAsync("You do not have permission to run this command.");
-                return;
-            }
-
             var config = await ConfigurationService.Persistence.LoadConfigurationAsync();
             if (config is null)
             {
@@ -201,12 +169,6 @@ namespace WabbitBot.DiscBot.App.Commands
         {
             await ctx.DeferResponseAsync();
 
-            if (ctx.User is not DiscordMember member || !IsModerator(member))
-            {
-                await ctx.EditResponseAsync("You do not have permission to run this command.");
-                return;
-            }
-
             var scrim = ConfigurationProvider.GetSection<ScrimmageOptions>(ScrimmageOptions.SectionName);
             var tc = scrim.TeamConfig;
             var content =
@@ -227,12 +189,6 @@ namespace WabbitBot.DiscBot.App.Commands
         )
         {
             await ctx.DeferResponseAsync();
-
-            if (ctx.User is not DiscordMember member || !IsModerator(member))
-            {
-                await ctx.EditResponseAsync("You do not have permission to run this command.");
-                return;
-            }
 
             var config = await ConfigurationService.Persistence.LoadConfigurationAsync();
             if (config is null)
@@ -258,12 +214,6 @@ namespace WabbitBot.DiscBot.App.Commands
         )
         {
             await ctx.DeferResponseAsync();
-
-            if (ctx.User is not DiscordMember member || !IsModerator(member))
-            {
-                await ctx.EditResponseAsync("You do not have permission to run this command.");
-                return;
-            }
 
             var config = await ConfigurationService.Persistence.LoadConfigurationAsync();
             if (config is null)
@@ -294,6 +244,93 @@ namespace WabbitBot.DiscBot.App.Commands
 
             var ok = await ConfigurationService.Persistence.SaveConfigurationAsync(config);
             await ctx.EditResponseAsync(ok ? "TeamConfig group updated." : "Failed to save configuration.");
+        }
+
+        [Command("emojis-view")]
+        [Description("View current emoji configuration")]
+        public async Task ViewEmojisAsync(CommandContext ctx)
+        {
+            await ctx.DeferResponseAsync();
+
+            var emojis = ConfigurationProvider.GetSection<EmojisOptions>(EmojisOptions.SectionName);
+            var content =
+                $"TeamRole1EmojiId: {emojis.TeamRole1EmojiId}\n" + $"TeamRole2EmojiId: {emojis.TeamRole2EmojiId}";
+
+            await ctx.EditResponseAsync($"```${content}```");
+        }
+
+        [Command("emojis-set-teamrole1")]
+        [Description("Set TeamRole1EmojiId")]
+        public async Task SetTeamRole1EmojiAsync(CommandContext ctx, [Description("Emoji ID")] ulong emojiId)
+        {
+            await ctx.DeferResponseAsync();
+
+            var config = await ConfigurationService.Persistence.LoadConfigurationAsync();
+            if (config is null)
+            {
+                await ctx.EditResponseAsync("Failed to load configuration.");
+                return;
+            }
+
+            config.Emojis.TeamRole1EmojiId = emojiId;
+            var ok = await ConfigurationService.Persistence.SaveConfigurationAsync(config);
+            if (!ok)
+            {
+                await ctx.EditResponseAsync("Failed to save configuration.");
+                return;
+            }
+
+            await ctx.EditResponseAsync($"TeamRole1EmojiId set to {emojiId}.");
+        }
+
+        [Command("emojis-set-teamrole2")]
+        [Description("Set TeamRole2EmojiId")]
+        public async Task SetTeamRole2EmojiAsync(CommandContext ctx, [Description("Emoji ID")] ulong emojiId)
+        {
+            await ctx.DeferResponseAsync();
+
+            var config = await ConfigurationService.Persistence.LoadConfigurationAsync();
+            if (config is null)
+            {
+                await ctx.EditResponseAsync("Failed to load configuration.");
+                return;
+            }
+
+            config.Emojis.TeamRole2EmojiId = emojiId;
+            var ok = await ConfigurationService.Persistence.SaveConfigurationAsync(config);
+            if (!ok)
+            {
+                await ctx.EditResponseAsync("Failed to save configuration.");
+                return;
+            }
+
+            await ctx.EditResponseAsync($"TeamRole2EmojiId set to {emojiId}.");
+        }
+
+        [Command("threads-set-inactivity-threshold")]
+        [Description("Set thread inactivity threshold in minutes (1-1440)")]
+        public async Task SetThreadInactivityThresholdAsync(CommandContext ctx, [Description("Minutes")] int minutes)
+        {
+            await ctx.DeferResponseAsync();
+
+            if (minutes < 1 || minutes > 1440)
+            {
+                await ctx.EditResponseAsync(
+                    "Thread inactivity threshold must be between 1 and 1440 minutes (24 hours)."
+                );
+                return;
+            }
+
+            var configCommands = new WabbitBot.Core.Common.Commands.ConfigurationCommands();
+            var result = await configCommands.SetThreadInactivityThresholdAsync(minutes);
+
+            if (!result.Success)
+            {
+                await ctx.EditResponseAsync($"Failed to set thread inactivity threshold: {result.ErrorMessage}");
+                return;
+            }
+
+            await ctx.EditResponseAsync($"Thread inactivity threshold set to {minutes} minutes.");
         }
     }
 }

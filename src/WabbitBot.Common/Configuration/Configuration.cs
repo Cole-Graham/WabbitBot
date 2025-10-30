@@ -263,12 +263,13 @@ namespace WabbitBot.Common.Configuration
     {
         public const string SectionName = "Bot";
 
-        public required string Token { get; set; }
+        public string Token { get; set; } = string.Empty;
         public string LogLevel { get; set; } = "Information";
         public ulong? ServerId { get; set; } = null;
         public DatabaseOptions Database { get; set; } = new();
         public ChannelsOptions Channels { get; set; } = new();
         public RolesOptions Roles { get; set; } = new();
+        public EmojisOptions Emojis { get; set; } = new();
         public ActivityOptions Activity { get; set; } = new();
         public ScrimmageOptions Scrimmage { get; set; } = new();
         public TournamentOptions Tournament { get; set; } = new();
@@ -279,6 +280,7 @@ namespace WabbitBot.Common.Configuration
         public DivisionsOptions Divisions { get; set; } = new();
         public RetentionOptions Retention { get; set; } = new();
         public StorageOptions Storage { get; set; } = new();
+        public ThreadsOptions Threads { get; set; } = new();
     }
 
     public class DatabaseOptions
@@ -300,7 +302,7 @@ namespace WabbitBot.Common.Configuration
     public class ChannelsOptions
     {
         public const string SectionName = "Bot:Channels";
-        public ulong? BotChannel { get; set; } = null;
+        public ulong? MashinaChannel { get; set; } = null;
         public ulong? ReplayChannel { get; set; } = null;
         public ulong? DeckChannel { get; set; } = null;
         public ulong? SignupChannel { get; set; } = null;
@@ -315,6 +317,13 @@ namespace WabbitBot.Common.Configuration
         public ulong? Whitelisted { get; set; } = null;
         public ulong? Admin { get; set; } = null;
         public ulong? Moderator { get; set; } = null;
+    }
+
+    public class EmojisOptions
+    {
+        public const string SectionName = "Bot:Emojis";
+        public ulong TeamRole1EmojiId { get; set; } = 1431419053158957077;
+        public ulong TeamRole2EmojiId { get; set; } = 1431419084381098136;
     }
 
     public class ActivityOptions
@@ -473,6 +482,17 @@ namespace WabbitBot.Common.Configuration
             }
             return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, path));
         }
+    }
+
+    public class ThreadsOptions
+    {
+        public const string SectionName = "Bot:Threads";
+
+        /// <summary>
+        /// How long a container thread can be inactive before being automatically deleted (in minutes).
+        /// Default is 5 minutes.
+        /// </summary>
+        public int InactivityThresholdMinutes { get; set; } = 5;
     }
 
     public class MapConfiguration

@@ -3,8 +3,10 @@ using System.Threading.Tasks;
 using DSharpPlus.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.VisualBasic;
+using WabbitBot.Common.Configuration;
 using WabbitBot.Core.Common.Models.Common;
 using WabbitBot.Core.Common.Services;
+using WabbitBot.DiscBot.App.Services.DiscBot;
 
 namespace WabbitBot.DiscBot.App.Renderers
 {
@@ -17,9 +19,14 @@ namespace WabbitBot.DiscBot.App.Renderers
             TeamSizeRosterGroup rosterGroup
         )
         {
+            var config = ConfigurationProvider.GetConfigurationService();
+            var emojiOptions = config.GetSection<EmojisOptions>("Bot:Emojis");
+
             var team = await CoreService.WithDbContext(async db =>
                 await db
-                    .Teams.Include(t => t.Rosters)
+                    .Teams.Include(t => t.TeamMajor)
+                    .ThenInclude(p => p.MashinaUser)
+                    .Include(t => t.Rosters)
                     .ThenInclude(r => r.RosterMembers)
                     .ThenInclude(rm => rm.MashinaUser)
                     .ThenInclude(mu => mu.Player)
@@ -40,18 +47,16 @@ namespace WabbitBot.DiscBot.App.Renderers
                     new List<DiscordComponent> { new DiscordTextDisplayComponent(content: "Roster not found") }
                 );
             }
-
-            var captains = roster.RosterMembers.Where(m => m.Role == RosterRole.Captain).ToList();
-            var cores = roster.RosterMembers.Where(m => m.Role == RosterRole.Core).ToList();
-            var otherMembers = roster
-                .RosterMembers.Where(m => m.Role != RosterRole.Captain && m.Role != RosterRole.Core)
-                .ToList();
-
+            var teamMajor = team.TeamMajor;
+            var allMembers = roster.RosterMembers.ToList();
+            var teamRole1Emoji = DiscordEmoji.FromGuildEmote(DiscBotService.Client, emojiOptions.TeamRole1EmojiId);
             string RosterLabel(TeamSizeRosterGroup g) =>
                 g switch
                 {
-                    TeamSizeRosterGroup.Duo => "Duo - 2v2",
-                    TeamSizeRosterGroup.Squad => "Squad - 3v3/4v4",
+                    TeamSizeRosterGroup.Duo =>
+                        $"[{teamRole1Emoji}{teamMajor.MashinaUser?.DiscordMention ?? "??"}] Duo - 2v2",
+                    TeamSizeRosterGroup.Squad =>
+                        $"[{teamRole1Emoji}{teamMajor.MashinaUser?.DiscordMention ?? "??"}] Squad - 3v3/4v4",
                     TeamSizeRosterGroup.Solo => "Solo",
                     _ => g.ToString(),
                 };
@@ -59,51 +64,62 @@ namespace WabbitBot.DiscBot.App.Renderers
             long unixTimestamp = ((DateTimeOffset)team.LastActive).ToUnixTimeSeconds();
 
             // Display format helper is inlined in LINQ selects below
-
+            var teamRole2Emoji = DiscordEmoji.FromGuildEmote(DiscBotService.Client, emojiOptions.TeamRole2EmojiId);
             var components = new List<DiscordComponent>
             {
-                new DiscordTextDisplayComponent(content: $"# {team.Name} - {RosterLabel(rosterGroup)}"),
+                new DiscordTextDisplayComponent(content: $"# {team.Name} {RosterLabel(rosterGroup)}"),
                 new DiscordSeparatorComponent(true),
                 new DiscordTextDisplayComponent(content: $"Last Active: <t:{unixTimestamp}:R>"),
                 new DiscordSeparatorComponent(true),
                 new DiscordTextDisplayComponent(
-                    content: string.Concat(
-                        captains.Any()
-                            ? string.Join(
-                                ", ",
-                                captains.Select(m =>
-                                {
-                                    var steam = m.MashinaUser?.Player?.CurrentSteamUsername;
-                                    var steamDisplay = string.IsNullOrWhiteSpace(steam) ? "N/A" : steam;
-                                    var mentionDisplay = m.MashinaUser?.DiscordMention ?? "N/A";
-                                    return $"✪ **{steamDisplay}** {mentionDisplay}";
-                                })
+                    content: string.Join(
+                        "\n",
+                        allMembers
+                            .OrderBy(m =>
+                            {
+                                // Priority ordering: Major (1), Captain (2), Core (3), Manager (4), Standard (5)
+                                if (
+                                    m.TeamRoster.Team.TeamMajor.MashinaUser.DiscordUserId
+                                    == m.MashinaUser?.DiscordUserId
+                                )
+                                    return 1; // Team Major
+                                if (m.Role == RosterRole.Captain)
+                                    return 2; // Captain
+                                if (m.Role == RosterRole.Core)
+                                    return 3; // Core Player
+                                if (m.IsRosterManager)
+                                    return 4; // Manager
+                                return 5; // Standard member
+                            })
+                            .ThenBy(m =>
+                                m.MashinaUser?.DiscordGlobalname
+                                ?? m.MashinaUser?.DiscordUsername
+                                ?? m.DiscordUserId.ToString()
                             )
-                            : string.Empty,
-                        cores.Any()
-                            ? string.Join(
-                                ", ",
-                                cores.Select(m =>
+                            .Select(m =>
+                            {
+                                string IconFor(TeamMember member)
                                 {
-                                    var steam = m.MashinaUser?.Player?.CurrentSteamUsername;
-                                    var steamDisplay = string.IsNullOrWhiteSpace(steam) ? "N/A" : steam;
-                                    var mentionDisplay = m.MashinaUser?.DiscordMention ?? "N/A";
-                                    return $"\n     **{steamDisplay}** {mentionDisplay}";
-                                })
-                            )
-                            : string.Empty,
-                        otherMembers.Any()
-                            ? string.Join(
-                                ", ",
-                                otherMembers.Select(m =>
-                                {
-                                    var steam = m.MashinaUser?.Player?.CurrentSteamUsername;
-                                    var steamDisplay = string.IsNullOrWhiteSpace(steam) ? "N/A" : steam;
-                                    var mentionDisplay = m.MashinaUser?.DiscordMention ?? "N/A";
-                                    return $"\n     **{steamDisplay}** {mentionDisplay}";
-                                })
-                            )
-                            : string.Empty
+                                    if (
+                                        member.TeamRoster.Team.TeamMajor.MashinaUser.DiscordUserId
+                                        == member.MashinaUser?.DiscordUserId
+                                    )
+                                        return $"{teamRole1Emoji} ";
+                                    if (member.Role == RosterRole.Captain)
+                                        return $"{teamRole2Emoji} ";
+                                    if (member.Role == RosterRole.Core)
+                                        return "︽   ";
+                                    if (member.IsRosterManager)
+                                        return "︿   ";
+                                    return "     ";
+                                }
+
+                                var steam = m.MashinaUser?.Player?.CurrentSteamUsername;
+                                var steamDisplay = string.IsNullOrWhiteSpace(steam) ? "N/A" : steam;
+                                var mentionDisplay = m.MashinaUser?.DiscordMention ?? "N/A";
+                                var icon = IconFor(m);
+                                return $"{icon}{mentionDisplay} **{steamDisplay}**";
+                            })
                     )
                 ),
             };
@@ -111,19 +127,28 @@ namespace WabbitBot.DiscBot.App.Renderers
             return new DiscordContainerComponent(components);
         }
 
-        public static async Task<DiscordContainerComponent> RenderTeamRoleEditorAsync(
+        public static async Task<DiscordContainerComponent> RenderTeamEditorAsync(
             ulong discordUserId,
             Guid? selectedTeamId = null,
             TeamSizeRosterGroup? selectedRosterGroup = null,
-            Guid? selectedMemberPlayerId = null
+            Guid? selectedMemberPlayerId = null,
+            bool adminMode = false,
+            bool awaitingAddInput = false
         )
         {
+            var config = ConfigurationProvider.GetConfigurationService();
+            var emojiOptions = config.GetSection<EmojisOptions>("Bot:Emojis");
+
             var components = new List<DiscordComponent>();
 
-            // Load teams where user is a roster captain or manager
+            // Load teams where user is a roster captain, manager, or team major
             var teams = await CoreService.WithDbContext(async db =>
-                await db
-                    .Teams.Where(t =>
+            {
+                var query = db.Teams.AsQueryable();
+
+                if (!adminMode)
+                {
+                    query = query.Where(t =>
                         t.Rosters.Any(r =>
                             r.RosterMembers.Any(m =>
                                 m.MashinaUser != null
@@ -131,33 +156,59 @@ namespace WabbitBot.DiscBot.App.Renderers
                                 && (m.Role == RosterRole.Captain || m.IsRosterManager)
                             )
                         )
-                    )
-                    .OrderBy(t => t.Name)
-                    .Select(t => new { t.Id, t.Name })
-                    .Take(25)
-                    .ToListAsync()
-            );
+                        || t.TeamMajor.MashinaUser.DiscordUserId == discordUserId
+                    );
+                }
 
-            var teamOptions = teams
-                .Select(t => new DiscordSelectComponentOption(
-                    t.Name,
-                    t.Id.ToString(),
-                    isDefault: selectedTeamId.HasValue && selectedTeamId.Value == t.Id
-                ))
-                .ToList();
+                return await query.OrderBy(t => t.Name).Select(t => new { t.Id, t.Name }).Take(25).ToListAsync();
+            });
 
-            if (teamOptions.Count == 0)
+            if (!adminMode)
             {
-                teamOptions.Add(new DiscordSelectComponentOption("No teams available", "none"));
+                var teamOptions = teams
+                    .Select(t => new DiscordSelectComponentOption(
+                        t.Name,
+                        t.Id.ToString(),
+                        isDefault: selectedTeamId.HasValue && selectedTeamId.Value == t.Id
+                    ))
+                    .ToList();
+
+                if (teamOptions.Count == 0)
+                {
+                    teamOptions.Add(new DiscordSelectComponentOption("No teams available", "none"));
+                }
+                var teamSelect = new DiscordSelectComponent(
+                    $"team_roles_team_{discordUserId}",
+                    "Select Team",
+                    teamOptions,
+                    minOptions: 0,
+                    maxOptions: 1
+                );
+                components.Add(new DiscordActionRowComponent([teamSelect]));
             }
-            var teamSelect = new DiscordSelectComponent(
-                $"team_roles_team_{discordUserId}",
-                "Select Team",
-                teamOptions,
-                minOptions: 0,
-                maxOptions: 1
-            );
-            components.Add(new DiscordActionRowComponent([teamSelect]));
+
+            var teamRole1Emoji = DiscordEmoji.FromGuildEmote(DiscBotService.Client, emojiOptions.TeamRole1EmojiId);
+
+            // Admin header: show which team is being edited
+            if (adminMode && selectedTeamId.HasValue)
+            {
+                var teamInfo = await CoreService.WithDbContext(async db =>
+                {
+                    return await db
+                        .Teams.Where(t => t.Id == selectedTeamId.Value)
+                        .Select(t => new { t.Name, MajorDiscordGlobalName = t.TeamMajor.MashinaUser.DiscordMention })
+                        .FirstOrDefaultAsync();
+                });
+                if (!string.IsNullOrWhiteSpace(teamInfo?.Name))
+                {
+                    var headerText = $"Editing team: **{teamInfo.Name}**";
+                    if (!string.IsNullOrWhiteSpace(teamInfo.MajorDiscordGlobalName))
+                    {
+                        headerText += $" ({teamRole1Emoji} {teamInfo.MajorDiscordGlobalName})";
+                    }
+                    components.Add(new DiscordTextDisplayComponent(content: headerText));
+                }
+            }
 
             // Roster select (for selected team)
             List<DiscordSelectComponentOption> rosterOptions = new();
@@ -257,18 +308,33 @@ namespace WabbitBot.DiscBot.App.Renderers
             components.Add(new DiscordActionRowComponent([memberSelect]));
 
             components.Add(new DiscordSeparatorComponent(true));
+            var teamRole1ComponentEmoji = new DiscordComponentEmoji(
+                DiscordEmoji.FromGuildEmote(DiscBotService.Client, emojiOptions.TeamRole1EmojiId)
+            );
+            var teamRole2ComponentEmoji = new DiscordComponentEmoji(
+                DiscordEmoji.FromGuildEmote(DiscBotService.Client, emojiOptions.TeamRole2EmojiId)
+            );
 
             // Role buttons
             components.Add(
                 new DiscordActionRowComponent(
                     [
                         new DiscordButtonComponent(
-                            DiscordButtonStyle.Primary,
-                            "team_roles_set_captain",
-                            "✪ Roster Captain"
+                            DiscordButtonStyle.Secondary,
+                            "team_roles_set_major",
+                            string.Empty,
+                            disabled: false,
+                            emoji: teamRole1ComponentEmoji
                         ),
                         new DiscordButtonComponent(
-                            DiscordButtonStyle.Success,
+                            DiscordButtonStyle.Secondary,
+                            "team_roles_set_captain",
+                            "Roster Captain",
+                            disabled: false,
+                            emoji: teamRole2ComponentEmoji
+                        ),
+                        new DiscordButtonComponent(
+                            DiscordButtonStyle.Secondary,
                             "team_roles_set_core",
                             "︽ Roster Core Player"
                         ),
@@ -282,6 +348,46 @@ namespace WabbitBot.DiscBot.App.Renderers
                 )
             );
 
+            // Admin add/remove controls
+            if (adminMode && selectedTeamId.HasValue)
+            {
+                components.Add(
+                    new DiscordActionRowComponent(
+                        [
+                            new DiscordButtonComponent(
+                                DiscordButtonStyle.Success,
+                                "team_roles_admin_add_player",
+                                "+ Add Player"
+                            ),
+                            new DiscordButtonComponent(
+                                DiscordButtonStyle.Danger,
+                                "team_roles_admin_remove_player",
+                                "− Remove Player"
+                            ),
+                            new DiscordButtonComponent(
+                                DiscordButtonStyle.Danger,
+                                "team_roles_admin_delete_roster",
+                                "Delete Roster"
+                            ),
+                            new DiscordButtonComponent(
+                                DiscordButtonStyle.Danger,
+                                "team_roles_admin_delete_team",
+                                "Delete Team"
+                            ),
+                        ]
+                    )
+                );
+                if (awaitingAddInput)
+                {
+                    components.Add(
+                        new DiscordTextDisplayComponent(
+                            content: "Reply to this message with a Discord mention or numeric ID of"
+                                + "the user you want to add."
+                        )
+                    );
+                }
+            }
+
             components.Add(new DiscordSeparatorComponent(true));
 
             // Roster display with emojis
@@ -289,21 +395,54 @@ namespace WabbitBot.DiscBot.App.Renderers
             {
                 var team = await CoreService.WithDbContext(async db =>
                     await db
-                        .Teams.Include(t => t.Rosters)
+                        .Teams.Include(t => t.TeamMajor.MashinaUser)
+                        .Include(t => t.Rosters)
                         .ThenInclude(r => r.RosterMembers)
                         .ThenInclude(m => m.MashinaUser)
                         .FirstOrDefaultAsync(t => t.Id == selectedTeamId.Value)
                 );
+                var scrimmageConfig = ConfigurationProvider.GetSection<ScrimmageOptions>(ScrimmageOptions.SectionName);
+                var teamRules = scrimmageConfig.TeamRules;
+                var maxRosterSlots = TeamCore.TeamSizeRosterGrouping.GetMaxRosterSlots(selectedRosterGroup.Value);
+                var (maxCaptainSlots, maxCoreSlots) = TeamCore.TeamSizeRosterGrouping.GetRosterRoleCaps(
+                    selectedRosterGroup.Value
+                );
+                if (team is null)
+                {
+                    components.Add(new DiscordTextDisplayComponent(content: "Team not found"));
+                    return new DiscordContainerComponent(components);
+                }
+                var rosterSlotsUsed = team.Rosters.Sum(r => r.RosterMembers.Count(m => m.ValidTo == null));
+                var captainSlotsUsed = team.Rosters.Sum(r =>
+                    r.RosterMembers.Count(m =>
+                        m.ValidTo == null && (m.Role == RosterRole.Captain || m.PlayerId == team.TeamMajorId)
+                    )
+                );
+                var coreSlotsUsed = team.Rosters.Sum(r =>
+                    r.RosterMembers.Count(m => m.ValidTo == null && m.Role == RosterRole.Core)
+                );
+                var majorEmoji = DiscordEmoji.FromGuildEmote(DiscBotService.Client, emojiOptions.TeamRole1EmojiId);
+                var captainEmoji = DiscordEmoji.FromGuildEmote(DiscBotService.Client, emojiOptions.TeamRole2EmojiId);
+                components.Add(
+                    new DiscordTextDisplayComponent(
+                        content: $"**Roster:**        👥 {rosterSlotsUsed}/{maxRosterSlots}        "
+                            + $"{captainEmoji} : {captainSlotsUsed}/{maxCaptainSlots}        "
+                            + $"︽ : {coreSlotsUsed}/{maxCoreSlots}"
+                    )
+                );
+                components.Add(new DiscordSeparatorComponent(true));
 
                 if (team is not null)
                 {
                     var roster = team.Rosters.FirstOrDefault(r => r.RosterGroup == selectedRosterGroup.Value);
                     if (roster is not null)
                     {
-                        static string? IconFor(TeamMember m)
+                        string? IconFor(TeamMember m)
                         {
+                            if (m.TeamRoster.Team.TeamMajor.MashinaUser.DiscordUserId == m.MashinaUser?.DiscordUserId)
+                                return $"{majorEmoji} ";
                             if (m.Role == RosterRole.Captain)
-                                return "✪ ";
+                                return $"{captainEmoji} ";
                             if (m.Role == RosterRole.Core)
                                 return "︽ ";
                             if (m.IsRosterManager)
@@ -313,6 +452,25 @@ namespace WabbitBot.DiscBot.App.Renderers
 
                         var lines = roster
                             .RosterMembers.Where(m => m.ValidTo == null)
+                            .OrderBy(m =>
+                            {
+                                // Priority ordering: Major (1), Captain (2), Core (3), Manager (4), Standard (5)
+                                if (
+                                    m.TeamRoster.Team.TeamMajor.MashinaUser.DiscordUserId
+                                    == m.MashinaUser?.DiscordUserId
+                                )
+                                    return 1; // Team Major
+                                if (m.Role == RosterRole.Captain)
+                                    return 2; // Captain
+                                if (m.Role == RosterRole.Core)
+                                    return 3; // Core Player
+                                if (m.IsRosterManager)
+                                    return 4; // Manager
+                                return 5; // Standard member
+                            })
+                            .ThenBy(m =>
+                                m.MashinaUser?.DiscordGlobalname ?? m.MashinaUser?.DiscordUsername ?? m.DiscordUserId
+                            )
                             .Select(m =>
                             {
                                 var icon = IconFor(m);

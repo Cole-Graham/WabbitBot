@@ -24,12 +24,12 @@ namespace WabbitBot.Core.Common.Interfaces
         /// <summary>
         /// Updates the role of a player in a team
         /// </summary>
-        Task UpdatePlayerRole(Guid teamId, Guid playerId, RosterRole newRole);
+        Task UpdatePlayerRole(Guid teamId, Guid playerId, RosterRole newRole, bool isMod = false);
 
         /// <summary>
         /// Changes the captain for a specific roster group in a team
         /// </summary>
-        Task ChangeCaptain(Guid teamId, TeamSizeRosterGroup rosterGroup, Guid newCaptainId);
+        Task ChangeCaptain(Guid teamId, TeamSizeRosterGroup rosterGroup, Guid newCaptainId, bool isMod = false);
 
         /// <summary>
         /// Sets the team manager status of a player

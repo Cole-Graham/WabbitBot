@@ -147,7 +147,7 @@ EXCLUDE USING gist (
 ### Migration runbook (quick reference)
 #### Development
 1. Update entity, build to generate code.
-2. `dotnet ef migrations add MeaningfulName -p src/WabbitBot.Core -s src/WabbitBot.Host`
+2. `dotnet ef migrations add MeaningfulName -p src/WabbitBot.Core -s src/WabbitBot.Host -o Migrations`
 3. `dotnet ef database update -p src/WabbitBot.Core -s src/WabbitBot.Host`
 4. Verify constraints and indexes; tests pass.
 

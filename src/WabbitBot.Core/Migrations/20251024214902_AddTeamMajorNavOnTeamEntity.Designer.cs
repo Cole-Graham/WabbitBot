@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using WabbitBot.Core.Common.Database;
@@ -13,9 +14,11 @@ using WabbitBot.Core.Common.Models.Common;
 namespace WabbitBot.Core.Migrations
 {
     [DbContext(typeof(WabbitBotDbContext))]
-    partial class WabbitBotDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251024214902_AddTeamMajorNavOnTeamEntity")]
+    partial class AddTeamMajorNavOnTeamEntity
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

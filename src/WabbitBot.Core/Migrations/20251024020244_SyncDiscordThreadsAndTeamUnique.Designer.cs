@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using WabbitBot.Core.Common.Database;
@@ -13,9 +14,11 @@ using WabbitBot.Core.Common.Models.Common;
 namespace WabbitBot.Core.Migrations
 {
     [DbContext(typeof(WabbitBotDbContext))]
-    partial class WabbitBotDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251024020244_SyncDiscordThreadsAndTeamUnique")]
+    partial class SyncDiscordThreadsAndTeamUnique
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -4399,9 +4402,6 @@ namespace WabbitBot.Core.Migrations
 
                     NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("ScrimmageTeamStats"), "gin");
 
-                    b.HasIndex("TeamMajorId")
-                        .HasDatabaseName("idx_teams_team_major_id");
-
                     b.HasIndex("TournamentTeamStats")
                         .HasDatabaseName("gin_idx_teams_tournament_team_stats");
 
@@ -7014,17 +7014,6 @@ namespace WabbitBot.Core.Migrations
                         .IsRequired();
 
                     b.Navigation("Replay");
-                });
-
-            modelBuilder.Entity("WabbitBot.Core.Common.Models.Common.Team", b =>
-                {
-                    b.HasOne("WabbitBot.Core.Common.Models.Common.Player", "TeamMajor")
-                        .WithMany()
-                        .HasForeignKey("TeamMajorId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("TeamMajor");
                 });
 
             modelBuilder.Entity("WabbitBot.Core.Common.Models.Common.TeamMember", b =>
